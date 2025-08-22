@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Sidebar styles */
+.sidebar {
+  width: 260px;
+  transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 64px;
+}
+
+/* Menu item styles */
+.menu-item {
+  @apply flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-600 rounded-lg transition-colors hover:bg-slate-100 hover:text-slate-900;
+}
+
+.menu-item.active {
+  @apply bg-blue-600 text-white;
+}
+
+.menu-item.disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* Drawer styles */
+.drawer {
+  @apply fixed right-0 top-0 h-full w-80 bg-white border-l border-slate-200 shadow-lg transform transition-transform duration-300 ease-in-out z-50;
+}
+
+.drawer.closed {
+  @apply translate-x-full;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white text-slate-900 rounded-lg border border-slate-200 shadow-sm;
+}
+
+.card-header {
+  @apply flex flex-col space-y-1.5 p-6;
+}
+
+.card-title {
+  @apply text-2xl font-semibold leading-none tracking-tight;
+}
+
+.card-description {
+  @apply text-sm text-slate-600;
+}
+
+.card-content {
+  @apply p-6 pt-0;
+}
+
+.card-footer {
+  @apply flex items-center p-6 pt-0;
+}
+
+/* Button styles */
+.btn {
+  @apply inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.btn-secondary {
+  @apply bg-slate-100 text-slate-900 hover:bg-slate-200;
+}
+
+.btn-outline {
+  @apply border border-slate-300 bg-white hover:bg-slate-50 hover:text-slate-900;
+}
+
+.btn-ghost {
+  @apply hover:bg-slate-100 hover:text-slate-900;
+}
+
+.btn-sm {
+  @apply h-9 rounded-md px-3;
+}
+
+.btn-md {
+  @apply h-10 px-4 py-2;
+}
+
+.btn-lg {
+  @apply h-11 rounded-md px-8;
+}
+
+/* Badge styles */
+.badge {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+.badge-default {
+  @apply border-transparent bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.badge-secondary {
+  @apply border-transparent bg-slate-100 text-slate-900 hover:bg-slate-200;
+}
+
+.badge-destructive {
+  @apply border-transparent bg-red-600 text-white hover:bg-red-700;
+}
+
+.badge-outline {
+  @apply text-slate-900 border-slate-300;
+}
