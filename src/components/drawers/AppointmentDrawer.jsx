@@ -1,24 +1,31 @@
 import { 
   X, 
   Plus, 
-
-
-
   CheckCircle, 
-  Upload
+  Upload,
+  Loader2,
+  Trash2
 } from 'lucide-react'
 import { useState } from 'react'
+import { useAppointments } from '../../hooks/useAppointments.js'
 
 const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  
+  // Hook pentru gestionarea programărilor
+  const { addAppointment, updateAppointment, deleteAppointment } = useAppointments()
+  
   const [formData, setFormData] = useState(() => {
     if (appointmentData) {
       return {
         patient: appointmentData.patient || '',
         doctor: appointmentData.doctor || '',
-        date: appointmentData.date || '',
+        date: appointmentData.date ? new Date(appointmentData.date).toISOString().split('T')[0] : '',
         time: appointmentData.time || '',
-        treatment: appointmentData.service || '',
+        service: appointmentData.service || '',
+        status: appointmentData.status || 'scheduled',
         postOperativeNotes: appointmentData.postOperativeNotes || '',
         prescription: appointmentData.prescription || '',
         price: appointmentData.price || '',
@@ -28,9 +35,10 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     return {
       patient: '',
       doctor: '',
-      date: '',
+      date: new Date().toISOString().split('T')[0],
       time: '',
-      treatment: '',
+      service: '',
+      status: 'scheduled',
       postOperativeNotes: '',
       prescription: '',
       price: '',
@@ -87,10 +95,71 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     }))
   }
 
-  const handleAppointmentDone = () => {
-    // TODO: Implement appointment completion logic
-    console.log('Appointment completed:', formData)
-    onClose()
+  const handleSave = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const appointmentData = {
+        ...formData,
+        date: new Date(formData.date).toISOString(),
+        price: parseFloat(formData.price) || 0
+      }
+      
+      if (isNewAppointment) {
+        await addAppointment(appointmentData)
+      } else {
+        await updateAppointment(appointmentData.id, appointmentData)
+      }
+      
+      onClose()
+    } catch (err) {
+      setError(err.message)
+      console.error('Error saving appointment:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!appointmentData?.id) return
+    
+    if (!confirm('Sigur doriți să ștergeți această programare?')) return
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      await deleteAppointment(appointmentData.id)
+      onClose()
+    } catch (err) {
+      setError(err.message)
+      console.error('Error deleting appointment:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAppointmentDone = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const updatedData = {
+        ...formData,
+        status: 'completed',
+        date: new Date(formData.date).toISOString(),
+        price: parseFloat(formData.price) || 0
+      }
+      
+      await updateAppointment(appointmentData.id, updatedData)
+      onClose()
+    } catch (err) {
+      setError(err.message)
+      console.error('Error completing appointment:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const renderMenu1 = () => (
@@ -106,7 +175,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
           <select
             value={formData.patient}
             onChange={(e) => handleInputChange('patient', e.target.value)}
-            className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <option value="">Selectează pacient</option>
             {patients.map(patient => (
@@ -127,7 +196,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         <select
           value={formData.doctor}
           onChange={(e) => handleInputChange('doctor', e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <option value="">Selectează doctor</option>
           {doctors.map(doctor => (
@@ -145,7 +214,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
           type="date"
           value={formData.date}
           onChange={(e) => handleInputChange('date', e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
       </div>
 
@@ -156,24 +225,40 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
           type="time"
           value={formData.time}
           onChange={(e) => handleInputChange('time', e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
       </div>
 
-      {/* Treatment */}
+      {/* Service */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Tratament</label>
+        <label className="text-sm font-medium">Serviciu</label>
         <select
-          value={formData.treatment}
-          onChange={(e) => handleInputChange('treatment', e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          value={formData.service}
+          onChange={(e) => handleInputChange('service', e.target.value)}
+          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <option value="">Selectează tratament</option>
+          <option value="">Selectează serviciu</option>
           {treatments.map(treatment => (
             <option key={treatment} value={treatment}>
               {treatment}
             </option>
           ))}
+        </select>
+      </div>
+
+      {/* Status */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Status</label>
+        <select
+          value={formData.status}
+          onChange={(e) => handleInputChange('status', e.target.value)}
+          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <option value="scheduled">Programat</option>
+          <option value="in-progress">În curs</option>
+          <option value="completed">Completat</option>
+          <option value="cancelled">Anulat</option>
+          <option value="urgent">Urgent</option>
         </select>
       </div>
     </div>
@@ -193,7 +278,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
           onChange={(e) => handleInputChange('postOperativeNotes', e.target.value)}
           placeholder="Introduceți notele post-operatorii..."
           rows={4}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
       </div>
 
@@ -205,7 +290,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
           onChange={(e) => handleInputChange('prescription', e.target.value)}
           placeholder="Introduceți prescripția..."
           rows={3}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
       </div>
 
@@ -226,14 +311,56 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         </div>
       </div>
 
-      {/* Appointment Done Button */}
-      <button
-        onClick={handleAppointmentDone}
-        className="w-full btn btn-primary"
-      >
-        <CheckCircle className="h-4 w-4 mr-2" />
-        Programarea este gata
-      </button>
+      {/* Action Buttons */}
+      <div className="space-y-2">
+        {!isNewAppointment && (
+          <button
+            onClick={handleAppointmentDone}
+            disabled={loading}
+            className="w-full btn btn-primary"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle className="h-4 w-4 mr-2" />
+            )}
+            Programarea este gata
+          </button>
+        )}
+        
+        <button
+          onClick={handleSave}
+          disabled={loading}
+          className="w-full btn btn-outline"
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : null}
+          {isNewAppointment ? 'Creează programarea' : 'Salvează modificările'}
+        </button>
+        
+        {!isNewAppointment && (
+          <button
+            onClick={handleDelete}
+            disabled={loading}
+            className="w-full btn btn-destructive"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
+            Șterge programarea
+          </button>
+        )}
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
     </div>
   )
 

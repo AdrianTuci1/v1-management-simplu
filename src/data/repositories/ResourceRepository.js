@@ -1,4 +1,4 @@
-import { db } from "../db/indexedDb";
+import { db } from "../infrastructure/db";
 
 export class ResourceRepository {
   constructor(resourceType, store = "resources") {
