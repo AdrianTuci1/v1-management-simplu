@@ -9,11 +9,12 @@ import {
   BarChart3,
   Plus
 } from 'lucide-react'
-
 import { useDrawer } from '../../contexts/DrawerContext'
 
+
+
 const DashboardHome = () => {
-  const { openQuickActionsDrawer } = useDrawer()
+  const openDrawer = useDrawer()
   const kpiData = [
     {
       title: 'Programări Astăzi',
@@ -105,7 +106,7 @@ const DashboardHome = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <button
-                      onClick={openQuickActionsDrawer}
+                      onClick={() => openDrawer('quick-actions')}
           className="btn btn-primary"
         >
           <Plus className="h-4 w-4 mr-2" />

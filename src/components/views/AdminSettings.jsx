@@ -1,5 +1,4 @@
 import { Settings, Plus } from 'lucide-react'
-
 import { useDrawer } from '../../contexts/DrawerContext'
 
 const AdminSettings = () => {

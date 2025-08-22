@@ -1,4 +1,5 @@
 import { db } from "../infrastructure/db";
+import { apiRequest, buildResourcesEndpoint } from "../infrastructure/apiClient.js";
 
 export class ResourceRepository {
   constructor(resourceType, store = "resources") {
@@ -7,20 +8,27 @@ export class ResourceRepository {
   }
 
   async request(path = "", options = {}) {
-    const res = await fetch(`/api/resources${path}`, {
-      ...options,
-      headers: {
-        "X-Resource-Type": this.resourceType,
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
-    });
+    try {
+      const endpoint = buildResourcesEndpoint(path);
+      return await apiRequest(this.resourceType, endpoint, options);
+    } catch (error) {
+      // Dacă buildResourcesEndpoint eșuează, încercă cu endpoint-ul simplu
+      console.warn('Failed to build resources endpoint, trying simple endpoint:', error.message);
+      const res = await fetch(`/api/resources${path}`, {
+        ...options,
+        headers: {
+          "X-Resource-Type": this.resourceType,
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        },
+      });
 
-    if (!res.ok) {
-      throw new Error(`API error: ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+
+      return res.json();
     }
-
-    return res.json();
   }
 
   async query(params) {

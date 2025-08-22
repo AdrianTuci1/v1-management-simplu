@@ -1,5 +1,5 @@
 import { X, Bell, User, Settings, Search, Calendar } from 'lucide-react'
-import { QuickActionsDrawer, AppointmentDrawer } from './index.js'
+import { QuickActionsDrawer, AppointmentDrawer, PatientDrawer, ProductDrawer, UserDrawer } from './index.js'
 
 const Drawer = ({ open, content, onClose }) => {
   if (!open) return null
@@ -18,6 +18,14 @@ const Drawer = ({ open, content, onClose }) => {
         return <QuickActionsDrawer onClose={onClose} />
       case 'appointment':
         return <AppointmentDrawer onClose={onClose} isNewAppointment={content?.isNew} appointmentData={content?.data} />
+      case 'new-person':
+        return <PatientDrawer onClose={onClose} isNewPatient={true} />
+      case 'edit-person':
+        return <PatientDrawer onClose={onClose} isNewPatient={false} patientData={content?.data} />
+      case 'product':
+        return <ProductDrawer onClose={onClose} product={content?.data} />
+      case 'medic':
+        return <UserDrawer onClose={onClose} user={content?.data} />
       default:
         return <DefaultContent />
     }
@@ -32,7 +40,7 @@ const Drawer = ({ open, content, onClose }) => {
       />
       
       {/* Drawer */}
-      <div className={`drawer z-50 ${open ? '' : 'closed'}`}>
+      <div className={`drawer ${open ? '' : 'closed'}`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold">
@@ -41,6 +49,10 @@ const Drawer = ({ open, content, onClose }) => {
             {content?.type === 'user' && 'Profil Utilizator'}
             {content?.type === 'search' && 'Căutare'}
             {content?.type === 'appointment' && 'Programare'}
+            {content?.type === 'new-person' && 'Pacient nou'}
+            {content?.type === 'edit-person' && 'Editare pacient'}
+            {content?.type === 'product' && 'Produs'}
+            {content?.type === 'medic' && 'Medic'}
             {!content?.type && 'Drawer'}
           </h2>
           <button

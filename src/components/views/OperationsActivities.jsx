@@ -1,5 +1,4 @@
 import { Activity, Plus, Search, Filter } from 'lucide-react'
-
 import { useDrawer } from '../../contexts/DrawerContext'
 
 const OperationsActivities = () => {

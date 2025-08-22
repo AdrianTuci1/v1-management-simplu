@@ -1,8 +1,9 @@
 import { Bell, User, Search, Menu, MapPin, Bot } from 'lucide-react'
 import { useDrawer } from '../contexts/DrawerContext'
 
+
 const Navbar = ({ currentView, currentLocation }) => {
-  const { openMenuDrawer, openNotificationsDrawer, openUserDrawer } = useDrawer()
+  const openDrawer = useDrawer()
   const getViewTitle = (view) => {
     const titles = {
       dashboard: 'Dashboard',
@@ -29,7 +30,7 @@ const Navbar = ({ currentView, currentLocation }) => {
         {/* Left side - Menu toggle and title */}
         <div className="flex items-center gap-4">
           <button
-            onClick={openMenuDrawer}
+            onClick={() => openDrawer('menu')}
             className="btn btn-ghost btn-sm lg:hidden"
           >
             <Menu className="h-5 w-5" />
@@ -68,7 +69,7 @@ const Navbar = ({ currentView, currentLocation }) => {
 
           {/* Notifications */}
           <button
-            onClick={openNotificationsDrawer}
+            onClick={() => openDrawer('notifications')}
             className="btn btn-ghost btn-sm relative"
           >
             <Bell className="h-5 w-5" />
@@ -77,7 +78,7 @@ const Navbar = ({ currentView, currentLocation }) => {
 
           {/* User menu */}
           <button
-            onClick={openUserDrawer}
+            onClick={() => openDrawer('user')}
             className="btn btn-ghost btn-sm flex items-center gap-2"
           >
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">

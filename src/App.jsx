@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
-import { MainDrawer as Drawer } from './components/drawers'
 import Dashboard from './components/Dashboard'
 import AuthScreen from './components/AuthScreen'
 import LoadingScreen from './components/LoadingScreen'
 import AccessDenied from './components/AccessDenied'
 import authService from './services/authService'
-import { DrawerProvider, useDrawer } from './contexts/DrawerContext'
+import { DrawerProvider } from './contexts/DrawerContext'
 
 function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -18,7 +17,6 @@ function AppContent() {
   const [cognitoData, setCognitoData] = useState(null)
   const [accessibleLocations, setAccessibleLocations] = useState([])
   const [accessDenied, setAccessDenied] = useState(false)
-  const { drawerOpen, drawerContent, closeDrawer } = useDrawer()
 
   // Check if demo mode is enabled
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
@@ -199,15 +197,7 @@ function AppContent() {
             currentLocation={selectedLocation}
           />
         </main>
-
-        {/* Drawer */}
-        <Drawer 
-          open={drawerOpen}
-          content={drawerContent}
-          onClose={closeDrawer}
-        />
       </div>
-      
     </div>
   )
 }

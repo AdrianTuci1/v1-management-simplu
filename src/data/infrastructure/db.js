@@ -16,18 +16,16 @@ class AppDatabase extends Dexie {
       patients: 'id, name, email, phone, status, city, county', // Store pentru pacienți
       products: 'id, name, category, price, stock, reorderLevel', // Store pentru produse
       productCounts: 'category, count', // Cache pentru numărul de produse per categorie
-      users: 'id, email, licenseNumber, specialization, status, role', // Store pentru utilizatori (medici)
-      roles: 'id, name, description, status', // Store pentru roluri
-      permissions: 'id, resource, action, description' // Store pentru permisiuni
+      users: 'id, email, licenseNumber, specialization, status, role' // Store pentru utilizatori (medici)
     });
   }
 }
 
 // Instanță globală a bazei de date
-export const indexedDb = new AppDatabase();
+export const db = new AppDatabase();
 
 // Wrapper pentru compatibilitate cu codul existent
-export const db = {
+export const indexedDb = {
   async put(storeName, value) {
     try {
       // Verifică dacă store-ul există
@@ -221,65 +219,6 @@ export const db = {
       .where('role')
       .equals(role)
       .toArray();
-  },
-  
-  // Metode specifice pentru roluri
-  async getRolesByStatus(status) {
-    return db.roles
-      .where('status')
-      .equals(status)
-      .toArray();
-  },
-  
-  async searchRoles(searchTerm) {
-    const term = searchTerm.toLowerCase();
-    return db.roles
-      .filter(role => 
-        role.name.toLowerCase().includes(term) ||
-        role.description.toLowerCase().includes(term)
-      )
-      .toArray();
-  },
-  
-  async getRoleByName(name) {
-    return db.roles
-      .where('name')
-      .equals(name)
-      .first();
-  },
-  
-  // Metode specifice pentru permisiuni
-  async getPermissionsByResource(resource) {
-    return db.permissions
-      .where('resource')
-      .equals(resource)
-      .toArray();
-  },
-  
-  async getPermissionsByAction(action) {
-    return db.permissions
-      .where('action')
-      .equals(action)
-      .toArray();
-  },
-  
-  async searchPermissions(searchTerm) {
-    const term = searchTerm.toLowerCase();
-    return db.permissions
-      .filter(permission => 
-        permission.resource.toLowerCase().includes(term) ||
-        permission.action.toLowerCase().includes(term) ||
-        permission.description.toLowerCase().includes(term)
-      )
-      .toArray();
-  },
-  
-  async getPermissionByResourceAndAction(resource, action) {
-    return db.permissions
-      .filter(permission => 
-        permission.resource === resource && permission.action === action
-      )
-      .first();
   }
 };
 
