@@ -1,6 +1,9 @@
 import { RefreshCw, Plus } from 'lucide-react'
 
-const BusinessProcesses = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const BusinessProcesses = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const BusinessProcesses = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Procese</h1>
           <p className="text-muted-foreground">Gestionează workflow-urile și procesele</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-process' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-process' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Proces nou
         </button>

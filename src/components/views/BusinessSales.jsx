@@ -1,6 +1,9 @@
 import { TrendingUp, Plus } from 'lucide-react'
 
-const BusinessSales = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const BusinessSales = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const BusinessSales = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Vânzări</h1>
           <p className="text-muted-foreground">Gestionează vânzările și tranzacțiile</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-sale' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-sale' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Vânzare nouă
         </button>

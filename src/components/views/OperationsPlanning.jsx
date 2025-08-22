@@ -1,6 +1,8 @@
-import { Calendar, Plus, Search, Filter } from 'lucide-react'
+import { Calendar, Plus, Search, Filter, Edit } from 'lucide-react'
+import { useDrawer } from '../../contexts/DrawerContext'
 
-const OperationsPlanning = ({ onDrawerOpen }) => {
+const OperationsPlanning = () => {
+  const { openDrawer } = useDrawer()
   const appointments = [
     {
       time: '09:00',
@@ -73,7 +75,7 @@ const OperationsPlanning = ({ onDrawerOpen }) => {
           </p>
         </div>
         <button
-          onClick={() => onDrawerOpen({ type: 'new-appointment' })}
+          onClick={() => openDrawer({ type: 'new-appointment' })}
           className="btn btn-primary"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -158,8 +160,11 @@ const OperationsPlanning = ({ onDrawerOpen }) => {
                   <span className={`badge ${getStatusColor(appointment.status)}`}>
                     {getStatusText(appointment.status)}
                   </span>
-                  <button className="btn btn-ghost btn-sm">
-                    <Plus className="h-4 w-4" />
+                  <button 
+                    onClick={() => openAppointmentDrawer(appointment)}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    <Edit className="h-4 w-4" />
                   </button>
                 </div>
               </div>

@@ -1,6 +1,9 @@
 import { Settings, Plus } from 'lucide-react'
 
-const AdminSettings = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const AdminSettings = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const AdminSettings = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Setări</h1>
           <p className="text-muted-foreground">Configurează sistemul</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-setting' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-setting' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Setare nouă
         </button>

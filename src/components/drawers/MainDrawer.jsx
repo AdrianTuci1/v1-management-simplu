@@ -1,5 +1,5 @@
-import { X, Bell, User, Settings, Search } from 'lucide-react'
-import { QuickActionsDrawer } from './drawers'
+import { X, Bell, User, Settings, Search, Calendar } from 'lucide-react'
+import { QuickActionsDrawer, AppointmentDrawer } from './index.js'
 
 const Drawer = ({ open, content, onClose }) => {
   if (!open) return null
@@ -16,6 +16,8 @@ const Drawer = ({ open, content, onClose }) => {
         return <SearchContent />
       case 'quick-actions':
         return <QuickActionsDrawer onClose={onClose} />
+      case 'appointment':
+        return <AppointmentDrawer onClose={onClose} isNewAppointment={content?.isNew} appointmentData={content?.data} />
       default:
         return <DefaultContent />
     }
@@ -25,7 +27,7 @@ const Drawer = ({ open, content, onClose }) => {
     <>
       {/* Backdrop */}
       <div 
-        className="relative inset-0 bg-black/10 z-40"
+        className="fixed inset-0 bg-black/50 z-40"
         onClick={onClose}
       />
       
@@ -38,6 +40,7 @@ const Drawer = ({ open, content, onClose }) => {
             {content?.type === 'notifications' && 'Notificări'}
             {content?.type === 'user' && 'Profil Utilizator'}
             {content?.type === 'search' && 'Căutare'}
+            {content?.type === 'appointment' && 'Programare'}
             {!content?.type && 'Drawer'}
           </h2>
           <button

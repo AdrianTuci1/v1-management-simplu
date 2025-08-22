@@ -10,7 +10,10 @@ import {
   Plus
 } from 'lucide-react'
 
-const DashboardHome = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const DashboardHome = () => {
+  const { openQuickActionsDrawer } = useDrawer()
   const kpiData = [
     {
       title: 'Programări Astăzi',
@@ -101,14 +104,8 @@ const DashboardHome = ({ onDrawerOpen }) => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Bun venit! Iată o privire de ansamblu asupra afacerii tale.
-          </p>
-        </div>
         <button
-          onClick={() => onDrawerOpen({ type: 'quick-actions' })}
+                      onClick={openQuickActionsDrawer}
           className="btn btn-primary"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -231,35 +228,7 @@ const DashboardHome = ({ onDrawerOpen }) => {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="card-title">Acțiuni Rapide</h3>
-          <p className="card-description">
-            Accesează rapid funcționalitățile cele mai folosite
-          </p>
-        </div>
-        <div className="card-content">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button className="btn btn-outline flex flex-col items-center gap-2 p-4 h-auto">
-              <Calendar className="h-6 w-6" />
-              <span className="text-sm">Programare nouă</span>
-            </button>
-            <button className="btn btn-outline flex flex-col items-center gap-2 p-4 h-auto">
-              <Users className="h-6 w-6" />
-              <span className="text-sm">Client nou</span>
-            </button>
-            <button className="btn btn-outline flex flex-col items-center gap-2 p-4 h-auto">
-              <TrendingUp className="h-6 w-6" />
-              <span className="text-sm">Vânzare nouă</span>
-            </button>
-            <button className="btn btn-outline flex flex-col items-center gap-2 p-4 h-auto">
-              <CreditCard className="h-6 w-6" />
-              <span className="text-sm">Factură nouă</span>
-            </button>
-          </div>
-        </div>
-      </div>
+
     </div>
   )
 }

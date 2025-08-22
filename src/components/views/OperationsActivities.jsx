@@ -1,6 +1,9 @@
 import { Activity, Plus, Search, Filter } from 'lucide-react'
 
-const OperationsActivities = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const OperationsActivities = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -12,7 +15,7 @@ const OperationsActivities = ({ onDrawerOpen }) => {
           </p>
         </div>
         <button
-          onClick={() => onDrawerOpen({ type: 'new-activity' })}
+                      onClick={() => openDrawer({ type: 'new-activity' })}
           className="btn btn-primary"
         >
           <Plus className="h-4 w-4 mr-2" />

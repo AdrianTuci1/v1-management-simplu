@@ -1,6 +1,8 @@
-import { Bell, User, Search, Menu } from 'lucide-react'
+import { Bell, User, Search, Menu, MapPin, Bot } from 'lucide-react'
+import { useDrawer } from '../contexts/DrawerContext'
 
-const Navbar = ({ currentView, onDrawerOpen }) => {
+const Navbar = ({ currentView, currentLocation }) => {
+  const { openMenuDrawer, openNotificationsDrawer, openUserDrawer } = useDrawer()
   const getViewTitle = (view) => {
     const titles = {
       dashboard: 'Dashboard',
@@ -27,7 +29,7 @@ const Navbar = ({ currentView, onDrawerOpen }) => {
         {/* Left side - Menu toggle and title */}
         <div className="flex items-center gap-4">
           <button
-            onClick={() => onDrawerOpen({ type: 'menu' })}
+            onClick={openMenuDrawer}
             className="btn btn-ghost btn-sm lg:hidden"
           >
             <Menu className="h-5 w-5" />
@@ -37,6 +39,12 @@ const Navbar = ({ currentView, onDrawerOpen }) => {
             <h1 className="text-lg font-semibold">
               🏢 Business Dashboard
             </h1>
+            {currentLocation && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span>{currentLocation.name}</span>
+              </div>
+            )}
           </div>
           
           <div className="lg:hidden">
@@ -46,23 +54,21 @@ const Navbar = ({ currentView, onDrawerOpen }) => {
           </div>
         </div>
 
-        {/* Center - Search (desktop only) */}
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Caută..."
-              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            />
-          </div>
-        </div>
 
-        {/* Right side - Notifications and user */}
+
+        {/* Right side - Robot, Notifications and user */}
         <div className="flex items-center gap-2">
+          {/* Robot AI Assistant */}
+          <button
+            onClick={() => {}} // TODO: Implement AI assistant
+            className="btn btn-ghost btn-sm"
+          >
+            <Bot className="h-5 w-5" />
+          </button>
+
           {/* Notifications */}
           <button
-            onClick={() => onDrawerOpen({ type: 'notifications' })}
+            onClick={openNotificationsDrawer}
             className="btn btn-ghost btn-sm relative"
           >
             <Bell className="h-5 w-5" />
@@ -71,7 +77,7 @@ const Navbar = ({ currentView, onDrawerOpen }) => {
 
           {/* User menu */}
           <button
-            onClick={() => onDrawerOpen({ type: 'user' })}
+            onClick={openUserDrawer}
             className="btn btn-ghost btn-sm flex items-center gap-2"
           >
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">

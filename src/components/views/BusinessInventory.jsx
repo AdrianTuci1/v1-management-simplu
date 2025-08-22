@@ -1,6 +1,9 @@
 import { Package, Plus } from 'lucide-react'
 
-const BusinessInventory = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const BusinessInventory = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const BusinessInventory = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Inventar</h1>
           <p className="text-muted-foreground">Gestionează stocul și produsele</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-product' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-product' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Produs nou
         </button>

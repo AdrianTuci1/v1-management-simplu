@@ -1,6 +1,9 @@
 import { DollarSign, Plus } from 'lucide-react'
 
-const FinancialAccounting = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const FinancialAccounting = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const FinancialAccounting = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Contabilitate</h1>
           <p className="text-muted-foreground">Gestionează contabilitatea</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-transaction' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-transaction' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Tranzacție nouă
         </button>

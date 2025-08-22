@@ -1,6 +1,9 @@
 import { PieChart, Plus } from 'lucide-react'
 
-const AnalyticsDashboard = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const AnalyticsDashboard = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const AnalyticsDashboard = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Analize</h1>
           <p className="text-muted-foreground">Dashboard analitice și KPI-uri</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-analytics' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-analytics' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Analiză nouă
         </button>

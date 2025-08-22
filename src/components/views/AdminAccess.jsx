@@ -1,6 +1,9 @@
 import { Shield, Plus } from 'lucide-react'
 
-const AdminAccess = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const AdminAccess = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const AdminAccess = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Control Acces</h1>
           <p className="text-muted-foreground">Gestionează rolurile și permisiunile</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-role' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-role' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Rol nou
         </button>

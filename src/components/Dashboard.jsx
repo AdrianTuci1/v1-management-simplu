@@ -13,39 +13,39 @@ import AdminAccess from './views/AdminAccess'
 import AdminUsers from './views/AdminUsers'
 import AdminSettings from './views/AdminSettings'
 
-const Dashboard = ({ currentView, onDrawerOpen }) => {
+const Dashboard = ({ currentView }) => {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <DashboardHome onDrawerOpen={onDrawerOpen} />
+        return <DashboardHome />
       case 'operations-planning':
-        return <OperationsPlanning onDrawerOpen={onDrawerOpen} />
+        return <OperationsPlanning />
       case 'operations-people':
-        return <OperationsPeople onDrawerOpen={onDrawerOpen} />
+        return <OperationsPeople />
       case 'operations-activities':
-        return <OperationsActivities onDrawerOpen={onDrawerOpen} />
+        return <OperationsActivities />
       case 'business-sales':
-        return <BusinessSales onDrawerOpen={onDrawerOpen} />
+        return <BusinessSales />
       case 'business-inventory':
-        return <BusinessInventory onDrawerOpen={onDrawerOpen} />
+        return <BusinessInventory />
       case 'business-processes':
-        return <BusinessProcesses onDrawerOpen={onDrawerOpen} />
+        return <BusinessProcesses />
       case 'financial-billing':
-        return <FinancialBilling onDrawerOpen={onDrawerOpen} />
+        return <FinancialBilling />
       case 'financial-accounting':
-        return <FinancialAccounting onDrawerOpen={onDrawerOpen} />
+        return <FinancialAccounting />
       case 'analytics-reports':
-        return <AnalyticsReports onDrawerOpen={onDrawerOpen} />
+        return <AnalyticsReports />
       case 'analytics-dashboard':
-        return <AnalyticsDashboard onDrawerOpen={onDrawerOpen} />
+        return <AnalyticsDashboard />
       case 'admin-access':
-        return <AdminAccess onDrawerOpen={onDrawerOpen} />
+        return <AdminAccess />
       case 'admin-users':
-        return <AdminUsers onDrawerOpen={onDrawerOpen} />
+        return <AdminUsers />
       case 'admin-settings':
-        return <AdminSettings onDrawerOpen={onDrawerOpen} />
+        return <AdminSettings />
       default:
-        return <DashboardHome onDrawerOpen={onDrawerOpen} />
+        return <DashboardHome />
     }
   }
 

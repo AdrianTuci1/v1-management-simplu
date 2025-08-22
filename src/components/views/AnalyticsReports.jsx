@@ -1,6 +1,9 @@
 import { BarChart3, Plus } from 'lucide-react'
 
-const AnalyticsReports = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const AnalyticsReports = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const AnalyticsReports = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Rapoarte</h1>
           <p className="text-muted-foreground">Generează și vizualizează rapoarte</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-report' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-report' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Raport nou
         </button>

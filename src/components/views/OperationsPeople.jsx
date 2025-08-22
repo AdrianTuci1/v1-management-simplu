@@ -1,6 +1,9 @@
 import { Users, Plus, Search, Filter } from 'lucide-react'
 
-const OperationsPeople = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const OperationsPeople = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -12,7 +15,7 @@ const OperationsPeople = ({ onDrawerOpen }) => {
           </p>
         </div>
         <button
-          onClick={() => onDrawerOpen({ type: 'new-person' })}
+                      onClick={() => openDrawer({ type: 'new-person' })}
           className="btn btn-primary"
         >
           <Plus className="h-4 w-4 mr-2" />

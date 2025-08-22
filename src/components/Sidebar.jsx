@@ -17,8 +17,9 @@ import {
   Settings,
   Home
 } from 'lucide-react'
+import LocationSwitcher from './LocationSwitcher'
 
-const Sidebar = ({ collapsed, currentView, onViewChange, onToggle }) => {
+const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocation, onLocationChange }) => {
   const [expandedMenus, setExpandedMenus] = useState(['operations'])
 
   const menuItems = [
@@ -158,9 +159,6 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle }) => {
     <aside className={`sidebar bg-card border-r border-border flex flex-col transition-all duration-300 ${collapsed ? 'collapsed' : ''}`}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
-        {!collapsed && (
-          <h2 className="text-lg font-semibold">🏢 Business</h2>
-        )}
         <button
           onClick={onToggle}
           className="btn btn-ghost btn-sm"
@@ -226,6 +224,15 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle }) => {
           </div>
         ))}
       </nav>
+
+      {/* Location Switcher */}
+      <div className="border-t border-border">
+        <LocationSwitcher
+          collapsed={collapsed}
+          currentLocation={currentLocation}
+          onLocationChange={onLocationChange}
+        />
+      </div>
 
       {/* Footer */}
       {!collapsed && (

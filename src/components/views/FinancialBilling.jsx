@@ -1,6 +1,9 @@
 import { CreditCard, Plus } from 'lucide-react'
 
-const FinancialBilling = ({ onDrawerOpen }) => {
+import { useDrawer } from '../../contexts/DrawerContext'
+
+const FinancialBilling = () => {
+  const { openDrawer } = useDrawer()
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -8,7 +11,7 @@ const FinancialBilling = ({ onDrawerOpen }) => {
           <h1 className="text-3xl font-bold">Facturare</h1>
           <p className="text-muted-foreground">Gestionează facturile și plățile</p>
         </div>
-        <button onClick={() => onDrawerOpen({ type: 'new-invoice' })} className="btn btn-primary">
+        <button onClick={() => openDrawer({ type: 'new-invoice' })} className="btn btn-primary">
           <Plus className="h-4 w-4 mr-2" />
           Factură nouă
         </button>
