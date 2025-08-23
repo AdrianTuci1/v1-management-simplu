@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import patientService from '../services/patientService.js'
 import { indexedDb } from '../data/infrastructure/db.js'
-import { populateTestPatients, checkPatientCacheStatus } from '../utils/patientUtils.js'
 
 export const usePatients = () => {
   const [patients, setPatients] = useState([])
@@ -28,17 +27,6 @@ export const usePatients = () => {
       try {
         console.warn('API failed, trying local cache:', err.message)
         const cachedData = await indexedDb.getAll('patients')
-        
-        // Dacă cache-ul este gol, populează cu date de test
-        if (cachedData.length === 0) {
-          console.log('Cache is empty, populating with test data...')
-          await populateTestPatients()
-          const testData = await indexedDb.getAll('patients')
-          setPatients(testData)
-          setError('Conectare la server eșuată. Se afișează datele de test din cache local.')
-          return testData
-        }
-        
         setPatients(cachedData)
         setError('Conectare la server eșuată. Se afișează datele din cache local.')
         return cachedData
@@ -66,17 +54,23 @@ export const usePatients = () => {
         console.warn('API failed for pagination, trying local cache:', err.message)
         const cachedData = await indexedDb.getAll('patients')
         
-        // Aplică filtrele local
+        // Aplică filtrele pe datele din cache
         let filteredData = cachedData
-        if (filters.name) {
-          const searchTerm = filters.name.toLowerCase()
-          filteredData = filteredData.filter(p => 
-            p.name.toLowerCase().includes(searchTerm) ||
-            p.email.toLowerCase().includes(searchTerm)
-          )
-        }
+        
         if (filters.status) {
           filteredData = filteredData.filter(p => p.status === filters.status)
+        }
+        if (filters.city) {
+          filteredData = filteredData.filter(p => p.city === filters.city)
+        }
+        if (filters.search) {
+          const searchTerm = filters.search.toLowerCase()
+          filteredData = filteredData.filter(p => 
+            p.name.toLowerCase().includes(searchTerm) ||
+            p.email.toLowerCase().includes(searchTerm) ||
+            (p.phone && p.phone.includes(searchTerm)) ||
+            (p.cnp && p.cnp.includes(searchTerm))
+          )
         }
         
         // Aplică paginarea
@@ -162,7 +156,8 @@ export const usePatients = () => {
     
     try {
       const newPatient = await patientService.addPatient(patientData)
-      setPatients(prev => [...prev, newPatient])
+      // Reîncarcă lista de pacienți
+      await loadPatients()
       return newPatient
     } catch (err) {
       setError(err.message)
@@ -171,7 +166,7 @@ export const usePatients = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadPatients])
 
   // Funcție pentru actualizarea unui pacient
   const updatePatient = useCallback(async (id, patientData) => {
@@ -180,7 +175,8 @@ export const usePatients = () => {
     
     try {
       const updatedPatient = await patientService.updatePatient(id, patientData)
-      setPatients(prev => prev.map(p => p.id === id ? updatedPatient : p))
+      // Reîncarcă lista de pacienți
+      await loadPatients()
       return updatedPatient
     } catch (err) {
       setError(err.message)
@@ -189,7 +185,7 @@ export const usePatients = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadPatients])
 
   // Funcție pentru ștergerea unui pacient
   const deletePatient = useCallback(async (id) => {
@@ -198,8 +194,8 @@ export const usePatients = () => {
     
     try {
       await patientService.deletePatient(id)
-      setPatients(prev => prev.filter(p => p.id !== id))
-      return true
+      // Reîncarcă lista de pacienți
+      await loadPatients()
     } catch (err) {
       setError(err.message)
       console.error('Error deleting patient:', err)
@@ -207,66 +203,41 @@ export const usePatients = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadPatients])
 
   // Funcție pentru obținerea statisticilor
   const loadStats = useCallback(async () => {
     try {
-      const patientStats = await patientService.getPatientStats()
-      setStats(patientStats)
-      return patientStats
+      const statsData = await patientService.getPatientStats()
+      setStats(statsData)
+      return statsData
     } catch (err) {
-      try {
-        console.warn('API failed for stats, calculating from cache:', err.message)
-        const cachedData = await indexedDb.getAll('patients')
-        
-        const stats = {
-          total: cachedData.length,
-          active: cachedData.filter(p => p.status === 'active').length,
-          inactive: cachedData.filter(p => p.status === 'inactive').length,
-          newThisMonth: cachedData.filter(p => {
-            const createdAt = new Date(p.createdAt)
-            const now = new Date()
-            return createdAt.getMonth() === now.getMonth() && 
-                   createdAt.getFullYear() === now.getFullYear()
-          }).length
-        }
-        
-        setStats(stats)
-        return stats
-      } catch (cacheErr) {
-        console.error('Error loading patient stats:', err)
-        return {
-          total: 0,
-          active: 0,
-          inactive: 0,
-          newThisMonth: 0
-        }
+      console.error('Error loading patient stats:', err)
+      return {
+        total: 0,
+        active: 0,
+        inactive: 0,
+        newThisMonth: 0
       }
     }
   }, [])
 
   // Funcție pentru exportul pacienților
   const exportPatients = useCallback(async (format = 'csv') => {
-    setLoading(true)
-    setError(null)
-    
     try {
-      const exportData = await patientService.exportPatients(format)
-      return exportData
+      return await patientService.exportPatients(format)
     } catch (err) {
       setError(err.message)
       console.error('Error exporting patients:', err)
       throw err
-    } finally {
-      setLoading(false)
     }
   }, [])
 
-  // Încarcă statisticile la montarea componentei
+  // Încarcă datele la montarea componentei
   useEffect(() => {
+    loadPatients()
     loadStats()
-  }, [loadStats])
+  }, [loadPatients, loadStats])
 
   return {
     patients,

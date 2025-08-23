@@ -13,10 +13,10 @@ import {
   Pill,
   Clock
 } from 'lucide-react'
-import { useState} from 'react'
+import { useState, useEffect } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
 
-const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, zIndex = 50 }) => {
+const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -398,19 +398,12 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, zInd
   }
 
   return (
-    <>
+    <div className="drawer">
       {/* Overlay */}
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50" 
-        style={{ zIndex: 9998 }}
-        onClick={onClose}
-      ></div>
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose}></div>
       
       {/* Drawer Content */}
-      <div 
-        className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl flex flex-col border-4 border-purple-500"
-        style={{ zIndex: 9999 }}
-      >
+      <div className="relative z-50 h-full w-full max-w-2xl bg-white shadow-xl flex flex-col">
         {/* Header */}
         <div className="drawer-header">
           <div>
@@ -507,7 +500,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, zInd
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

@@ -17,10 +17,12 @@ class UserService {
     try {
       const command = new GetCommand(this.repository, filters)
       const users = await this.invoker.run(command)
-      return userManager.transformUsersForUI(users)
+      // Asigură-te că rezultatul este întotdeauna un array
+      const usersArray = Array.isArray(users) ? users : []
+      return userManager.transformUsersForUI(usersArray)
     } catch (error) {
       console.error('Error getting users:', error)
-      throw error
+      return []
     }
   }
 
@@ -91,10 +93,12 @@ class UserService {
       }
       const command = new GetCommand(this.repository, searchFilters)
       const users = await this.invoker.run(command)
-      return userManager.transformUsersForUI(users)
+      // Asigură-te că rezultatul este întotdeauna un array
+      const usersArray = Array.isArray(users) ? users : []
+      return userManager.transformUsersForUI(usersArray)
     } catch (error) {
       console.error('Error searching users:', error)
-      throw error
+      return []
     }
   }
 

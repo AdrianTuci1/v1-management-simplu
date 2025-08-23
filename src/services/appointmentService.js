@@ -16,7 +16,9 @@ class AppointmentService {
   // Obține programările pentru o perioadă specifică
   async getAppointments(params = {}) {
     const command = new GetCommand(this.repository, params)
-    return this.invoker.run(command)
+    const result = await this.invoker.run(command)
+    // Asigură-te că rezultatul este întotdeauna un array
+    return Array.isArray(result) ? result : []
   }
 
   // Obține programările pentru o zi specifică
@@ -32,7 +34,8 @@ class AppointmentService {
       endDate: endOfDay.toISOString().split('T')[0], // Format yyyy-mm-dd
     }
 
-    return this.getAppointments(params)
+    const result = await this.getAppointments(params)
+    return Array.isArray(result) ? result : []
   }
 
   // Obține programările pentru o săptămână
@@ -54,7 +57,8 @@ class AppointmentService {
       sortOrder: 'asc'
     }
 
-    return this.getAppointments(params)
+    const result = await this.getAppointments(params)
+    return Array.isArray(result) ? result : []
   }
 
   // Obține programările pentru o lună
@@ -70,7 +74,8 @@ class AppointmentService {
       sortOrder: 'asc'
     }
 
-    return this.getAppointments(params)
+    const result = await this.getAppointments(params)
+    return Array.isArray(result) ? result : []
   }
 
   // Adaugă o programare nouă
@@ -133,7 +138,8 @@ class AppointmentService {
       limit,
       offset
     }
-    return this.getAppointments(allParams)
+    const result = await this.getAppointments(allParams)
+    return Array.isArray(result) ? result : []
   }
 
 

@@ -5,7 +5,7 @@ import { useAppointments } from '../../hooks/useAppointments.js'
 import { useDrawer } from '../../contexts/DrawerContext'
 
 const OperationsPlanning = () => {
-  const openDrawer = useDrawer()
+  const { openDrawer } = useDrawer();
   
   // State management
   const [viewType, setViewType] = useState('week') // 'day', 'week', 'month'

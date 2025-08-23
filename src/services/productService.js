@@ -20,11 +20,14 @@ class ProductService {
       const command = new GetCommand(this.repository, filters);
       const products = await command.execute();
       
+      // Asigură-te că rezultatul este întotdeauna un array
+      const productsArray = Array.isArray(products) ? products : [];
+      
       // Transformă datele pentru UI
-      return products.map(product => productManager.transformForUI(product));
+      return productsArray.map(product => productManager.transformForUI(product));
     } catch (error) {
       console.error('Error loading products:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -34,10 +37,13 @@ class ProductService {
       const command = new GetCommand(this.repository, { category });
       const products = await command.execute();
       
-      return products.map(product => productManager.transformForUI(product));
+      // Asigură-te că rezultatul este întotdeauna un array
+      const productsArray = Array.isArray(products) ? products : [];
+      
+      return productsArray.map(product => productManager.transformForUI(product));
     } catch (error) {
       console.error('Error loading products by category:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -47,10 +53,13 @@ class ProductService {
       const command = new GetCommand(this.repository, { lowStock: true });
       const products = await command.execute();
       
-      return products.map(product => productManager.transformForUI(product));
+      // Asigură-te că rezultatul este întotdeauna un array
+      const productsArray = Array.isArray(products) ? products : [];
+      
+      return productsArray.map(product => productManager.transformForUI(product));
     } catch (error) {
       console.error('Error loading low stock products:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -60,10 +69,13 @@ class ProductService {
       const command = new GetCommand(this.repository, { search: searchTerm });
       const products = await command.execute();
       
-      return products.map(product => productManager.transformForUI(product));
+      // Asigură-te că rezultatul este întotdeauna un array
+      const productsArray = Array.isArray(products) ? products : [];
+      
+      return productsArray.map(product => productManager.transformForUI(product));
     } catch (error) {
       console.error('Error searching products:', error);
-      throw error;
+      return [];
     }
   }
 

@@ -15,7 +15,7 @@ import { productManager } from '../../business/productManager.js'
 import { useDrawer } from '../../contexts/DrawerContext'
 
 const BusinessInventory = () => {
-  const openDrawer = useDrawer()
+  const { openDrawer } = useDrawer();
   const { 
     products, 
     loading, 

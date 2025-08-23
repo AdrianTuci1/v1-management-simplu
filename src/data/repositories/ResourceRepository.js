@@ -34,7 +34,24 @@ export class ResourceRepository {
   async query(params) {
     const query = params ? "?" + new URLSearchParams(params).toString() : "";
     const data = await this.request(query, { method: "GET" });
-    await db.table(this.store).bulkPut(data);
+    
+    // Verifică și asigură-te că toate datele au ID-uri valide
+    if (Array.isArray(data)) {
+      const validData = data.filter(item => {
+        if (!item || !item.id) {
+          console.warn('Item without ID found:', item);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validData.length > 0) {
+        await db.table(this.store).bulkPut(validData);
+      }
+    } else if (data && data.id) {
+      await db.table(this.store).put(data);
+    }
+    
     return data;
   }
 

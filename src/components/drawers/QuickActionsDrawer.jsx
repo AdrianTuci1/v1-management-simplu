@@ -1,19 +1,19 @@
 import { 
-  X, 
-  Plus, 
   Calendar, 
   Users, 
   TrendingUp, 
-  CreditCard, 
-  FileText, 
-  Package, 
-  DollarSign, 
+  CreditCard,
+  X,
+  Plus,
+  FileText,
+  Package,
+  DollarSign,
   Settings
 } from 'lucide-react'
-import useDrawer from '../../contexts/DrawerContext'
+import { useDrawer } from '../../contexts/DrawerContext'
 
-const QuickActionsDrawer = ({ onClose, zIndex = 50 }) => {
-  const openDrawer = useDrawer()
+const QuickActionsDrawer = ({ onClose }) => {
+  const { openAppointmentDrawer } = useDrawer()
   const quickActions = [
     {
       title: 'Programare nouă',
@@ -22,7 +22,7 @@ const QuickActionsDrawer = ({ onClose, zIndex = 50 }) => {
       color: 'bg-blue-500',
       action: () => {
         onClose()
-        openDrawer('appointment')
+        openAppointmentDrawer()
       }
     },
     {
@@ -99,15 +99,14 @@ const QuickActionsDrawer = ({ onClose, zIndex = 50 }) => {
 
   return (
     <>
-      {/* Backdrop - temporar comentat pentru test */}
-      {/* <div 
-        className="fixed inset-0 bg-black/50"
-        style={{ zIndex: 9998 }}
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/50 z-40"
         onClick={onClose}
-      /> */}
+      />
       
       {/* Drawer */}
-      <div className="fixed top-0 right-0 bottom-0 w-96 bg-white shadow-xl flex flex-col border-4 border-red-500" style={{ zIndex: 100 }}>
+      <div className="drawer z-50">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div>
@@ -153,6 +152,8 @@ const QuickActionsDrawer = ({ onClose, zIndex = 50 }) => {
               </button>
             ))}
           </div>
+
+
         </div>
       </div>
     </>

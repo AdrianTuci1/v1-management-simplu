@@ -16,7 +16,9 @@ class PatientService {
   // Obține pacienții cu parametri de filtrare
   async getPatients(params = {}) {
     const command = new GetCommand(this.repository, params)
-    return this.invoker.run(command)
+    const result = await this.invoker.run(command)
+    // Asigură-te că rezultatul este întotdeauna un array
+    return Array.isArray(result) ? result : []
   }
 
   // Obține pacienții pentru o pagină specifică
@@ -28,7 +30,8 @@ class PatientService {
       sortBy: 'createdAt',
       sortOrder: 'desc'
     }
-    return this.getPatients(params)
+    const result = await this.getPatients(params)
+    return Array.isArray(result) ? result : []
   }
 
   // Obține pacienții după nume (căutare)
@@ -39,7 +42,8 @@ class PatientService {
       sortBy: 'name',
       sortOrder: 'asc'
     }
-    return this.getPatients(params)
+    const result = await this.getPatients(params)
+    return Array.isArray(result) ? result : []
   }
 
   // Obține un pacient după ID

@@ -111,7 +111,9 @@ class UserManager {
 
   // Transformare pentru UI (array)
   transformUsersForUI(users) {
-    return users.map(user => this.transformUserForUI(user))
+    // Asigură-te că users este un array
+    const usersArray = Array.isArray(users) ? users : []
+    return usersArray.map(user => this.transformUserForUI(user))
   }
 
   // Text pentru experiență
@@ -257,12 +259,15 @@ class UserManager {
 
   // Export CSV
   exportToCSV(users) {
+    // Asigură-te că users este un array
+    const usersArray = Array.isArray(users) ? users : []
+    
     const headers = [
       'ID', 'Prenume', 'Nume', 'Email', 'Telefon', 'Specializare',
       'Număr Licență', 'Experiență', 'Educație', 'Status', 'Data Creării'
     ]
 
-    const rows = users.map(user => [
+    const rows = usersArray.map(user => [
       user.id,
       user.firstName,
       user.lastName,
