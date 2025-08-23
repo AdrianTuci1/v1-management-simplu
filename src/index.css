@@ -46,7 +46,7 @@
 
 /* Drawer styles */
 .drawer {
-  @apply fixed right-0 top-0 h-full w-80 bg-white border-l border-slate-200 shadow-lg transform transition-transform duration-300 ease-in-out z-50;
+  @apply fixed right-0 top-0 h-full w-96 bg-white border-l border-slate-200 shadow-lg transform transition-transform duration-300 ease-in-out z-50;
 }
 
 .drawer.closed {
