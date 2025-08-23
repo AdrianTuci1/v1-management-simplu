@@ -1,6 +1,7 @@
 import DashboardHome from './views/DashboardHome'
 import OperationsPlanning from './views/OperationsPlanning'
 import OperationsPeople from './views/OperationsPeople'
+import OperationsTreatments from './views/OperationsTreatments'
 import OperationsActivities from './views/OperationsActivities'
 import BusinessSales from './views/BusinessSales'
 import BusinessInventory from './views/BusinessInventory'
@@ -22,6 +23,8 @@ const Dashboard = ({ currentView }) => {
         return <OperationsPlanning />
       case 'operations-people':
         return <OperationsPeople />
+      case 'operations-treatments':
+        return <OperationsTreatments />
       case 'operations-activities':
         return <OperationsActivities />
       case 'business-sales':

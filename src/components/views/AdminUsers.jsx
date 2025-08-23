@@ -126,8 +126,8 @@ const AdminUsers = () => {
                     </th>
                     <th className="px-4 py-3 text-left">Nume</th>
                     <th className="px-4 py-3 text-left">Contact</th>
-                    <th className="px-4 py-3 text-left">Specializare</th>
-                    <th className="px-4 py-3 text-left">Experiență</th>
+                    <th className="px-4 py-3 text-left">Rol</th>
+                    <th className="px-4 py-3 text-left">Zile Serviciu</th>
                     <th className="px-4 py-3 text-left">Status</th>
                     <th className="px-4 py-3 text-left">Acțiuni</th>
                   </tr>
@@ -146,7 +146,6 @@ const AdminUsers = () => {
                       <td className="px-4 py-3">
                         <div>
                           <p className="font-medium">{user.fullName}</p>
-                          <p className="text-sm text-muted-foreground">{user.licenseNumber}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -162,13 +161,29 @@ const AdminUsers = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <GraduationCap className="h-4 w-4 text-blue-500" />
-                          <span>{user.specialization}</span>
-                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          user.role === 'doctor' ? 'bg-blue-100 text-blue-700' :
+                          user.role === 'nurse' ? 'bg-green-100 text-green-700' :
+                          user.role === 'specialist' ? 'bg-purple-100 text-purple-700' :
+                          user.role === 'resident' ? 'bg-orange-100 text-orange-700' :
+                          user.role === 'admin' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {user.role === 'doctor' ? 'Medic' :
+                           user.role === 'nurse' ? 'Asistent' :
+                           user.role === 'specialist' ? 'Specialist' :
+                           user.role === 'resident' ? 'Rezident' :
+                           user.role === 'admin' ? 'Admin' : user.role}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-sm">{user.experienceText}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {user.dutyDays?.map((day, index) => (
+                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
+                              {day}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${

@@ -3,13 +3,11 @@ class UserManager {
   validateUser(userData, existingId = null) {
     const errors = []
 
-    // Validări de bază
-    if (!userData.firstName?.trim()) {
-      errors.push('Prenumele este obligatoriu')
-    }
-
-    if (!userData.lastName?.trim()) {
-      errors.push('Numele este obligatoriu')
+    // Validări pentru câmpurile din UserDrawer
+    if (!userData.medicName?.trim()) {
+      errors.push('Numele medicului este obligatoriu')
+    } else if (userData.medicName.trim().length < 2) {
+      errors.push('Numele medicului trebuie să aibă cel puțin 2 caractere')
     }
 
     if (!userData.email?.trim()) {
@@ -18,31 +16,16 @@ class UserManager {
       errors.push('Email-ul nu este valid')
     }
 
-    if (!userData.phone?.trim()) {
-      errors.push('Telefonul este obligatoriu')
-    } else if (!this.isValidPhone(userData.phone)) {
-      errors.push('Telefonul nu este valid')
+
+
+    // Validare pentru rol
+    if (!userData.role?.trim()) {
+      errors.push('Rolul este obligatoriu')
     }
 
-    if (!userData.specialization?.trim()) {
-      errors.push('Specializarea este obligatorie')
-    }
-
-    if (!userData.licenseNumber?.trim()) {
-      errors.push('Numărul de licență este obligatoriu')
-    }
-
-    // Validări suplimentare
-    if (userData.firstName && userData.firstName.length < 2) {
-      errors.push('Prenumele trebuie să aibă cel puțin 2 caractere')
-    }
-
-    if (userData.lastName && userData.lastName.length < 2) {
-      errors.push('Numele trebuie să aibă cel puțin 2 caractere')
-    }
-
-    if (userData.licenseNumber && userData.licenseNumber.length < 5) {
-      errors.push('Numărul de licență trebuie să aibă cel puțin 5 caractere')
+    // Validare pentru zile de serviciu
+    if (!userData.dutyDays || !Array.isArray(userData.dutyDays) || userData.dutyDays.length === 0) {
+      errors.push('Cel puțin o zi de serviciu trebuie selectată')
     }
 
     return {
@@ -57,26 +40,16 @@ class UserManager {
     return emailRegex.test(email)
   }
 
-  // Validare telefon
-  isValidPhone(phone) {
-    const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/
-    return phoneRegex.test(phone)
-  }
+
 
   // Transformare pentru API
   transformUserForAPI(userData) {
     return {
-      firstName: userData.firstName?.trim(),
-      lastName: userData.lastName?.trim(),
+      ...userData,
+      medicName: userData.medicName?.trim(),
       email: userData.email?.trim().toLowerCase(),
       phone: userData.phone?.trim(),
-      specialization: userData.specialization?.trim(),
-      licenseNumber: userData.licenseNumber?.trim(),
-      experience: userData.experience || 0,
-      education: userData.education?.trim(),
-      certifications: userData.certifications?.trim(),
-      bio: userData.bio?.trim(),
-      status: userData.status || 'active',
+      dutyDays: userData.dutyDays || [],
       role: userData.role || 'doctor',
       createdAt: userData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -86,45 +59,19 @@ class UserManager {
   // Transformare pentru UI
   transformUserForUI(userData) {
     return {
-      id: userData.id,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      fullName: `${userData.firstName} ${userData.lastName}`,
-      email: userData.email,
-      phone: userData.phone,
-      specialization: userData.specialization,
-      licenseNumber: userData.licenseNumber,
-      experience: userData.experience || 0,
-      education: userData.education,
-      certifications: userData.certifications,
-      bio: userData.bio,
-      status: userData.status || 'active',
-      role: userData.role || 'doctor',
-      createdAt: userData.createdAt,
-      updatedAt: userData.updatedAt,
+      ...userData,
+      fullName: userData.medicName || userData.fullName,
+      dutyDays: userData.dutyDays || [],
       // Proprietăți calculate
       isActive: userData.status === 'active',
-      experienceText: this.getExperienceText(userData.experience),
       statusText: this.getStatusText(userData.status)
     }
   }
 
   // Transformare pentru UI (array)
   transformUsersForUI(users) {
-    // Asigură-te că users este un array
     const usersArray = Array.isArray(users) ? users : []
     return usersArray.map(user => this.transformUserForUI(user))
-  }
-
-  // Text pentru experiență
-  getExperienceText(experience) {
-    if (!experience || experience === 0) {
-      return 'Fără experiență'
-    }
-    if (experience === 1) {
-      return '1 an'
-    }
-    return `${experience} ani`
   }
 
   // Text pentru status
@@ -143,28 +90,11 @@ class UserManager {
     const total = users.length
     const active = users.filter(u => u.status === 'active').length
     const inactive = users.filter(u => u.status === 'inactive').length
-    const suspended = users.filter(u => u.status === 'suspended').length
-    const retired = users.filter(u => u.status === 'retired').length
-
-    // Statistici pe specializări
-    const specializations = {}
-    users.forEach(user => {
-      const spec = user.specialization || 'Necunoscută'
-      specializations[spec] = (specializations[spec] || 0) + 1
-    })
-
-    // Experiență medie
-    const totalExperience = users.reduce((sum, user) => sum + (user.experience || 0), 0)
-    const avgExperience = total > 0 ? Math.round(totalExperience / total) : 0
 
     return {
       total,
       active,
       inactive,
-      suspended,
-      retired,
-      specializations,
-      avgExperience,
       activePercentage: total > 0 ? Math.round((active / total) * 100) : 0
     }
   }
@@ -178,50 +108,26 @@ class UserManager {
       filtered = filtered.filter(user => user.status === filters.status)
     }
 
-    // Filtrare după specializare
-    if (filters.specialization) {
-      filtered = filtered.filter(user => 
-        user.specialization?.toLowerCase().includes(filters.specialization.toLowerCase())
-      )
-    }
-
     // Filtrare după căutare text
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase()
       filtered = filtered.filter(user => 
-        user.firstName?.toLowerCase().includes(searchTerm) ||
-        user.lastName?.toLowerCase().includes(searchTerm) ||
+        user.medicName?.toLowerCase().includes(searchTerm) ||
         user.email?.toLowerCase().includes(searchTerm) ||
-        user.specialization?.toLowerCase().includes(searchTerm) ||
-        user.licenseNumber?.toLowerCase().includes(searchTerm)
+        user.phone?.toLowerCase().includes(searchTerm)
       )
-    }
-
-    // Filtrare după experiență
-    if (filters.minExperience) {
-      filtered = filtered.filter(user => (user.experience || 0) >= filters.minExperience)
-    }
-
-    if (filters.maxExperience) {
-      filtered = filtered.filter(user => (user.experience || 0) <= filters.maxExperience)
     }
 
     return filtered
   }
 
   // Sortare utilizatori
-  sortUsers(users, sortBy = 'lastName', sortOrder = 'asc') {
+  sortUsers(users, sortBy = 'medicName', sortOrder = 'asc') {
     const sorted = [...users]
 
     sorted.sort((a, b) => {
       let aValue = a[sortBy]
       let bValue = b[sortBy]
-
-      // Pentru nume complete
-      if (sortBy === 'fullName') {
-        aValue = `${a.firstName} ${a.lastName}`
-        bValue = `${b.firstName} ${b.lastName}`
-      }
 
       // Pentru valori numerice
       if (typeof aValue === 'number' && typeof bValue === 'number') {
@@ -259,24 +165,18 @@ class UserManager {
 
   // Export CSV
   exportToCSV(users) {
-    // Asigură-te că users este un array
     const usersArray = Array.isArray(users) ? users : []
     
     const headers = [
-      'ID', 'Prenume', 'Nume', 'Email', 'Telefon', 'Specializare',
-      'Număr Licență', 'Experiență', 'Educație', 'Status', 'Data Creării'
+      'ID', 'Nume Medic', 'Email', 'Telefon', 'Zile Serviciu', 'Status', 'Data Creării'
     ]
 
     const rows = usersArray.map(user => [
       user.id,
-      user.firstName,
-      user.lastName,
+      user.medicName,
       user.email,
       user.phone,
-      user.specialization,
-      user.licenseNumber,
-      user.experience,
-      user.education,
+      user.dutyDays?.join(', ') || '',
       user.status,
       new Date(user.createdAt).toLocaleDateString('ro-RO')
     ])
@@ -290,32 +190,31 @@ class UserManager {
 
   // Generare date de test
   generateTestUsers(count = 10) {
-    const specializations = [
-      'Cardiologie', 'Dermatologie', 'Endocrinologie', 'Gastroenterologie',
-      'Neurologie', 'Oftalmologie', 'Ortopedie', 'Pediatrie', 'Psihiatrie',
-      'Radiologie', 'Urologie', 'Ginecologie'
+    const dutyDaysOptions = [
+      ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri'],
+      ['Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă'],
+      ['Luni', 'Marți', 'Joi', 'Vineri'],
+      ['Marți', 'Miercuri', 'Joi'],
+      ['Luni', 'Miercuri', 'Vineri']
     ]
 
     const users = []
     for (let i = 1; i <= count; i++) {
-      const firstName = `Prenume${i}`
-      const lastName = `Nume${i}`
-      const specialization = specializations[Math.floor(Math.random() * specializations.length)]
+      const firstName = `Dr. ${['Ion', 'Maria', 'Alexandru', 'Elena', 'Mihai', 'Ana', 'Andrei', 'Cristina'][Math.floor(Math.random() * 8)]}`
+      const lastName = `${['Popescu', 'Ionescu', 'Dumitrescu', 'Stoica', 'Munteanu', 'Florescu', 'Dobrescu', 'Constantinescu'][Math.floor(Math.random() * 8)]}`
+      const medicName = `${firstName} ${lastName}`
+      const dutyDays = dutyDaysOptions[Math.floor(Math.random() * dutyDaysOptions.length)]
+      
+      const roles = ['doctor', 'nurse', 'specialist', 'resident', 'admin']
+      const role = roles[Math.floor(Math.random() * roles.length)]
       
       users.push({
-        id: `user_${i}`,
-        firstName,
-        lastName,
-        email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
+        medicName: medicName,
+        email: `${firstName.toLowerCase().replace('dr. ', '')}.${lastName.toLowerCase()}@example.com`,
         phone: `+40${Math.floor(Math.random() * 900000000) + 100000000}`,
-        specialization,
-        licenseNumber: `LIC${String(i).padStart(6, '0')}`,
-        experience: Math.floor(Math.random() * 30) + 1,
-        education: 'Universitatea de Medicină și Farmacie',
-        certifications: 'Certificat de specialitate',
-        bio: `Dr. ${firstName} ${lastName} este specialist în ${specialization.toLowerCase()}.`,
+        role: role,
+        dutyDays: dutyDays,
         status: Math.random() > 0.1 ? 'active' : 'inactive',
-        role: 'doctor',
         createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
         updatedAt: new Date().toISOString()
       })

@@ -7,18 +7,15 @@ class AppDatabase extends Dexie {
     
     // Versiunea bazei de date
     this.version(1).stores({
-      clients: 'id',
-      timeline: 'id',
-      packages: 'id',
-      members: 'id',
       appointments: 'id, date, doctor, patient, status', // Store pentru programări
       appointmentCounts: 'date, count', // Cache pentru numărul de programări
       patients: 'resourceId, name, email, phone, status, city, county', // Store pentru pacienți
-      products: 'id, name, category, price, stock, reorderLevel', // Store pentru produse
+      products: 'resourceId, name, category, price, stock, reorderLevel', // Store pentru produse
       productCounts: 'category, count', // Cache pentru numărul de produse per categorie
-      users: 'id, email, licenseNumber, specialization, status, role', // Store pentru utilizatori (medici)
-      roles: 'id, name, description, status', // Store pentru roluri
-      permissions: 'id, resource, action, description' // Store pentru permisiuni
+      users: 'resourceId, email, licenseNumber, specialization, status, role', // Store pentru utilizatori (medici)
+      roles: 'resourceId, name, description, status', // Store pentru roluri
+      permissions: 'resourceId, resource, action, description', // Store pentru permisiuni
+      treatments: 'resourceId, treatmentType, category, duration, price' // Store pentru tratamente
     });
   }
 }
@@ -280,6 +277,60 @@ export const indexedDb = {
         permission.resource === resource && permission.action === action
       )
       .first();
+  },
+  
+  // Metode specifice pentru tratamente
+  async getTreatmentsByCategory(category) {
+    return db.treatments
+      .where('category')
+      .equals(category)
+      .toArray();
+  },
+  
+  async getTreatmentsByType(treatmentType) {
+    return db.treatments
+      .where('treatmentType')
+      .equals(treatmentType)
+      .toArray();
+  },
+  
+  async searchTreatments(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    return db.treatments
+      .filter(treatment => 
+        treatment.treatmentType.toLowerCase().includes(term) ||
+        treatment.category.toLowerCase().includes(term) ||
+        (treatment.description && treatment.description.toLowerCase().includes(term))
+      )
+      .toArray();
+  },
+  
+  async getTreatmentsByDurationRange(minDuration, maxDuration) {
+    return db.treatments
+      .filter(treatment => 
+        treatment.duration >= minDuration && treatment.duration <= maxDuration
+      )
+      .toArray();
+  },
+  
+  async getTreatmentsByPriceRange(minPrice, maxPrice) {
+    return db.treatments
+      .filter(treatment => 
+        treatment.price >= minPrice && treatment.price <= maxPrice
+      )
+      .toArray();
+  },
+  
+  async bulkAdd(storeName, values) {
+    try {
+      if (!db.table(storeName)) {
+        console.warn(`Store ${storeName} does not exist`);
+        return;
+      }
+      return db.table(storeName).bulkAdd(values);
+    } catch (error) {
+      console.warn(`Failed to bulkAdd to ${storeName}:`, error);
+    }
   }
 };
 

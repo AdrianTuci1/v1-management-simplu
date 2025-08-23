@@ -52,6 +52,14 @@ export const DrawerProvider = ({ children }) => {
     openDrawer({ type: 'quick-actions' })
   }
 
+  const openTreatmentDrawer = (treatmentData = null) => {
+    openDrawer({
+      type: 'treatment',
+      isNew: !treatmentData,
+      data: treatmentData
+    })
+  }
+
   const value = {
     drawerOpen,
     drawerContent,
@@ -62,7 +70,8 @@ export const DrawerProvider = ({ children }) => {
     openNotificationsDrawer,
     openUserDrawer,
     openSearchDrawer,
-    openQuickActionsDrawer
+    openQuickActionsDrawer,
+    openTreatmentDrawer
   }
 
   return (

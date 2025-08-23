@@ -10,6 +10,7 @@ const UserDrawer = ({ onClose, user = null }) => {
     medicName: '',
     email: '',
     phone: '',
+    role: 'doctor',
     dutyDays: []
   })
   
@@ -23,6 +24,7 @@ const UserDrawer = ({ onClose, user = null }) => {
         medicName: user.medicName || user.firstName + ' ' + user.lastName || '',
         email: user.email || '',
         phone: user.phone || '',
+        role: user.role || 'doctor',
         dutyDays: user.dutyDays || []
       })
     } else {
@@ -31,49 +33,32 @@ const UserDrawer = ({ onClose, user = null }) => {
         medicName: '',
         email: '',
         phone: '',
+        role: 'doctor',
         dutyDays: []
       })
     }
     setValidationErrors({})
   }, [user])
 
-  // Validare în timp real
+  // Validare folosind userManager
   const validateField = (name, value) => {
-    const errors = {}
+    const testData = { ...formData, [name]: value }
+    const validationResult = userManager.validateUser(testData)
     
-    switch (name) {
-      case 'medicName':
-        if (!value.trim()) {
-          errors.medicName = 'Numele medicului este obligatoriu'
-        } else if (value.trim().length < 2) {
-          errors.medicName = 'Numele medicului trebuie să aibă cel puțin 2 caractere'
-        }
-        break
-        
-      case 'email':
-        if (!value.trim()) {
-          errors.email = 'Email-ul este obligatoriu'
-        } else if (!userManager.isValidEmail(value)) {
-          errors.email = 'Email-ul nu este valid'
-        }
-        break
-        
-      case 'phone':
-        if (!value.trim()) {
-          errors.phone = 'Telefonul este obligatoriu'
-        } else if (!userManager.isValidPhone(value)) {
-          errors.phone = 'Telefonul nu este valid'
-        }
-        break
-        
-      case 'dutyDays':
-        if (!value || value.length === 0) {
-          errors.dutyDays = 'Cel puțin o zi de serviciu trebuie selectată'
-        }
-        break
+    if (validationResult.isValid) {
+      return {}
     }
     
-    return errors
+    // Găsește eroarea pentru câmpul curent
+    const fieldError = validationResult.errors.find(error => {
+      if (name === 'medicName' && error.includes('Numele medicului')) return true
+      if (name === 'email' && error.includes('Email')) return true
+      if (name === 'dutyDays' && error.includes('zi de serviciu')) return true
+      if (name === 'role' && error.includes('Rol')) return true
+      return false
+    })
+    
+    return fieldError ? { [name]: fieldError } : {}
   }
 
   const handleInputChange = (e) => {
@@ -120,14 +105,19 @@ const UserDrawer = ({ onClose, user = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Validare completă
-    const errors = {}
-    Object.keys(formData).forEach(field => {
-      const fieldErrors = validateField(field, formData[field])
-      Object.assign(errors, fieldErrors)
-    })
+    // Validare folosind userManager
+    const validationResult = userManager.validateUser(formData)
     
-    if (Object.keys(errors).length > 0) {
+    if (!validationResult.isValid) {
+      // Convertește erorile în format pentru UI
+      const errors = {}
+      validationResult.errors.forEach(error => {
+        if (error.includes('Numele medicului')) errors.medicName = error
+        else if (error.includes('Email')) errors.email = error
+        else if (error.includes('zi de serviciu')) errors.dutyDays = error
+        else if (error.includes('Rol')) errors.role = error
+      })
+      
       setValidationErrors(errors)
       return
     }
@@ -252,7 +242,7 @@ const UserDrawer = ({ onClose, user = null }) => {
                 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Telefon *
+                    Telefon
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -264,13 +254,36 @@ const UserDrawer = ({ onClose, user = null }) => {
                       className={`w-full p-3 pl-10 border rounded-lg ${
                         validationErrors.phone ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      placeholder="+40 123 456 789"
+                      placeholder="+40 123 456 789 (opțional)"
                     />
                   </div>
                   {validationErrors.phone && (
                     <p className="text-red-500 text-sm mt-1">{validationErrors.phone}</p>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Rol *
+                </label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleInputChange}
+                  className={`w-full p-3 border rounded-lg ${
+                    validationErrors.role ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="doctor">Medic</option>
+                  <option value="nurse">Asistent medical</option>
+                  <option value="specialist">Specialist</option>
+                  <option value="resident">Rezident</option>
+                  <option value="admin">Administrator</option>
+                </select>
+                {validationErrors.role && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.role}</p>
+                )}
               </div>
 
               <div>

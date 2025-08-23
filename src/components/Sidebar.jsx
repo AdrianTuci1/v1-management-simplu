@@ -47,10 +47,10 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocati
           view: 'operations-people'
         },
         {
-          id: 'operations-activities',
-          label: 'Activități',
+          id: 'operations-treatments',
+          label: 'Tratamente',
           icon: Activity,
-          view: 'operations-activities'
+          view: 'operations-treatments'
         }
       ]
     },
@@ -70,6 +70,19 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocati
           label: 'Inventar',
           icon: Package,
           view: 'business-inventory'
+        }
+      ]
+    },
+    {
+      id: 'ai-agent',
+      label: 'AI AGENT',
+      icon: Activity,
+      submenu: [
+        {
+          id: 'operations-activities',
+          label: 'Activități',
+          icon: Activity,
+          view: 'operations-activities'
         },
         {
           id: 'business-processes',
