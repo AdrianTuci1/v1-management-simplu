@@ -404,8 +404,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
       
       {/* Drawer Content */}
       <div className="relative z-50 h-full w-full max-w-2xl bg-white shadow-xl flex flex-col">
-        {/* Header */}
-        <div className="drawer-header">
+        {/* Header - Fixed */}
+        <div className="flex items-center justify-between border-b border-slate-200 flex-shrink-0 p-4">
           <div>
             <h2 className="text-xl font-semibold">
               {isNewPatient ? 'Pacient nou' : 'Editare pacient'}
@@ -422,8 +422,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
           </button>
         </div>
 
-        {/* Navigation */}
-        <div className="flex border-b border-slate-200">
+        {/* Navigation - Fixed */}
+        <div className="flex border-b border-slate-200 flex-shrink-0">
           {[
             { id: 1, label: 'Detalii pacient', icon: User },
             { id: 2, label: 'Note dentare', icon: Pill },
@@ -447,8 +447,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
           })}
         </div>
 
-        {/* Content */}
-        <div className="drawer-content">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4">
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
               {error}
@@ -458,8 +458,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
           {renderMenu()}
         </div>
 
-        {/* Footer */}
-        <div className="drawer-footer">
+        {/* Footer - Fixed */}
+        <div className="flex items-center justify-between border-t border-slate-200 flex-shrink-0 p-4">
           <div className="flex gap-2">
             {!isNewPatient && (
               <button
