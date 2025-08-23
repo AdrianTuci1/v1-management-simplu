@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
 import { useProducts } from '../../hooks/useProducts.js';
 import { productManager } from '../../business/productManager.js';
+import { 
+  Drawer, 
+  DrawerHeader, 
+  DrawerContent, 
+  DrawerFooter 
+} from '../ui/drawer';
 
 const ProductDrawer = ({ isOpen, onClose, product = null }) => {
   const { addProduct, updateProduct, deleteProduct, loading, error } = useProducts();
@@ -123,158 +129,178 @@ const ProductDrawer = ({ isOpen, onClose, product = null }) => {
   // Obține categoriile disponibile
   const categories = productManager.getCategories();
 
+  if (!isOpen) return null;
+
   return (
-    <div className="p-6">
+    <Drawer onClose={onClose} size="default">
+      <DrawerHeader
+        title={isEditing ? 'Editează Produs' : 'Produs Nou'}
+        subtitle={isEditing ? 'Modifică detaliile produsului' : 'Adaugă un produs nou în inventar'}
+        onClose={onClose}
+        variant="default"
+      />
 
-          {/* Error Display */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center">
-                <AlertTriangle className="h-4 w-4 text-red-500 mr-2" />
-                <span className="text-red-700 text-sm">{error}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Form */}
-          <div className="space-y-4">
-            {/* Nume Produs */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nume Produs *
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.name ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Introdu numele produsului"
-              />
-              {validationErrors.name && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
-              )}
-            </div>
-
-            {/* Preț */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Preț (RON) *
-              </label>
-              <input
-                type="number"
-                name="price"
-                value={formData.price}
-                onChange={handleInputChange}
-                step="0.01"
-                min="0"
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.price ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="0.00"
-              />
-              {validationErrors.price && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
-              )}
-            </div>
-
-            {/* Categorie */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Categorie *
-              </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.category ? 'border-red-300' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Selectează o categorie</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              {validationErrors.category && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.category}</p>
-              )}
-            </div>
-
-            {/* Stoc */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Stoc *
-              </label>
-              <input
-                type="number"
-                name="stock"
-                value={formData.stock}
-                onChange={handleInputChange}
-                min="0"
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.stock ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="0"
-              />
-              {validationErrors.stock && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.stock}</p>
-              )}
-            </div>
-
-            {/* Nivel de Reîncărcare */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nivel de Reîncărcare *
-              </label>
-              <input
-                type="number"
-                name="reorderLevel"
-                value={formData.reorderLevel}
-                onChange={handleInputChange}
-                min="0"
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.reorderLevel ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="0"
-              />
-              <p className="text-gray-500 text-sm mt-1">
-                Produsul va fi marcat ca "stoc scăzut" când cantitatea ajunge la acest nivel
-              </p>
-              {validationErrors.reorderLevel && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.reorderLevel}</p>
-              )}
+      <DrawerContent padding="spacious">
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <span className="text-red-700 text-sm">{error}</span>
             </div>
           </div>
+        )}
 
-          {/* Actions */}
-          <div className="flex gap-3 mt-8">
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="flex-1 btn btn-primary flex items-center justify-center"
+        {/* Form */}
+        <div className="space-y-6">
+          {/* Nume Produs */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Nume Produs *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.name ? 'border-red-300' : 'border-gray-300'
+              }`}
+              placeholder="Introdu numele produsului"
+            />
+            {validationErrors.name && (
+              <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
+            )}
+          </div>
+
+          {/* Preț */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Preț (RON) *
+            </label>
+            <input
+              type="number"
+              name="price"
+              value={formData.price}
+              onChange={handleInputChange}
+              step="0.01"
+              min="0"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.price ? 'border-red-300' : 'border-gray-300'
+              }`}
+              placeholder="0.00"
+            />
+            {validationErrors.price && (
+              <p className="text-red-500 text-sm mt-1">{validationErrors.price}</p>
+            )}
+          </div>
+
+          {/* Categorie */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Categorie *
+            </label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleInputChange}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.category ? 'border-red-300' : 'border-gray-300'
+              }`}
             >
-              <Save className="h-4 w-4 mr-2" />
-              {loading ? 'Se salvează...' : 'Salvează'}
-            </button>
-            
-            {isEditing && (
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="btn btn-danger flex items-center justify-center"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Șterge
-              </button>
+              <option value="">Selectează o categorie</option>
+              {categories.map(category => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+            {validationErrors.category && (
+              <p className="text-red-500 text-sm mt-1">{validationErrors.category}</p>
+            )}
+          </div>
+
+          {/* Stoc */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Stoc *
+            </label>
+            <input
+              type="number"
+              name="stock"
+              value={formData.stock}
+              onChange={handleInputChange}
+              min="0"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.stock ? 'border-red-300' : 'border-gray-300'
+              }`}
+              placeholder="0"
+            />
+            {validationErrors.stock && (
+              <p className="text-red-500 text-sm mt-1">{validationErrors.stock}</p>
+            )}
+          </div>
+
+          {/* Nivel de Reîncărcare */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Nivel de Reîncărcare *
+            </label>
+            <input
+              type="number"
+              name="reorderLevel"
+              value={formData.reorderLevel}
+              onChange={handleInputChange}
+              min="0"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.reorderLevel ? 'border-red-300' : 'border-gray-300'
+              }`}
+              placeholder="0"
+            />
+            <p className="text-gray-500 text-sm mt-1">
+              Produsul va fi marcat ca "stoc scăzut" când cantitatea ajunge la acest nivel
+            </p>
+            {validationErrors.reorderLevel && (
+              <p className="text-red-500 text-sm mt-1">{validationErrors.reorderLevel}</p>
             )}
           </div>
         </div>
-      );
-    };
+      </DrawerContent>
+
+      <DrawerFooter variant="default">
+        <div className="flex gap-3">
+          {isEditing && (
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Șterge</span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+          >
+            Anulează
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            <span>{loading ? 'Se salvează...' : 'Salvează'}</span>
+          </button>
+        </div>
+      </DrawerFooter>
+    </Drawer>
+  );
+};
 
 export default ProductDrawer;

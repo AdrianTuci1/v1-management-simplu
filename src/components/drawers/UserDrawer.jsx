@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react'
 import { X, Save, Trash2, User, Mail, Phone, AlertCircle } from 'lucide-react'
 import { useUsers } from '../../hooks/useUsers.js'
 import { userManager } from '../../business/userManager.js'
+import { 
+  Drawer, 
+  DrawerHeader, 
+  DrawerContent, 
+  DrawerFooter 
+} from '../ui/drawer'
 
 const UserDrawer = ({ onClose, user = null }) => {
   const { addUser, updateUser, deleteUser, loading, error } = useUsers()
@@ -155,200 +161,182 @@ const UserDrawer = ({ onClose, user = null }) => {
     'Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'
   ]
 
-
-
   return (
-    <div className="drawer">
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose}></div>
-      
-      {/* Drawer Content */}
-      <div className="relative z-50 h-full w-full max-w-2xl bg-white shadow-xl flex flex-col">
-        {/* Header */}
-        <div className="drawer-header">
-          <div>
-            <h2 className="text-xl font-semibold">
-              {user ? 'Editează medic' : 'Medic nou'}
-            </h2>
-            <p className="text-sm text-slate-600">
-              {user ? 'Modifică informațiile medicului' : 'Adaugă un medic nou în sistem'}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="btn btn-ghost btn-sm"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <Drawer onClose={onClose} size="default">
+      <DrawerHeader
+        title={user ? 'Editează medic' : 'Medic nou'}
+        subtitle={user ? 'Modifică informațiile medicului' : 'Adaugă un medic nou în sistem'}
+        onClose={onClose}
+        variant="default"
+      />
 
-                {/* Content */}
-        <div className="drawer-content">
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-              {error}
+      <DrawerContent padding="spacious">
+        {error && (
+          <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <span className="text-red-700 text-sm">{error}</span>
             </div>
-          )}
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Informații de bază */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Informații medic
-              </h3>
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Informații de bază */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Informații medic
+            </h3>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Nume medic *
+              </label>
+              <input
+                type="text"
+                name="medicName"
+                value={formData.medicName}
+                onChange={handleInputChange}
+                className={`w-full p-3 border rounded-lg ${
+                  validationErrors.medicName ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Numele complet al medicului"
+              />
+              {validationErrors.medicName && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.medicName}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Email *
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`w-full p-3 pl-10 border rounded-lg ${
+                      validationErrors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="email@example.com"
+                  />
+                </div>
+                {validationErrors.email && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.email}</p>
+                )}
+              </div>
               
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Nume medic *
+                  Telefon
                 </label>
-                <input
-                  type="text"
-                  name="medicName"
-                  value={formData.medicName}
-                  onChange={handleInputChange}
-                  className={`w-full p-3 border rounded-lg ${
-                    validationErrors.medicName ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Numele complet al medicului"
-                />
-                {validationErrors.medicName && (
-                  <p className="text-red-500 text-sm mt-1">{validationErrors.medicName}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Email *
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className={`w-full p-3 pl-10 border rounded-lg ${
-                        validationErrors.email ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="email@example.com"
-                    />
-                  </div>
-                  {validationErrors.email && (
-                    <p className="text-red-500 text-sm mt-1">{validationErrors.email}</p>
-                  )}
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className={`w-full p-3 pl-10 border rounded-lg ${
+                      validationErrors.phone ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="+40 123 456 789 (opțional)"
+                  />
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Telefon
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      className={`w-full p-3 pl-10 border rounded-lg ${
-                        validationErrors.phone ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="+40 123 456 789 (opțional)"
-                    />
-                  </div>
-                  {validationErrors.phone && (
-                    <p className="text-red-500 text-sm mt-1">{validationErrors.phone}</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Rol *
-                </label>
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={handleInputChange}
-                  className={`w-full p-3 border rounded-lg ${
-                    validationErrors.role ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                >
-                  <option value="doctor">Medic</option>
-                  <option value="nurse">Asistent medical</option>
-                  <option value="specialist">Specialist</option>
-                  <option value="resident">Rezident</option>
-                  <option value="admin">Administrator</option>
-                </select>
-                {validationErrors.role && (
-                  <p className="text-red-500 text-sm mt-1">{validationErrors.role}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Zile de serviciu *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {daysOfWeek.map(day => (
-                    <label key={day} className="flex items-center space-x-2 p-2 border rounded-lg hover:bg-gray-50">
-                      <input
-                        type="checkbox"
-                        checked={formData.dutyDays.includes(day)}
-                        onChange={() => handleDutyDaysChange(day)}
-                        className="rounded border-gray-300"
-                      />
-                      <span className="text-sm">{day}</span>
-                    </label>
-                  ))}
-                </div>
-                {validationErrors.dutyDays && (
-                  <p className="text-red-500 text-sm mt-1">{validationErrors.dutyDays}</p>
+                {validationErrors.phone && (
+                  <p className="text-red-500 text-sm mt-1">{validationErrors.phone}</p>
                 )}
               </div>
             </div>
-          </form>
-        </div>
 
-        {/* Footer */}
-        <div className="drawer-footer">
-          <div className="flex gap-2">
-            {user && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isSubmitting}
-                className="btn btn-destructive"
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Rol *
+              </label>
+              <select
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                className={`w-full p-3 border rounded-lg ${
+                  validationErrors.role ? 'border-red-500' : 'border-gray-300'
+                }`}
               >
-                <Trash2 className="h-4 w-4" />
-                Șterge
-              </button>
-            )}
+                <option value="doctor">Medic</option>
+                <option value="nurse">Asistent medical</option>
+                <option value="specialist">Specialist</option>
+                <option value="resident">Rezident</option>
+                <option value="admin">Administrator</option>
+              </select>
+              {validationErrors.role && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.role}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Zile de serviciu *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {daysOfWeek.map(day => (
+                  <label key={day} className="flex items-center space-x-2 p-2 border rounded-lg hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={formData.dutyDays.includes(day)}
+                      onChange={() => handleDutyDaysChange(day)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm">{day}</span>
+                  </label>
+                ))}
+              </div>
+              {validationErrors.dutyDays && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.dutyDays}</p>
+              )}
+            </div>
           </div>
-          
-          <div className="flex gap-2">
+        </form>
+      </DrawerContent>
+
+      <DrawerFooter variant="default">
+        <div className="flex gap-2">
+          {user && (
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleDelete}
               disabled={isSubmitting}
-              className="btn btn-outline"
+              className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
             >
-              Anulează
+              <Trash2 className="h-4 w-4" />
+              <span>Șterge</span>
             </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting || loading}
-              className="btn btn-primary"
-            >
-              <Save className="h-4 w-4" />
-              {isSubmitting ? 'Salvând...' : 'Salvează'}
-            </button>
-          </div>
+          )}
         </div>
-      </div>
-    </div>
+        
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+          >
+            Anulează
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting || loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            <span>{isSubmitting ? 'Salvând...' : 'Salvează'}</span>
+          </button>
+        </div>
+      </DrawerFooter>
+    </Drawer>
   )
 }
 

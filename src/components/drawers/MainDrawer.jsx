@@ -43,28 +43,6 @@ const Drawer = ({ open, content, onClose }) => {
       
       {/* Drawer */}
       <div className={`drawer ${open ? '' : 'closed'}`}>
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-lg font-semibold">
-            {content?.type === 'menu' && 'Meniu'}
-            {content?.type === 'notifications' && 'Notificări'}
-            {content?.type === 'user' && 'Profil Utilizator'}
-            {content?.type === 'search' && 'Căutare'}
-            {content?.type === 'appointment' && 'Programare'}
-            {content?.type === 'new-person' && 'Pacient nou'}
-            {content?.type === 'edit-person' && 'Editare pacient'}
-            {content?.type === 'product' && 'Produs'}
-            {content?.type === 'medic' && 'Medic'}
-            {content?.type === 'treatment' && 'Tratament'}
-            {!content?.type && 'Drawer'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="btn btn-ghost btn-sm"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">

@@ -41,9 +41,10 @@ const PatientCombobox = ({
           variant="outline"
           role="combobox"
           mode="input"
+          size="lg"
           placeholder={!value}
           aria-expanded={open}
-          className={cn("w-full justify-between", className)}
+          className={cn("w-full justify-between bg-white border-gray-300", className)}
           disabled={loading}
         >
           <span className={cn('truncate')}>

@@ -42,13 +42,14 @@ const DoctorCombobox = ({
           variant="outline"
           role="combobox"
           mode="input"
+          size="lg"
           placeholder={!value}
           aria-expanded={open}
-          className={cn("w-full justify-between", className)}
+          className={cn("w-full justify-between bg-white border-gray-300", className)}
           disabled={loading}
         >
           <span className={cn('truncate')}>
-            {selectedDoctor ? selectedDoctor.name : placeholder}
+            {selectedDoctor ? selectedDoctor.medicName : placeholder}
           </span>
           <ButtonArrow />
         </Button>
@@ -74,7 +75,7 @@ const DoctorCombobox = ({
                     setOpen(false);
                   }}
                 >
-                  <span className="truncate">{user.name}</span>
+                  <span className="truncate">{user.medicName}</span>
                   {value === user.id.toString() && <CommandCheck />}
                 </CommandItem>
               ))}

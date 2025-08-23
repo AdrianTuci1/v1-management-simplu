@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { userService } from '../services/userService.js'
 import { userManager } from '../business/userManager.js'
+import { indexedDb } from '../data/infrastructure/db.js'
 
 export const useUsers = () => {
   const [users, setUsers] = useState([])
@@ -30,8 +31,34 @@ export const useUsers = () => {
       setUsers(filteredUsers)
       setUserCount(filteredUsers.length)
     } catch (err) {
-      setError(err.message)
-      console.error('Error loading users:', err)
+      // Încearcă să încarce din cache local dacă API-ul eșuează
+      try {
+        console.warn('API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('users')
+        
+        // Aplică filtrele pe datele din cache
+        let filteredUsers = cachedData
+        
+        if (allFilters.status) {
+          filteredUsers = filteredUsers.filter(user => user.status === allFilters.status)
+        }
+        if (allFilters.role) {
+          filteredUsers = filteredUsers.filter(user => user.role === allFilters.role)
+        }
+        if (allFilters.specialization) {
+          filteredUsers = filteredUsers.filter(user => user.specialization === allFilters.specialization)
+        }
+        
+        // Aplică sortarea
+        filteredUsers = userManager.sortUsers(filteredUsers, sortBy, sortOrder)
+        
+        setUsers(filteredUsers)
+        setUserCount(filteredUsers.length)
+        setError('Conectare la server eșuată. Se afișează datele din cache local.')
+      } catch (cacheErr) {
+        setError(err.message)
+        console.error('Error loading users:', err)
+      }
     } finally {
       setLoading(false)
     }
@@ -111,9 +138,27 @@ export const useUsers = () => {
       setUserCount(searchResults.length)
       return searchResults
     } catch (err) {
-      setError(err.message)
-      console.error('Error searching users:', err)
-      return []
+      // Încearcă să încarce din cache local dacă API-ul eșuează
+      try {
+        console.warn('API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('users')
+        
+        const searchTermLower = query.toLowerCase()
+        const filteredData = cachedData.filter(user => 
+          user.name.toLowerCase().includes(searchTermLower) ||
+          user.email.toLowerCase().includes(searchTermLower) ||
+          (user.phone && user.phone.includes(query))
+        ).slice(0, limit)
+        
+        setUsers(filteredData)
+        setUserCount(filteredData.length)
+        setError('Conectare la server eșuată. Se afișează datele din cache local.')
+        return filteredData
+      } catch (cacheErr) {
+        setError(err.message)
+        console.error('Error searching users:', err)
+        return []
+      }
     } finally {
       setLoading(false)
     }

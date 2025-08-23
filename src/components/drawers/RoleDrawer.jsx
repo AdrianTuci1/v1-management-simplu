@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react'
 import { X, Save, Trash2, Shield, Check, AlertCircle } from 'lucide-react'
 import { useRoles } from '../../hooks/useRoles.js'
 import { usePermissions } from '../../hooks/usePermissions.js'
+import { 
+  Drawer, 
+  DrawerHeader, 
+  DrawerContent, 
+  DrawerFooter 
+} from '../ui/drawer'
 
 const RoleDrawer = ({ isOpen, onClose, roleData = null }) => {
   const { addRole, updateRole, deleteRole } = useRoles()
@@ -194,186 +200,167 @@ const RoleDrawer = ({ isOpen, onClose, roleData = null }) => {
   if (!isOpen) return null
 
   return (
-    <div className="drawer">
+    <Drawer onClose={onClose} size="default">
+      <DrawerHeader
+        title={isEditing ? 'Editează Rol' : 'Rol Nou'}
+        subtitle={isEditing ? 'Modifică detaliile rolului' : 'Creează un nou rol'}
+        onClose={onClose}
+        variant="default"
+      />
 
-      <div className="bg-white w-full max-w-2xl h-full flex flex-col">
-        {/* Header - Fix */}
-        <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <Shield className="h-6 w-6 text-primary" />
-            <div>
-              <h2 className="text-xl font-semibold">
-                {isEditing ? 'Editează Rol' : 'Rol Nou'}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {isEditing ? 'Modifică detaliile rolului' : 'Creează un nou rol'}
-              </p>
-            </div>
+      <DrawerContent padding="spacious">
+        {/* Eroare generală */}
+        {errors.general && (
+          <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-6">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            <span className="text-red-700">{errors.general}</span>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        )}
 
-        {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Eroare generală */}
-          {errors.general && (
-            <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-red-500" />
-              <span className="text-red-700">{errors.general}</span>
-            </div>
-          )}
-
-          {/* Formular de bază */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Nume */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Nume Rol *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                  errors.name ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="ex: Administrator"
-              />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-              )}
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Status
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="active">Activ</option>
-                <option value="inactive">Inactiv</option>
-                <option value="archived">Arhivat</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Descriere */}
+        {/* Formular de bază */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Nume */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Descriere *
+              Nume Rol *
             </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                errors.description ? 'border-red-300' : 'border-gray-300'
+                errors.name ? 'border-red-300' : 'border-gray-300'
               }`}
-              placeholder="Descrie responsabilitățile și accesul acestui rol..."
+              placeholder="ex: Administrator"
             />
-            {errors.description && (
-              <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600">{errors.name}</p>
             )}
           </div>
 
-          {/* Permisiuni */}
+          {/* Status */}
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium">Permisiuni</h3>
-              <span className="text-sm text-muted-foreground">
-                {formData.permissions.length} permisiuni selectate
-              </span>
-            </div>
+            <label className="block text-sm font-medium mb-2">
+              Status
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="active">Activ</option>
+              <option value="inactive">Inactiv</option>
+              <option value="archived">Arhivat</option>
+            </select>
+          </div>
+        </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              {availableResources.map((resource) => (
-                <div key={resource.value} className="border rounded-lg p-4">
-                  {/* Header resursă */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={allPermissionsSelectedForResource(resource.value)}
-                        ref={(el) => {
-                          if (el) {
-                            el.indeterminate = somePermissionsSelectedForResource(resource.value)
-                          }
-                        }}
-                        onChange={() => toggleAllPermissionsForResource(resource.value)}
-                        className="rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <span className="font-medium text-gray-900">{resource.label}</span>
-                    </div>
-                  </div>
+        {/* Descriere */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-2">
+            Descriere *
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            rows={3}
+            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+              errors.description ? 'border-red-300' : 'border-gray-300'
+            }`}
+            placeholder="Descrie responsabilitățile și accesul acestui rol..."
+          />
+          {errors.description && (
+            <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+          )}
+        </div>
 
-                  {/* Acțiuni pentru această resursă */}
-                  <div className="space-y-2">
-                    {availableActions.map((action) => (
-                      <div key={action.value} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={hasPermission(resource.value, action.value)}
-                          onChange={() => togglePermission(resource.value, action.value)}
-                          className="rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                        <span className="text-sm text-gray-700">{action.label}</span>
-                      </div>
-                    ))}
+        {/* Permisiuni */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium">Permisiuni</h3>
+            <span className="text-sm text-muted-foreground">
+              {formData.permissions.length} permisiuni selectate
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {availableResources.map((resource) => (
+              <div key={resource.value} className="border rounded-lg p-4">
+                {/* Header resursă */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={allPermissionsSelectedForResource(resource.value)}
+                      ref={(el) => {
+                        if (el) {
+                          el.indeterminate = somePermissionsSelectedForResource(resource.value)
+                        }
+                      }}
+                      onChange={() => toggleAllPermissionsForResource(resource.value)}
+                      className="rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <span className="font-medium text-gray-900">{resource.label}</span>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Acțiuni pentru această resursă */}
+                <div className="space-y-2">
+                  {availableActions.map((action) => (
+                    <div key={action.value} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={hasPermission(resource.value, action.value)}
+                        onChange={() => togglePermission(resource.value, action.value)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <span className="text-sm text-gray-700">{action.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+      </DrawerContent>
 
-        {/* Footer - Fix */}
-        <div className="flex items-center justify-between p-6 border-t bg-gray-50 flex-shrink-0">
-          <div className="flex items-center space-x-4">
-            {isEditing && (
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Șterge</span>
-              </button>
+      <DrawerFooter variant="default">
+        <div className="flex items-center space-x-4">
+          {isEditing && (
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Șterge</span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+          >
+            Anulează
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+          >
+            {loading ? (
+              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
             )}
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            >
-              Anulează
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              <span>{isEditing ? 'Actualizează' : 'Creează'}</span>
-            </button>
-          </div>
+            <span>{isEditing ? 'Actualizează' : 'Creează'}</span>
+          </button>
         </div>
-      </div>
-    </div>
+      </DrawerFooter>
+    </Drawer>
   )
 }
 

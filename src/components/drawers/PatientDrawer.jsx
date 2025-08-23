@@ -1,5 +1,4 @@
 import { 
-  X, 
   Plus, 
   Save,
   Loader2,
@@ -15,6 +14,13 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
+import { 
+  Drawer, 
+  DrawerHeader, 
+  DrawerNavigation, 
+  DrawerContent, 
+  DrawerFooter 
+} from '../ui/drawer'
 
 const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
@@ -397,110 +403,77 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
     }
   }
 
+  const navigationItems = [
+    { id: 1, label: 'Detalii pacient', icon: User },
+    { id: 2, label: 'Note dentare', icon: Pill },
+    { id: 3, label: 'Programări', icon: Calendar }
+  ]
+
   return (
-    <div className="drawer">
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose}></div>
+    <Drawer onClose={onClose}>
+      <DrawerHeader
+        title={isNewPatient ? 'Pacient nou' : 'Editare pacient'}
+        subtitle={isNewPatient ? 'Adaugă un pacient nou în sistem' : 'Modifică informațiile pacientului'}
+        onClose={onClose}
+      />
       
-      {/* Drawer Content */}
-      <div className="relative z-50 h-full w-full max-w-2xl bg-white shadow-xl flex flex-col">
-        {/* Header - Fixed */}
-        <div className="flex items-center justify-between border-b border-slate-200 flex-shrink-0 p-4">
-          <div>
-            <h2 className="text-xl font-semibold">
-              {isNewPatient ? 'Pacient nou' : 'Editare pacient'}
-            </h2>
-            <p className="text-sm text-slate-600">
-              {isNewPatient ? 'Adaugă un pacient nou în sistem' : 'Modifică informațiile pacientului'}
-            </p>
+      <DrawerNavigation
+        items={navigationItems}
+        activeItem={currentMenu}
+        onItemChange={setCurrentMenu}
+      />
+      
+      <DrawerContent>
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+            {error}
           </div>
-          <button
-            onClick={onClose}
-            className="btn btn-ghost btn-sm"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Navigation - Fixed */}
-        <div className="flex border-b border-slate-200 flex-shrink-0">
-          {[
-            { id: 1, label: 'Detalii pacient', icon: User },
-            { id: 2, label: 'Note dentare', icon: Pill },
-            { id: 3, label: 'Programări', icon: Calendar }
-          ].map((menu) => {
-            const Icon = menu.icon
-            return (
-              <button
-                key={menu.id}
-                onClick={() => setCurrentMenu(menu.id)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  currentMenu === menu.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{menu.label}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          
-          {renderMenu()}
-        </div>
-
-        {/* Footer - Fixed */}
-        <div className="flex items-center justify-between border-t border-slate-200 flex-shrink-0 p-4">
-          <div className="flex gap-2">
-            {!isNewPatient && (
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="btn btn-destructive"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
-                Șterge
-              </button>
-            )}
-          </div>
-          
-          <div className="flex gap-2">
+        )}
+        
+        {renderMenu()}
+      </DrawerContent>
+      
+      <DrawerFooter>
+        <div className="flex gap-2">
+          {!isNewPatient && (
             <button
-              onClick={onClose}
-              className="btn btn-outline"
+              onClick={handleDelete}
               disabled={loading}
-            >
-              Anulează
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="btn btn-primary"
+              className="btn btn-destructive"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Save className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" />
               )}
-              {isNewPatient ? 'Adaugă' : 'Salvează'}
+              Șterge
             </button>
-          </div>
+          )}
         </div>
-      </div>
-    </div>
+        
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="btn btn-outline"
+            disabled={loading}
+          >
+            Anulează
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="btn btn-primary"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {isNewPatient ? 'Adaugă' : 'Salvează'}
+          </button>
+        </div>
+      </DrawerFooter>
+    </Drawer>
   )
 }
 

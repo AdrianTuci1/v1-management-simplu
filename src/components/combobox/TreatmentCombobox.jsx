@@ -41,9 +41,10 @@ const TreatmentCombobox = ({
           variant="outline"
           role="combobox"
           mode="input"
+          size="lg"
           placeholder={!value}
           aria-expanded={open}
-          className={cn("w-full justify-between", className)}
+          className={cn("w-full justify-between bg-white border-gray-300", className)}
           disabled={loading}
         >
           <span className={cn('truncate')}>
@@ -67,13 +68,13 @@ const TreatmentCombobox = ({
               {treatments.map((treatment) => (
                 <CommandItem
                   key={treatment.id}
-                  value={treatment.name}
+                  value={treatment.treatmentType}
                   onSelect={() => {
                     onValueChange(treatment.id.toString());
                     setOpen(false);
                   }}
                 >
-                  <span className="truncate">{treatment.name}</span>
+                  <span className="truncate">{treatment.treatmentType}</span>
                   {value === treatment.id.toString() && <CommandCheck />}
                 </CommandItem>
               ))}

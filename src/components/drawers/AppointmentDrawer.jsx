@@ -1,16 +1,25 @@
 import { 
-  X, 
   Plus, 
   CheckCircle, 
   Upload,
   Loader2,
-  Trash2
+  Trash2,
+  Calendar,
+  FileText,
+  Image
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAppointments } from '../../hooks/useAppointments.js'
 import PatientCombobox from '../combobox/PatientCombobox.jsx'
 import DoctorCombobox from '../combobox/DoctorCombobox.jsx'
 import TreatmentCombobox from '../combobox/TreatmentCombobox.jsx'
+import { 
+  Drawer, 
+  DrawerHeader, 
+  DrawerNavigation, 
+  DrawerContent, 
+  DrawerFooter 
+} from '../ui/drawer'
 
 const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
@@ -275,50 +284,6 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="space-y-2">
-        {!isNewAppointment && (
-          <button
-            onClick={handleAppointmentDone}
-            disabled={loading}
-            className="w-full btn btn-primary"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <CheckCircle className="h-4 w-4 mr-2" />
-            )}
-            Programarea este gata
-          </button>
-        )}
-        
-        <button
-          onClick={handleSave}
-          disabled={loading}
-          className="w-full btn btn-outline"
-        >
-          {loading ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : null}
-          {isNewAppointment ? 'Creează programarea' : 'Salvează modificările'}
-        </button>
-        
-        {!isNewAppointment && (
-          <button
-            onClick={handleDelete}
-            disabled={loading}
-            className="w-full btn btn-destructive"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4 mr-2" />
-            )}
-            Șterge programarea
-          </button>
-        )}
-      </div>
-
       {/* Error Display */}
       {error && (
         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -394,75 +359,69 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     }
   }
 
+  const navigationItems = [
+    { id: 1, label: 'Detalii', icon: Calendar },
+    { id: 2, label: 'Note', icon: FileText },
+    { id: 3, label: 'Galerie', icon: Image, disabled: isNewAppointment }
+  ]
+
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/50 z-40"
-        onClick={onClose}
+    <Drawer onClose={onClose}>
+      <DrawerHeader
+        title="Programare"
+        subtitle={isNewAppointment ? 'Programare nouă' : 'Editează programarea'}
+        onClose={onClose}
       />
       
-      {/* Drawer */}
-      <div className="drawer z-50">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div>
-            <h2 className="text-lg font-semibold">Programare</h2>
-            <p className="text-sm text-muted-foreground">
-              {isNewAppointment ? 'Programare nouă' : 'Editează programarea'}
-            </p>
-          </div>
+      <DrawerNavigation
+        items={navigationItems}
+        activeItem={currentMenu}
+        onItemChange={setCurrentMenu}
+      />
+      
+      <DrawerContent>
+        {renderContent()}
+      </DrawerContent>
+      
+      <DrawerFooter>
+        <div className="flex gap-2">
+          {!isNewAppointment && (
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="btn btn-destructive"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Șterge
+            </button>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="btn btn-ghost btn-sm"
+            className="btn btn-outline"
+            disabled={loading}
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Menu Navigation */}
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setCurrentMenu(1)}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              currentMenu === 1 
-                ? 'border-b-2 border-primary text-primary' 
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Detalii
+            Anulează
           </button>
           <button
-            onClick={() => setCurrentMenu(2)}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              currentMenu === 2 
-                ? 'border-b-2 border-primary text-primary' 
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            onClick={handleSave}
+            disabled={loading}
+            className="btn btn-primary"
           >
-            Note
-          </button>
-          <button
-            onClick={() => setCurrentMenu(3)}
-            disabled={isNewAppointment}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              currentMenu === 3 
-                ? 'border-b-2 border-primary text-primary' 
-                : isNewAppointment
-                ? 'text-muted-foreground cursor-not-allowed'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Galerie
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            {isNewAppointment ? 'Creează programarea' : 'Salvează modificările'}
           </button>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {renderContent()}
-        </div>
-      </div>
-    </>
+      </DrawerFooter>
+    </Drawer>
   )
 }
 
