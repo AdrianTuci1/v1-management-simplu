@@ -1,4 +1,5 @@
-import { db } from "../db/indexedDb";
+import { db } from "../infrastructure/db";
+import { apiRequest, buildResourcesEndpoint } from "../infrastructure/apiClient.js";
 
 export class ResourceRepository {
   constructor(resourceType, store = "resources") {
@@ -7,26 +8,50 @@ export class ResourceRepository {
   }
 
   async request(path = "", options = {}) {
-    const res = await fetch(`/api/resources${path}`, {
-      ...options,
-      headers: {
-        "X-Resource-Type": this.resourceType,
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
-    });
+    try {
+      const endpoint = buildResourcesEndpoint(path);
+      return await apiRequest(this.resourceType, endpoint, options);
+    } catch (error) {
+      // Dacă buildResourcesEndpoint eșuează, încercă cu endpoint-ul simplu
+      console.warn('Failed to build resources endpoint, trying simple endpoint:', error.message);
+      const res = await fetch(`/api/resources${path}`, {
+        ...options,
+        headers: {
+          "X-Resource-Type": this.resourceType,
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        },
+      });
 
-    if (!res.ok) {
-      throw new Error(`API error: ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+
+      return res.json();
     }
-
-    return res.json();
   }
 
   async query(params) {
     const query = params ? "?" + new URLSearchParams(params).toString() : "";
     const data = await this.request(query, { method: "GET" });
-    await db.table(this.store).bulkPut(data);
+    
+    // Verifică și asigură-te că toate datele au ID-uri valide
+    if (Array.isArray(data)) {
+      const validData = data.filter(item => {
+        if (!item || !item.id) {
+          console.warn('Item without ID found:', item);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validData.length > 0) {
+        await db.table(this.store).bulkPut(validData);
+      }
+    } else if (data && data.id) {
+      await db.table(this.store).put(data);
+    }
+    
     return data;
   }
 

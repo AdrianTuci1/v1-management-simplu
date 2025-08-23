@@ -1,9 +1,8 @@
 import { RefreshCw, Plus } from 'lucide-react'
-
 import { useDrawer } from '../../contexts/DrawerContext'
 
 const BusinessProcesses = () => {
-  const { openDrawer } = useDrawer()
+  const { openDrawer } = useDrawer();
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

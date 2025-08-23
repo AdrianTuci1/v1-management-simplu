@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
 import { MainDrawer as Drawer } from './components/drawers'
@@ -22,8 +22,11 @@ function AppContent() {
 
   // Check if demo mode is enabled
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
+
+  useCallback(() => {
   console.log('Demo mode enabled:', isDemoMode)
   console.log('VITE_DEMO_MODE value:', import.meta.env.VITE_DEMO_MODE)
+  }, [isDemoMode])
 
   // Load state from localStorage on mount
   useEffect(() => {
