@@ -13,7 +13,7 @@ class AppDatabase extends Dexie {
       members: 'id',
       appointments: 'id, date, doctor, patient, status', // Store pentru programări
       appointmentCounts: 'date, count', // Cache pentru numărul de programări
-      patients: 'id, name, email, phone, status, city, county', // Store pentru pacienți
+      patients: 'resourceId, name, email, phone, status, city, county', // Store pentru pacienți
       products: 'id, name, category, price, stock, reorderLevel', // Store pentru produse
       productCounts: 'category, count', // Cache pentru numărul de produse per categorie
       users: 'id, email, licenseNumber, specialization, status, role', // Store pentru utilizatori (medici)

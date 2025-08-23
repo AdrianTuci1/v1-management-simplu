@@ -107,7 +107,10 @@ const OperationsPeople = () => {
   const sortedPatients = patientManager.sortPatients(patients, sortBy, sortOrder)
 
   // Calculează vârsta
-  const calculateAge = (birthDate) => {
+  const calculateAge = (birthDate, birthYear) => {
+    if (birthYear) {
+      return new Date().getFullYear() - birthYear
+    }
     if (!birthDate) return null
     const today = new Date()
     const birth = new Date(birthDate)
@@ -334,11 +337,11 @@ const OperationsPeople = () => {
                     <th className="text-left p-3 font-medium">Adresa</th>
                     <th className="text-left p-3 font-medium">
                       <button 
-                        onClick={() => handleSort('birthDate')}
+                        onClick={() => handleSort('birthYear')}
                         className="flex items-center gap-1 hover:text-primary"
                       >
                         Vârsta
-                        {sortBy === 'birthDate' && (
+                        {sortBy === 'birthYear' && (
                           <span className="text-xs">
                             {sortOrder === 'asc' ? '↑' : '↓'}
                           </span>
@@ -373,6 +376,11 @@ const OperationsPeople = () => {
                               CNP: {patient.cnp}
                             </div>
                           )}
+                          {patient.resourceId && (
+                            <div className="text-sm text-muted-foreground">
+                              ID: {patient.resourceId}
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="p-3">
@@ -389,6 +397,12 @@ const OperationsPeople = () => {
                       </td>
                       <td className="p-3">
                         <div className="space-y-1">
+                          {patient.address && patient.address !== '.' && (
+                            <div className="flex items-center gap-1 text-sm">
+                              <MapPin className="h-3 w-3" />
+                              {patient.address}
+                            </div>
+                          )}
                           {patient.city && (
                             <div className="flex items-center gap-1 text-sm">
                               <MapPin className="h-3 w-3" />
@@ -400,13 +414,16 @@ const OperationsPeople = () => {
                               {patient.county}
                             </div>
                           )}
+                          {(!patient.address || patient.address === '.') && !patient.city && !patient.county && (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
                         </div>
                       </td>
                       <td className="p-3">
-                        {patient.birthDate ? (
+                        {patient.birthYear || patient.birthDate ? (
                           <div className="flex items-center gap-1 text-sm">
                             <Calendar className="h-3 w-3" />
-                            {calculateAge(patient.birthDate)} ani
+                            {calculateAge(patient.birthDate, patient.birthYear)} ani
                           </div>
                         ) : (
                           <span className="text-muted-foreground text-sm">-</span>
@@ -419,7 +436,7 @@ const OperationsPeople = () => {
                             {patient.insuranceProvider}
                           </div>
                         ) : (
-                          <span className="text-muted-foreground text-sm">Fără asigurare</span>
+                          <span className="text-muted-foreground text-sm">-</span>
                         )}
                       </td>
                       <td className="p-3">

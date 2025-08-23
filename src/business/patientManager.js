@@ -26,21 +26,26 @@ class PatientManager {
       }
     }
 
-    if (patientData.birthDate) {
-      const birthDate = new Date(patientData.birthDate)
-      const today = new Date()
-      if (birthDate > today) {
-        errors.push('Data nașterii nu poate fi în viitor')
+    if (patientData.birthYear) {
+      const currentYear = new Date().getFullYear()
+      const birthYear = parseInt(patientData.birthYear)
+      
+      if (isNaN(birthYear) || birthYear < 1900 || birthYear > currentYear) {
+        errors.push('Anul nașterii trebuie să fie între 1900 și anul curent')
       }
       
-      const age = today.getFullYear() - birthDate.getFullYear()
+      const age = currentYear - birthYear
       if (age > 120) {
         errors.push('Vârsta nu poate fi mai mare de 120 de ani')
       }
     }
 
-    if (patientData.cnp && patientData.cnp.length !== 13) {
-      errors.push('CNP-ul trebuie să aibă exact 13 cifre')
+    if (patientData.gender && !['male', 'female', 'other'].includes(patientData.gender)) {
+      errors.push('Genul trebuie să fie masculin, feminin sau altul')
+    }
+
+    if (patientData.tags && !Array.isArray(patientData.tags)) {
+      errors.push('Etichetele trebuie să fie o listă')
     }
 
     if (errors.length > 0) {
@@ -56,21 +61,12 @@ class PatientManager {
       name: patientData.name?.trim(),
       email: patientData.email?.toLowerCase().trim(),
       phone: patientData.phone?.trim(),
-      birthDate: patientData.birthDate ? new Date(patientData.birthDate).toISOString() : null,
-      cnp: patientData.cnp?.trim() || null,
+      birthYear: patientData.birthYear ? parseInt(patientData.birthYear) : null,
+      gender: patientData.gender || null,
       address: patientData.address?.trim() || null,
-      city: patientData.city?.trim() || null,
-      county: patientData.county?.trim() || null,
-      postalCode: patientData.postalCode?.trim() || null,
-      emergencyContact: patientData.emergencyContact?.trim() || null,
-      emergencyPhone: patientData.emergencyPhone?.trim() || null,
-      medicalHistory: patientData.medicalHistory?.trim() || null,
-      allergies: patientData.allergies?.trim() || null,
-      medications: patientData.medications?.trim() || null,
-      insuranceProvider: patientData.insuranceProvider?.trim() || null,
-      insuranceNumber: patientData.insuranceNumber?.trim() || null,
-      status: patientData.status || 'active',
       notes: patientData.notes?.trim() || null,
+      tags: Array.isArray(patientData.tags) ? patientData.tags : [],
+      status: patientData.status || 'active',
       createdAt: patientData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
@@ -80,10 +76,11 @@ class PatientManager {
   transformPatientForUI(patientData) {
     return {
       ...patientData,
-      birthDate: patientData.birthDate ? new Date(patientData.birthDate).toISOString().split('T')[0] : '',
-      age: patientData.birthDate ? this.calculateAge(patientData.birthDate) : null,
+      birthYear: patientData.birthYear ? patientData.birthYear.toString() : '',
+      age: patientData.birthYear ? this.calculateAgeFromYear(patientData.birthYear) : null,
       fullAddress: this.formatAddress(patientData),
-      statusLabel: this.getStatusLabel(patientData.status)
+      statusLabel: this.getStatusLabel(patientData.status),
+      tags: Array.isArray(patientData.tags) ? patientData.tags : []
     }
   }
 
@@ -101,15 +98,21 @@ class PatientManager {
     return age
   }
 
+  // Calculează vârsta din anul nașterii
+  calculateAgeFromYear(birthYear) {
+    const currentYear = new Date().getFullYear()
+    const birth = parseInt(birthYear)
+    return currentYear - birth
+  }
+
+
+
   // Formatează adresa completă
   formatAddress(patient) {
-    const parts = []
-    if (patient.address) parts.push(patient.address)
-    if (patient.city) parts.push(patient.city)
-    if (patient.county) parts.push(patient.county)
-    if (patient.postalCode) parts.push(patient.postalCode)
-    
-    return parts.length > 0 ? parts.join(', ') : 'Adresa nespecificată'
+    if (patient.address && patient.address.trim()) {
+      return patient.address.trim()
+    }
+    return 'Adresa nespecificată'
   }
 
   // Obține eticheta pentru status
@@ -143,18 +146,22 @@ class PatientManager {
     // Filtrare după vârstă
     if (filters.minAge || filters.maxAge) {
       filtered = filtered.filter(p => {
-        if (!p.birthDate) return false
-        const age = this.calculateAge(p.birthDate)
+        if (!p.birthYear) return false
+        const age = this.calculateAgeFromYear(p.birthYear)
         return (!filters.minAge || age >= filters.minAge) &&
                (!filters.maxAge || age <= filters.maxAge)
       })
     }
 
-    // Filtrare după oraș
-    if (filters.city) {
-      const cityTerm = filters.city.toLowerCase()
+    // Filtrare după gen
+    if (filters.gender) {
+      filtered = filtered.filter(p => p.gender === filters.gender)
+    }
+
+    // Filtrare după etichete
+    if (filters.tags && filters.tags.length > 0) {
       filtered = filtered.filter(p => 
-        p.city && p.city.toLowerCase().includes(cityTerm)
+        p.tags && p.tags.some(tag => filters.tags.includes(tag))
       )
     }
 
@@ -181,9 +188,21 @@ class PatientManager {
           aValue = new Date(a.createdAt || 0)
           bValue = new Date(b.createdAt || 0)
           break
+        case 'birthYear':
+          aValue = a.birthYear || 0
+          bValue = b.birthYear || 0
+          break
         case 'age':
-          aValue = a.birthDate ? this.calculateAge(a.birthDate) : 0
-          bValue = b.birthDate ? this.calculateAge(b.birthDate) : 0
+          aValue = a.birthYear ? this.calculateAgeFromYear(a.birthYear) : 0
+          bValue = b.birthYear ? this.calculateAgeFromYear(b.birthYear) : 0
+          break
+        case 'gender':
+          aValue = a.gender || ''
+          bValue = b.gender || ''
+          break
+        case 'status':
+          aValue = a.status || ''
+          bValue = b.status || ''
           break
         default:
           aValue = a[sortBy] || ''
@@ -205,22 +224,13 @@ class PatientManager {
         'Nume',
         'Email',
         'Telefon',
-        'Data nașterii',
+        'Anul nașterii',
         'Vârsta',
-        'CNP',
+        'Gen',
         'Adresa',
-        'Oraș',
-        'Județ',
-        'Cod poștal',
-        'Contact de urgență',
-        'Telefon urgență',
-        'Istoric medical',
-        'Alergii',
-        'Medicamente',
-        'Asigurător',
-        'Număr asigurare',
-        'Status',
         'Note',
+        'Etichete',
+        'Status',
         'Data creării'
       ]
       
@@ -228,22 +238,13 @@ class PatientManager {
         p.name || '',
         p.email || '',
         p.phone || '',
-        p.birthDate ? new Date(p.birthDate).toLocaleDateString('ro-RO') : '',
-        p.birthDate ? this.calculateAge(p.birthDate) : '',
-        p.cnp || '',
+        p.birthYear || '',
+        p.birthYear ? this.calculateAgeFromYear(p.birthYear) : '',
+        p.gender || '',
         p.address || '',
-        p.city || '',
-        p.county || '',
-        p.postalCode || '',
-        p.emergencyContact || '',
-        p.emergencyPhone || '',
-        p.medicalHistory || '',
-        p.allergies || '',
-        p.medications || '',
-        p.insuranceProvider || '',
-        p.insuranceNumber || '',
-        this.getStatusLabel(p.status),
         p.notes || '',
+        Array.isArray(p.tags) ? p.tags.join('; ') : '',
+        this.getStatusLabel(p.status),
         p.createdAt ? new Date(p.createdAt).toLocaleDateString('ro-RO') : ''
       ])
       
@@ -264,7 +265,6 @@ class PatientManager {
       active: patients.filter(p => p.status === 'active').length,
       inactive: patients.filter(p => p.status === 'inactive').length,
       archived: patients.filter(p => p.status === 'archived').length,
-      withInsurance: patients.filter(p => p.insuranceProvider).length,
       ageGroups: {
         '0-18': 0,
         '19-30': 0,
@@ -272,7 +272,13 @@ class PatientManager {
         '51-70': 0,
         '70+': 0
       },
-      topCities: {},
+      genderDistribution: {
+        male: 0,
+        female: 0,
+        other: 0,
+        unspecified: 0
+      },
+      topTags: {},
       newThisMonth: 0
     }
     
@@ -282,8 +288,8 @@ class PatientManager {
     
     patients.forEach(patient => {
       // Vârsta
-      if (patient.birthDate) {
-        const age = this.calculateAge(patient.birthDate)
+      if (patient.birthYear) {
+        const age = this.calculateAgeFromYear(patient.birthYear)
         if (age <= 18) stats.ageGroups['0-18']++
         else if (age <= 30) stats.ageGroups['19-30']++
         else if (age <= 50) stats.ageGroups['31-50']++
@@ -291,9 +297,22 @@ class PatientManager {
         else stats.ageGroups['70+']++
       }
       
-      // Orașe
-      if (patient.city) {
-        stats.topCities[patient.city] = (stats.topCities[patient.city] || 0) + 1
+      // Gen
+      if (patient.gender) {
+        if (stats.genderDistribution[patient.gender] !== undefined) {
+          stats.genderDistribution[patient.gender]++
+        } else {
+          stats.genderDistribution.other++
+        }
+      } else {
+        stats.genderDistribution.unspecified++
+      }
+      
+      // Etichete
+      if (patient.tags && Array.isArray(patient.tags)) {
+        patient.tags.forEach(tag => {
+          stats.topTags[tag] = (stats.topTags[tag] || 0) + 1
+        })
       }
       
       // Noi în această lună
@@ -305,12 +324,12 @@ class PatientManager {
       }
     })
     
-    // Sortează orașele după numărul de pacienți
-    stats.topCities = Object.entries(stats.topCities)
+    // Sortează etichetele după numărul de utilizări
+    stats.topTags = Object.entries(stats.topTags)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 10)
-      .reduce((obj, [city, count]) => {
-        obj[city] = count
+      .reduce((obj, [tag, count]) => {
+        obj[tag] = count
         return obj
       }, {})
     

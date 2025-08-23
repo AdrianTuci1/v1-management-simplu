@@ -46,11 +46,36 @@ export class ResourceRepository {
 
   async query(params) {
     const query = params ? "?" + new URLSearchParams(params).toString() : "";
-    const data = await this.request(query, { method: "GET" });
+    const response = await this.request(query, { method: "GET" });
     
-    // Verifică și asigură-te că toate datele au ID-uri valide
+    // Extract data from API response structure
+    let data = response;
+    if (response && response.success && Array.isArray(response.data)) {
+      data = response.data;
+    } else if (response && Array.isArray(response.data)) {
+      data = response.data;
+    }
+    
+    // Transform nested data structure to flat structure
     if (Array.isArray(data)) {
-      const validData = data.filter(item => {
+      const transformedData = data.map(item => {
+        // If the item has a nested data property, merge it with the main item
+        if (item && item.data && typeof item.data === 'object') {
+          return {
+            ...item.data,
+            id: item.id || item.data.id,
+            businessId: item.businessId,
+            locationId: item.locationId,
+            resourceType: item.resourceType,
+            resourceId: item.resourceId,
+            timestamp: item.timestamp,
+            lastUpdated: item.lastUpdated
+          };
+        }
+        return item;
+      });
+      
+      const validData = transformedData.filter(item => {
         if (!item || !item.id) {
           console.warn('Item without ID found:', item);
           return false;
@@ -61,31 +86,119 @@ export class ResourceRepository {
       if (validData.length > 0) {
         await db.table(this.store).bulkPut(validData);
       }
+      
+      return validData;
     } else if (data && data.id) {
-      await db.table(this.store).put(data);
+      // Handle single item
+      let transformedData = data;
+      if (data.data && typeof data.data === 'object') {
+        transformedData = {
+          ...data.data,
+          id: data.id || data.data.id,
+          businessId: data.businessId,
+          locationId: data.locationId,
+          resourceType: data.resourceType,
+          resourceId: data.resourceId,
+          timestamp: data.timestamp,
+          lastUpdated: data.lastUpdated
+        };
+      }
+      
+      await db.table(this.store).put(transformedData);
+      return transformedData;
     }
     
     return data;
   }
 
   async getById(id) {
-    return this.request(`/${id}`, { method: "GET" });
+    const response = await this.request(`/${id}`, { method: "GET" });
+    
+    // Extract data from API response structure
+    let data = response;
+    if (response && response.success && response.data) {
+      data = response.data;
+    } else if (response && response.data) {
+      data = response.data;
+    }
+    
+    // Transform nested data structure to flat structure
+    if (data && data.data && typeof data.data === 'object') {
+      return {
+        ...data.data,
+        id: data.id || data.data.id,
+        businessId: data.businessId,
+        locationId: data.locationId,
+        resourceType: data.resourceType,
+        resourceId: data.resourceId,
+        timestamp: data.timestamp,
+        lastUpdated: data.lastUpdated
+      };
+    }
+    
+    return data;
   }
 
   async add(resource) {
-    const data = await this.request("", {
+    const response = await this.request("", {
       method: "POST",
       body: JSON.stringify(resource),
     });
+    
+    // Extract data from API response structure
+    let data = response;
+    if (response && response.success && response.data) {
+      data = response.data;
+    } else if (response && response.data) {
+      data = response.data;
+    }
+    
+    // Transform nested data structure to flat structure
+    if (data && data.data && typeof data.data === 'object') {
+      data = {
+        ...data.data,
+        id: data.id || data.data.id,
+        businessId: data.businessId,
+        locationId: data.locationId,
+        resourceType: data.resourceType,
+        resourceId: data.resourceId,
+        timestamp: data.timestamp,
+        lastUpdated: data.lastUpdated
+      };
+    }
+    
     await db.table(this.store).put(data);
     return data;
   }
 
   async update(id, resource) {
-    const data = await this.request(`/${id}`, {
+    const response = await this.request(`/${id}`, {
       method: "PUT",
       body: JSON.stringify(resource),
     });
+    
+    // Extract data from API response structure
+    let data = response;
+    if (response && response.success && response.data) {
+      data = response.data;
+    } else if (response && response.data) {
+      data = response.data;
+    }
+    
+    // Transform nested data structure to flat structure
+    if (data && data.data && typeof data.data === 'object') {
+      data = {
+        ...data.data,
+        id: data.id || data.data.id,
+        businessId: data.businessId,
+        locationId: data.locationId,
+        resourceType: data.resourceType,
+        resourceId: data.resourceId,
+        timestamp: data.timestamp,
+        lastUpdated: data.lastUpdated
+      };
+    }
+    
     await db.table(this.store).put(data);
     return data;
   }
