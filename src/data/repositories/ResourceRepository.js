@@ -1,5 +1,5 @@
 import { db } from "../infrastructure/db";
-import { apiRequest, buildResourcesEndpoint } from "../infrastructure/apiClient.js";
+import { buildResourcesEndpoint } from "../infrastructure/apiClient.js";
 
 export class ResourceRepository {
   constructor(resourceType, store = "resources") {
@@ -9,18 +9,28 @@ export class ResourceRepository {
 
   async request(path = "", options = {}) {
     try {
-      const endpoint = buildResourcesEndpoint(path);
-      return await apiRequest(this.resourceType, endpoint, options);
-    } catch (error) {
-      // Dacă buildResourcesEndpoint eșuează, încercă cu endpoint-ul simplu
-      console.warn('Failed to build resources endpoint, trying simple endpoint:', error.message);
-      const res = await fetch(`/api/resources${path}`, {
+      // Folosește buildResourcesEndpoint pentru a construi URL-ul corect
+      const baseUrl = import.meta.env.VITE_API_URL || "";
+      const resourcesEndpoint = buildResourcesEndpoint(path);
+      const endpoint = baseUrl ? `${baseUrl}${resourcesEndpoint}` : resourcesEndpoint;
+      
+      const headers = {
+        "X-Resource-Type": this.resourceType,
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      };
+      
+      console.log('Making API request:', {
+        url: endpoint,
+        method: options.method || 'GET',
+        resourceType: this.resourceType,
+        headers: headers,
+        body: options.body
+      });
+      
+      const res = await fetch(endpoint, {
         ...options,
-        headers: {
-          "X-Resource-Type": this.resourceType,
-          "Content-Type": "application/json",
-          ...(options.headers || {}),
-        },
+        headers,
       });
 
       if (!res.ok) {
@@ -28,6 +38,9 @@ export class ResourceRepository {
       }
 
       return res.json();
+    } catch (error) {
+      console.error('API request failed:', error);
+      throw error;
     }
   }
 

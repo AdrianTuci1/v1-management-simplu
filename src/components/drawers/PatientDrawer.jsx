@@ -13,7 +13,7 @@ import {
   Pill,
   Clock
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
 
 const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) => {

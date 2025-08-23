@@ -31,11 +31,14 @@ export async function apiRequest(resourceType, endpoint = "", options = {}) {
 }
 
 export function buildResourcesEndpoint(path = "") {
+  
+  
   const businessId = localStorage.getItem("businessId") || 'B0100001';
   const locationId = localStorage.getItem("locationId") || 'L0100001';
-  
-  // Nu arunca eroare dacă folosim fallback-urile
+
+  if (!businessId || !locationId) {
+    throw new Error("Business ID and Location ID must be set before accessing resources.");
+  }
   const basePath = `/api/resources/${businessId}-${locationId}`;
   return `${basePath}${path}`;
 }
-

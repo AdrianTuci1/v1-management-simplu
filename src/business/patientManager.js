@@ -1,4 +1,3 @@
-import patientService from '../services/patientService.js'
 
 class PatientManager {
   // Validare pentru un pacient

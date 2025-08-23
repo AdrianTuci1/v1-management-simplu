@@ -5,7 +5,7 @@ import { AddCommand } from '../data/commands/AddCommand.js'
 import { UpdateCommand } from '../data/commands/UpdateCommand.js'
 import { DeleteCommand } from '../data/commands/DeleteCommand.js'
 import patientManager from '../business/patientManager.js'
-import { indexedDb } from '../data/infrastructure/db.js'
+
 
 class PatientService {
   constructor() {
@@ -16,8 +16,8 @@ class PatientService {
   // Obține pacienții cu parametri de filtrare
   async getPatients(params = {}) {
     const command = new GetCommand(this.repository, params)
+
     const result = await this.invoker.run(command)
-    // Asigură-te că rezultatul este întotdeauna un array
     return Array.isArray(result) ? result : []
   }
 
@@ -27,9 +27,8 @@ class PatientService {
       ...filters,
       limit,
       offset: (page - 1) * limit,
-      sortBy: 'createdAt',
-      sortOrder: 'desc'
     }
+
     const result = await this.getPatients(params)
     return Array.isArray(result) ? result : []
   }
