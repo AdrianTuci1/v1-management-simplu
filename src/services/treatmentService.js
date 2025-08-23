@@ -98,6 +98,22 @@ class TreatmentService {
   async exportTreatments(treatments, format = 'json') {
     return treatmentManager.exportTreatments(treatments, format)
   }
+
+  // Căutare tratamente
+  async searchTreatments(query, limit = 50) {
+    try {
+      const searchFilters = {
+        search: query,
+        limit
+      }
+      const command = new GetCommand(this.repository, searchFilters)
+      const treatments = await this.invoker.run(command)
+      return Array.isArray(treatments) ? treatments : []
+    } catch (error) {
+      console.error('Error searching treatments:', error)
+      return []
+    }
+  }
 }
 
 export default new TreatmentService()

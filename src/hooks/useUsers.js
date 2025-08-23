@@ -101,12 +101,14 @@ export const useUsers = () => {
   }, [])
 
   // Căutare utilizatori
-  const searchUsers = useCallback(async (query, searchFilters = {}) => {
+  const searchUsers = useCallback(async (query, searchFilters = {}, limit = 50) => {
     setLoading(true)
     setError(null)
     
     try {
-      const searchResults = await userService.searchUsers(query, searchFilters)
+      const searchResults = await userService.searchUsers(query, { ...searchFilters, limit })
+      setUsers(searchResults)
+      setUserCount(searchResults.length)
       return searchResults
     } catch (err) {
       setError(err.message)

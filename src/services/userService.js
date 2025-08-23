@@ -94,6 +94,7 @@ class UserService {
       const command = new GetCommand(this.repository, searchFilters)
       const users = await this.invoker.run(command)
       // Asigură-te că rezultatul este întotdeauna un array
+      console.log(users)
       const usersArray = Array.isArray(users) ? users : []
       return userManager.transformUsersForUI(usersArray)
     } catch (error) {

@@ -123,26 +123,21 @@ export const useTreatments = () => {
   }, [])
 
   // Caută tratamente
-  const searchTreatments = useCallback(async (searchTerm) => {
+  const searchTreatments = useCallback(async (searchTerm, limit = 50) => {
     setLoading(true)
     setError(null)
     
     try {
-      const searchFilters = { searchTerm }
-      const treatmentsData = await treatmentService.getTreatments(searchFilters)
-      
-      let filteredTreatments = treatmentManager.filterTreatments(treatmentsData, searchFilters)
-      filteredTreatments = treatmentManager.sortTreatments(filteredTreatments, sortBy, sortOrder)
-      
-      setTreatments(filteredTreatments)
-      setTreatmentCount(filteredTreatments.length)
+      const treatmentsData = await treatmentService.searchTreatments(searchTerm, limit)
+      setTreatments(treatmentsData)
+      setTreatmentCount(treatmentsData.length)
     } catch (err) {
       setError(err.message)
       console.error('Error searching treatments:', err)
     } finally {
       setLoading(false)
     }
-  }, [sortBy, sortOrder])
+  }, [])
 
   // Încarcă tratamentele după categorie
   const loadTreatmentsByCategory = useCallback(async (category) => {

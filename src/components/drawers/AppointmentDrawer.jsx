@@ -8,6 +8,9 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAppointments } from '../../hooks/useAppointments.js'
+import PatientCombobox from '../combobox/PatientCombobox.jsx'
+import DoctorCombobox from '../combobox/DoctorCombobox.jsx'
+import TreatmentCombobox from '../combobox/TreatmentCombobox.jsx'
 
 const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
@@ -46,27 +49,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     }
   })
 
-  const patients = [
-    { id: 1, name: 'Ion Marinescu' },
-    { id: 2, name: 'Maria Popescu' },
-    { id: 3, name: 'Alexandru Dumitrescu' },
-    { id: 4, name: 'Elena Ionescu' }
-  ]
 
-  const doctors = [
-    { id: 1, name: 'Dr. Ana Popa' },
-    { id: 2, name: 'Dr. Mihai Vasilescu' },
-    { id: 3, name: 'Dr. Elena Dumitru' }
-  ]
-
-  const treatments = [
-    'Control de rutină',
-    'Obturație',
-    'Extracție',
-    'Canal radicular',
-    'Proteză',
-    'Curățare profesională'
-  ]
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -168,22 +151,17 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         Detalii programare
       </div>
       
-      {/* Patient */}
+            {/* Patient */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Pacient</label>
         <div className="flex gap-2">
-          <select
-            value={formData.patient}
-            onChange={(e) => handleInputChange('patient', e.target.value)}
-            className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <option value="">Selectează pacient</option>
-            {patients.map(patient => (
-              <option key={patient.id} value={patient.id}>
-                {patient.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex-1">
+            <PatientCombobox
+              value={formData.patient}
+              onValueChange={(value) => handleInputChange('patient', value)}
+              placeholder="Selectează pacient"
+            />
+          </div>
           <button className="btn btn-primary btn-sm">
             <Plus className="h-4 w-4" />
           </button>
@@ -193,18 +171,11 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       {/* Doctor */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Doctor</label>
-        <select
+        <DoctorCombobox
           value={formData.doctor}
-          onChange={(e) => handleInputChange('doctor', e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <option value="">Selectează doctor</option>
-          {doctors.map(doctor => (
-            <option key={doctor.id} value={doctor.id}>
-              {doctor.name}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => handleInputChange('doctor', value)}
+          placeholder="Selectează doctor"
+        />
       </div>
 
       {/* Date */}
@@ -232,18 +203,11 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       {/* Service */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Serviciu</label>
-        <select
+        <TreatmentCombobox
           value={formData.service}
-          onChange={(e) => handleInputChange('service', e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <option value="">Selectează serviciu</option>
-          {treatments.map(treatment => (
-            <option key={treatment} value={treatment}>
-              {treatment}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => handleInputChange('service', value)}
+          placeholder="Selectează serviciu"
+        />
       </div>
 
       {/* Status */}

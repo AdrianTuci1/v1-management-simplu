@@ -18,6 +18,7 @@ class PatientService {
     const command = new GetCommand(this.repository, params)
 
     const result = await this.invoker.run(command)
+
     return Array.isArray(result) ? result : []
   }
 
