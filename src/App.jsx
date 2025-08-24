@@ -7,6 +7,7 @@ import AuthScreen from './components/AuthScreen'
 import LoadingScreen from './components/LoadingScreen'
 import AccessDenied from './components/AccessDenied'
 import AIAssistantComponent from './components/AIAssistant'
+import QuickActionsDrawer from './components/drawers/QuickActionsDrawer'
 import authService from './services/authService'
 import { DrawerProvider, useDrawer } from './contexts/DrawerContext'
 
@@ -211,6 +212,9 @@ function AppContent() {
       
       {/* AI Assistant */}
       <AIAssistantComponent />
+      
+      {/* Quick Actions Drawer */}
+      <QuickActionsDrawer />
     </div>
   )
 }

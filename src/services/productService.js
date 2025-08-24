@@ -2,23 +2,23 @@ import { GetCommand } from '../data/commands/GetCommand.js';
 import { AddCommand } from '../data/commands/AddCommand.js';
 import { UpdateCommand } from '../data/commands/UpdateCommand.js';
 import { DeleteCommand } from '../data/commands/DeleteCommand.js';
-import { ResourceRepository } from '../data/repositories/ResourceRepository.js';
 import { productManager } from '../business/productManager.js';
+import { ResourceInvoker } from '../data/invoker/ResourceInvoker.js';
+import { ResourceRepository } from '../data/repositories/ResourceRepository.js';
 
-// Repository pentru produse
-const productRepository = new ResourceRepository('product');
 
 // Serviciu pentru produse
 class ProductService {
   constructor() {
-    this.repository = productRepository;
+    this.repository = new ResourceRepository('product', 'products');
+    this.invoker = new ResourceInvoker()
   }
 
   // Încarcă toate produsele
   async loadProducts(filters = {}) {
     try {
       const command = new GetCommand(this.repository, filters);
-      const products = await command.execute();
+      const products = await this.invoker.run(command);
       
       // Asigură-te că rezultatul este întotdeauna un array
       const productsArray = Array.isArray(products) ? products : [];

@@ -22,7 +22,7 @@ class PermissionService {
             const permissionsArray = Array.isArray(permissions) ? permissions : [];
       
             // Transformă datele pentru UI
-            return permissionsArray.map(permission => permisionManager.transformForUI(permission));
+            return permissionsArray.map(permission => permissionManager.transformPermissionForUI(permission));
 
     } catch (error) {
       console.error('Error getting permissions:', error)
@@ -95,7 +95,7 @@ class PermissionService {
       }
       const command = new GetCommand(this.repository, searchFilters)
       const permissions = await this.invoker.run(command)
-      return permissionManager.transformPermissionsForUI(permissions)
+      return permissions.map(permission => permissionManager.transformPermissionForUI(permission))
     } catch (error) {
       console.error('Error searching permissions:', error)
       throw error
@@ -144,7 +144,7 @@ class PermissionService {
     try {
       const command = new GetCommand(this.repository, { resource })
       const permissions = await this.invoker.run(command)
-      return permissionManager.transformPermissionsForUI(permissions)
+      return permissions.map(permission => permissionManager.transformPermissionForUI(permission))
     } catch (error) {
       console.error('Error getting permissions by resource:', error)
       throw error
@@ -156,7 +156,7 @@ class PermissionService {
     try {
       const command = new GetCommand(this.repository, { action })
       const permissions = await this.invoker.run(command)
-      return permissionManager.transformPermissionsForUI(permissions)
+      return permissions.map(permission => permissionManager.transformPermissionForUI(permission))
     } catch (error) {
       console.error('Error getting permissions by action:', error)
       throw error

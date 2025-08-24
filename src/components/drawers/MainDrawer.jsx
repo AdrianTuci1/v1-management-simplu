@@ -23,7 +23,7 @@ const Drawer = ({ open, content, onClose }) => {
       case 'edit-person':
         return <PatientDrawer onClose={onClose} isNewPatient={false} patientData={content?.data} />
       case 'product':
-        return <ProductDrawer onClose={onClose} product={content?.data} />
+        return <ProductDrawer isOpen={open} onClose={onClose} product={content?.data} />
       case 'medic':
         return <UserDrawer onClose={onClose} user={content?.data} />
       case 'treatment':

@@ -129,8 +129,9 @@ export const useProducts = () => {
       // Actualizează lista locală
       setProducts(prev => [...prev, result]);
       
-      // Actualizează statisticile
-      const newStats = await productService.getProductStats();
+      // Actualizează statisticile local
+      const updatedProducts = [...products, result];
+      const newStats = productManager.calculateStats(updatedProducts);
       setStats(newStats);
       
       return result;
@@ -141,7 +142,7 @@ export const useProducts = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [products]);
 
   // Actualizează un produs
   const updateProduct = useCallback(async (id, productData) => {
@@ -156,8 +157,11 @@ export const useProducts = () => {
         product.id === id ? result : product
       ));
       
-      // Actualizează statisticile
-      const newStats = await productService.getProductStats();
+      // Actualizează statisticile local
+      const updatedProducts = products.map(product => 
+        product.id === id ? result : product
+      );
+      const newStats = productManager.calculateStats(updatedProducts);
       setStats(newStats);
       
       return result;
@@ -168,7 +172,7 @@ export const useProducts = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [products]);
 
   // Șterge un produs
   const deleteProduct = useCallback(async (id) => {
@@ -181,8 +185,9 @@ export const useProducts = () => {
       // Actualizează lista locală
       setProducts(prev => prev.filter(product => product.id !== id));
       
-      // Actualizează statisticile
-      const newStats = await productService.getProductStats();
+      // Actualizează statisticile local
+      const updatedProducts = products.filter(product => product.id !== id);
+      const newStats = productManager.calculateStats(updatedProducts);
       setStats(newStats);
       
       return { success: true };
@@ -193,7 +198,7 @@ export const useProducts = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [products]);
 
   // Obține statisticile
   const getStats = useCallback(async () => {

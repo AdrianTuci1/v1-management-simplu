@@ -87,6 +87,10 @@
   @apply bg-blue-600 text-white hover:bg-blue-700;
 }
 
+.btn-primary-dark {
+  @apply bg-blue-700 text-white hover:bg-blue-800;
+}
+
 .btn-secondary {
   @apply bg-slate-100 text-slate-900 hover:bg-slate-200;
 }

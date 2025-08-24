@@ -1,10 +1,13 @@
 import { Bell, User, Search, Menu, MapPin, Bot, Plus,  } from 'lucide-react'
 import { useDrawer } from '../contexts/DrawerContext'
 import { useAIAssistantStore } from '../stores/aiAssistantStore'
+import { useQuickActionsStore } from '../stores/quickActionsStore'
 
 const Navbar = ({ currentView, currentLocation }) => {
-  const { openMenuDrawer, openUserDrawer, openQuickActionsDrawer } = useDrawer()
+  const { openMenuDrawer, openUserDrawer } = useDrawer()
   const { toggleAIAssistant } = useAIAssistantStore()
+  const { toggleQuickActions } = useQuickActionsStore()
+  
   const getViewTitle = (view) => {
     const titles = {
       dashboard: 'Dashboard',
@@ -71,11 +74,12 @@ const Navbar = ({ currentView, currentLocation }) => {
 
 
           <button
-                      onClick={openQuickActionsDrawer}
-          className="btn btn-ghost btn-sm"
-        >
-          <Plus className="h-5 w-5" />
-        </button>
+            onClick={toggleQuickActions}
+            className="btn btn-ghost btn-sm"
+            title="Acțiuni Rapide"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
 
 
 

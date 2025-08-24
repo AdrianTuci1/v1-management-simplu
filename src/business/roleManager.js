@@ -55,7 +55,7 @@ class RoleManager {
   // Transformare pentru UI
   transformRoleForUI(roleData) {
     return {
-      id: roleData.id,
+      id: roleData.resourceId,
       name: roleData.name,
       description: roleData.description,
       permissions: roleData.permissions || [],

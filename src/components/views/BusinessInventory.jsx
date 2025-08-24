@@ -100,7 +100,7 @@ const BusinessInventory = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Inventar</h1>
-          <p className="text-muted-foreground">Gestionează stocul și produsele</p>
+          <p className="text-gray-500">Gestionează stocul și produsele</p>
         </div>
         <button 
           onClick={() => openDrawer({ type: 'product' })} 
@@ -118,7 +118,7 @@ const BusinessInventory = () => {
             <div className="card-content p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Produse</p>
+                  <p className="text-sm text-gray-500">Total Produse</p>
                   <p className="text-2xl font-bold">{stats.totalProducts}</p>
                 </div>
                 <Package className="h-8 w-8 text-blue-500" />

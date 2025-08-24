@@ -20,7 +20,7 @@ const drawerVariants = cva(
 )
 
 const drawerHeaderVariants = cva(
-  "flex items-center justify-between border-b border-border p-4 flex-shrink-0",
+  "flex items-center justify-between border-b border-gray-200 p-4 flex-shrink-0",
   {
     variants: {
       variant: {
@@ -66,7 +66,7 @@ const drawerContentVariants = cva(
 )
 
 const drawerFooterVariants = cva(
-  "flex items-center justify-between border-t border-border p-4 flex-shrink-0",
+  "flex items-center justify-between border-t border-gray-200 p-4 flex-shrink-0",
   {
     variants: {
       variant: {
@@ -188,12 +188,12 @@ const DrawerHeader = React.forwardRef<HTMLDivElement, DrawerHeaderProps>(
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
           {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
+            <p className="text-sm text-gray-500">{subtitle}</p>
           )}
         </div>
         <button
           onClick={onClose}
-          className="btn btn-ghost btn-sm"
+          className="inline-flex items-center justify-center h-9 rounded-md px-3 text-sm font-medium transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           <X className="h-4 w-4" />
         </button>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Shield, Plus, Search, Filter, Download, MoreVertical, Edit, Trash2, Eye, Users, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { Shield, Plus, Search, Download, Edit, Trash2, Users, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react'
 import { useDrawer } from '../../contexts/DrawerContext'
 import { useRoles } from '../../hooks/useRoles.js'
 
@@ -51,10 +51,10 @@ const AdminAccess = () => {
     })
   }
 
-  const handleDeleteRole = async (roleId) => {
+  const handleDeleteRole = async (id) => {
     if (confirm('Ești sigur că vrei să ștergi acest rol?')) {
       try {
-        await deleteRole(roleId)
+        await deleteRole(id)
       } catch (error) {
         console.error('Error deleting role:', error)
       }

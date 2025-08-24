@@ -21,8 +21,8 @@ class RoleService {
             // Asigură-te că rezultatul este întotdeauna un array
             const rolesArray = Array.isArray(roles) ? roles : [];
       
-            // Transformă datele pentru UI
-            return rolesArray.map(role => roleManager.transformForUI(role));
+                  // Transformă datele pentru UI
+      return rolesArray.map(role => roleManager.transformRoleForUI(role));
     } catch (error) {
       console.error('Error getting roles:', error)
       throw error
@@ -94,7 +94,7 @@ class RoleService {
       }
       const command = new GetCommand(this.repository, searchFilters)
       const roles = await this.invoker.run(command)
-      return roleManager.transformRolesForUI(roles)
+      return roles.map(role => roleManager.transformRoleForUI(role))
     } catch (error) {
       console.error('Error searching roles:', error)
       throw error
@@ -143,7 +143,7 @@ class RoleService {
     try {
       const command = new GetCommand(this.repository, { status })
       const roles = await this.invoker.run(command)
-      return roleManager.transformRolesForUI(roles)
+      return roles.map(role => roleManager.transformRoleForUI(role))
     } catch (error) {
       console.error('Error getting roles by status:', error)
       throw error

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { Save, Trash2, AlertTriangle } from 'lucide-react';
 import { useProducts } from '../../hooks/useProducts.js';
 import { productManager } from '../../business/productManager.js';
 import { 
@@ -128,8 +128,6 @@ const ProductDrawer = ({ isOpen, onClose, product = null }) => {
 
   // Obține categoriile disponibile
   const categories = productManager.getCategories();
-
-  if (!isOpen) return null;
 
   return (
     <Drawer onClose={onClose} size="default">
@@ -268,35 +266,37 @@ const ProductDrawer = ({ isOpen, onClose, product = null }) => {
       </DrawerContent>
 
       <DrawerFooter variant="default">
-        <div className="flex gap-3">
-          {isEditing && (
-            <button
-              onClick={handleDelete}
-              disabled={loading}
-              className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Șterge</span>
-            </button>
-          )}
-        </div>
+        <div className="flex items-center justify-between w-full">
+          <div>
+            {isEditing && (
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Șterge</span>
+              </button>
+            )}
+          </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-          >
-            Anulează
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            <span>{loading ? 'Se salvează...' : 'Salvează'}</span>
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            >
+              Anulează
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              <span>{loading ? 'Se salvează...' : 'Salvează'}</span>
+            </button>
+          </div>
         </div>
       </DrawerFooter>
     </Drawer>

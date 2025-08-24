@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, Save, Trash2, User, Mail, Phone, AlertCircle } from 'lucide-react'
 import { useUsers } from '../../hooks/useUsers.js'
+import { useRoles } from '../../hooks/useRoles.js'
 import { userManager } from '../../business/userManager.js'
 import { 
   Drawer, 
@@ -11,6 +12,7 @@ import {
 
 const UserDrawer = ({ onClose, user = null }) => {
   const { addUser, updateUser, deleteUser, loading, error } = useUsers()
+  const { roles } = useRoles()
   
   const [formData, setFormData] = useState({
     medicName: '',
@@ -265,11 +267,12 @@ const UserDrawer = ({ onClose, user = null }) => {
                   validationErrors.role ? 'border-red-500' : 'border-gray-300'
                 }`}
               >
-                <option value="doctor">Medic</option>
-                <option value="nurse">Asistent medical</option>
-                <option value="specialist">Specialist</option>
-                <option value="resident">Rezident</option>
-                <option value="admin">Administrator</option>
+                <option value="">Selectează un rol</option>
+                {roles.map((role) => (
+                  <option key={role.resourceId} value={role.resourceId}>
+                    {role.name}
+                  </option>
+                ))}
               </select>
               {validationErrors.role && (
                 <p className="text-red-500 text-sm mt-1">{validationErrors.role}</p>

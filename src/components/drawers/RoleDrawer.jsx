@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Shield, Check, AlertCircle } from 'lucide-react'
+import { X, Save, Trash2, AlertCircle } from 'lucide-react'
 import { useRoles } from '../../hooks/useRoles.js'
-import { usePermissions } from '../../hooks/usePermissions.js'
 import { 
   Drawer, 
   DrawerHeader, 
@@ -11,7 +10,6 @@ import {
 
 const RoleDrawer = ({ onClose, roleData = null }) => {
   const { addRole, updateRole, deleteRole } = useRoles()
-  const { permissions, loadPermissions } = usePermissions()
   
   const [formData, setFormData] = useState({
     name: '',
@@ -20,7 +18,7 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
     permissions: []
   })
   
-  const [errors, setErrors] = useState({})
+  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -44,10 +42,7 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
     { value: 'delete', label: 'Ștergere' }
   ]
 
-  // Încarcă permisiunile la deschiderea drawer-ului
-  useEffect(() => {
-    loadPermissions()
-  }, [loadPermissions])
+
 
   // Încarcă datele rolului dacă este editare
   useEffect(() => {
@@ -71,24 +66,20 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
     }
   }, [roleData])
 
-  // Validare formular
+  // Validare formular simplă
   const validateForm = () => {
-    const newErrors = {}
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Numele rolului este obligatoriu'
-    } else if (formData.name.length < 2) {
-      newErrors.name = 'Numele rolului trebuie să aibă cel puțin 2 caractere'
+    if (!formData.name?.trim()) {
+      setError('Numele rolului este obligatoriu')
+      return false
     }
-
-    if (!formData.description.trim()) {
-      newErrors.description = 'Descrierea rolului este obligatorie'
-    } else if (formData.description.length < 10) {
-      newErrors.description = 'Descrierea rolului trebuie să aibă cel puțin 10 caractere'
+    
+    if (!formData.description?.trim()) {
+      setError('Descrierea rolului este obligatorie')
+      return false
     }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    
+    setError(null)
+    return true
   }
 
   // Salvare rol
@@ -96,16 +87,18 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
     if (!validateForm()) return
 
     setLoading(true)
+    setError(null)
+    
     try {
       if (isEditing) {
-        await updateRole(roleData.id, formData)
+        await updateRole(roleData.resourceId, formData)
       } else {
         await addRole(formData)
       }
       onClose()
-    } catch (error) {
-      console.error('Error saving role:', error)
-      setErrors({ general: error.message })
+    } catch (err) {
+      setError(err.message)
+      console.error('Error saving role:', err)
     } finally {
       setLoading(false)
     }
@@ -118,12 +111,14 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
     if (!confirm('Ești sigur că vrei să ștergi acest rol?')) return
 
     setLoading(true)
+    setError(null)
+    
     try {
-      await deleteRole(roleData.id)
+      await deleteRole(roleData.resourceId)
       onClose()
-    } catch (error) {
-      console.error('Error deleting role:', error)
-      setErrors({ general: error.message })
+    } catch (err) {
+      setError(err.message)
+      console.error('Error deleting role:', err)
     } finally {
       setLoading(false)
     }
@@ -206,10 +201,9 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
 
       <DrawerContent padding="spacious">
         {/* Eroare generală */}
-        {errors.general && (
-          <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-6">
-            <AlertCircle className="h-5 w-5 text-red-500" />
-            <span className="text-red-700">{errors.general}</span>
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+            {error}
           </div>
         )}
 
@@ -224,14 +218,9 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                errors.name ? 'border-red-300' : 'border-gray-300'
-              }`}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="ex: Administrator"
             />
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-            )}
           </div>
 
           {/* Status */}
@@ -260,14 +249,9 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
             value={formData.description}
             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
             rows={3}
-            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-              errors.description ? 'border-red-300' : 'border-gray-300'
-            }`}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Descrie responsabilitățile și accesul acestui rol..."
           />
-          {errors.description && (
-            <p className="mt-1 text-sm text-red-600">{errors.description}</p>
-          )}
         </div>
 
         {/* Permisiuni */}
@@ -345,7 +329,7 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {loading ? (
               <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

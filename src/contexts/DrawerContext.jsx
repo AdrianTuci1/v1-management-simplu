@@ -67,6 +67,9 @@ export const DrawerProvider = ({ children }) => {
     })
   }
 
+
+
+
   const value = {
     drawerOpen,
     drawerContent,
@@ -79,7 +82,7 @@ export const DrawerProvider = ({ children }) => {
     openSearchDrawer,
     openQuickActionsDrawer,
     openTreatmentDrawer,
-    openRoleDrawer
+    openRoleDrawer,
   }
 
   return (
