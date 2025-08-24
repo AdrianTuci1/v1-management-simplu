@@ -16,10 +16,17 @@ class UserService {
   async getUsers(filters = {}) {
     try {
       const command = new GetCommand(this.repository, filters)
-      const users = await this.invoker.run(command)
-      // Asigură-te că rezultatul este întotdeauna un array
-      const usersArray = Array.isArray(users) ? users : []
-      return userManager.transformUsersForUI(usersArray)
+      const result = await this.invoker.run(command)
+      
+      // Extragem datele din răspunsul API
+      let users = []
+      if (result && result.data) {
+        users = Array.isArray(result.data) ? result.data : []
+      } else if (Array.isArray(result)) {
+        users = result
+      }
+      
+      return userManager.transformUsersForUI(users)
     } catch (error) {
       console.error('Error getting users:', error)
       return []

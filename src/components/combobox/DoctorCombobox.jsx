@@ -26,7 +26,7 @@ const DoctorCombobox = ({
   const { users, loading, error, searchUsers } = useUsers();
 
   // Toți utilizatorii (nu filtrăm după rol în combobox)
-  const selectedDoctor = users.find((user) => user.id.toString() === value);
+  const selectedDoctor = users.find((user) => (user.resourceId || user.id).toString() === value);
 
   // Căutare când se deschide combobox-ul sau când se schimbă termenul de căutare
   React.useEffect(() => {
@@ -68,15 +68,15 @@ const DoctorCombobox = ({
             <CommandGroup>
               {users.map((user) => (
                 <CommandItem
-                  key={user.id}
-                  value={user.name}
+                  key={user.resourceId || user.id}
+                  value={user.medicName}
                   onSelect={() => {
-                    onValueChange(user.id.toString());
+                    onValueChange((user.resourceId || user.id).toString());
                     setOpen(false);
                   }}
                 >
                   <span className="truncate">{user.medicName}</span>
-                  {value === user.id.toString() && <CommandCheck />}
+                  {value === (user.resourceId || user.id).toString() && <CommandCheck />}
                 </CommandItem>
               ))}
             </CommandGroup>

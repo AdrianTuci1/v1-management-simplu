@@ -23,7 +23,8 @@ const OperationsPlanning = () => {
     loadAppointmentsByWeek,
     loadAppointmentsByMonth,
     loadAppointmentsCount,
-    populateWithTestData
+    populateWithTestData,
+    loadAppointments
   } = useAppointments()
 
   const getStatusColor = (status) => {
@@ -148,34 +149,43 @@ const OperationsPlanning = () => {
     return currentViewDate.toLocaleDateString('ro-RO', options)
   }
 
-  // Încarcă programările în funcție de tipul de vizualizare
+  // Încarcă programările și numărul de programări pentru perioada vizibilă
   useEffect(() => {
-    const loadAppointments = async () => {
-      switch (viewType) {
-        case 'day':
-          await loadAppointmentsByDate(selectedDate)
-          break
-        case 'week':
-          await loadAppointmentsByWeek(selectedDate)
-          break
-        case 'month':
-          await loadAppointmentsByMonth(selectedDate.getFullYear(), selectedDate.getMonth())
-          break
-      }
-    }
-
-    loadAppointments()
-  }, [viewType, selectedDate, loadAppointmentsByDate, loadAppointmentsByWeek, loadAppointmentsByMonth])
-
-  // Încarcă numărul de programări pentru calendar
-  useEffect(() => {
-    const loadCounts = async () => {
+    const loadData = async () => {
+      // Obținem toate datele din calendar pentru a calcula perioada totală
       const calendarDates = getCalendarDates()
-      await loadAppointmentsCount(calendarDates)
+      
+      if (calendarDates.length === 0) return
+      
+      // Calculăm perioada totală (startDate și endDate)
+      const sortedDates = [...calendarDates].sort((a, b) => a - b)
+      const startDate = sortedDates[0]
+      const endDate = sortedDates[sortedDates.length - 1]
+      
+      // Formatăm datele în format yyyy-mm-dd
+      const formatDate = (date) => {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+      
+      // Facem o singură cerere pentru întreaga perioadă vizibilă
+      const loadedAppointments = await loadAppointments({
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+        sortBy: 'date',
+        sortOrder: 'asc'
+      })
+      
+      // Calculăm numărul de programări pentru fiecare zi din rezultatul obținut
+      await loadAppointmentsCount(calendarDates, loadedAppointments)
     }
 
-    loadCounts()
-  }, [currentViewDate, viewType, loadAppointmentsCount])
+    loadData()
+  }, [viewType, currentViewDate, loadAppointments, loadAppointmentsCount])
+
+
 
   // Filtrează programările pentru afișare
   const filteredAppointments = useMemo(() => {
@@ -197,9 +207,17 @@ const OperationsPlanning = () => {
            date.getFullYear() === selectedDate.getFullYear()
   }
 
+  // Funcție pentru formatarea datelor în format yyyy-mm-dd
+  const formatDate = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   // Obține numărul de programări pentru o dată specifică din cache
   const getAppointmentsCount = (date) => {
-    const dateKey = date.toISOString().split('T')[0]
+    const dateKey = formatDate(date)
     return appointmentsCount[dateKey] || 0
   }
 
@@ -364,12 +382,18 @@ const OperationsPlanning = () => {
                     <div className="flex items-center gap-4">
                       <div className="text-sm font-medium w-16">{appointment.time}</div>
                       <div>
-                        <div className="font-medium">{appointment.patient}</div>
-                        <div className="text-sm text-muted-foreground">{appointment.service}</div>
+                        <div className="font-medium">
+                          {appointment.patient?.name || appointment.patient || 'Pacient necunoscut'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {appointment.service?.name || appointment.service || 'Serviciu necunoscut'}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="text-sm text-muted-foreground">{appointment.doctor}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {appointment.doctor?.name || appointment.doctor || 'Doctor necunoscut'}
+                      </div>
                       <span className={`badge ${getStatusColor(appointment.status)}`}>
                         {getStatusText(appointment.status)}
                       </span>

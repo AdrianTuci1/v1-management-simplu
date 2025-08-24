@@ -6,13 +6,18 @@ import {
   Trash2,
   Calendar,
   FileText,
-  Image
+  Image,
+  X
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppointments } from '../../hooks/useAppointments.js'
+import { usePatients } from '../../hooks/usePatients.js'
+import { useUsers } from '../../hooks/useUsers.js'
+import { useTreatments } from '../../hooks/useTreatments.js'
 import PatientCombobox from '../combobox/PatientCombobox.jsx'
 import DoctorCombobox from '../combobox/DoctorCombobox.jsx'
 import TreatmentCombobox from '../combobox/TreatmentCombobox.jsx'
+import appointmentManager from '../../business/appointmentManager.js'
 import { 
   Drawer, 
   DrawerHeader, 
@@ -26,21 +31,34 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   
-  // Hook pentru gestionarea programărilor
-  const { addAppointment, updateAppointment, deleteAppointment } = useAppointments()
+  // Hook-uri pentru gestionarea datelor
+  const { addAppointment, updateAppointment, deleteAppointment, updateLookupData } = useAppointments()
+  const { patients } = usePatients()
+  const { users } = useUsers()
+  const { treatments } = useTreatments()
   
+  // Populăm cache-ul cu datele din combobox-uri
+  useEffect(() => {
+    if (patients.length > 0 || users.length > 0 || treatments.length > 0) {
+      updateLookupData(patients, users, treatments)
+    }
+  }, [patients, users, treatments, updateLookupData])
+
   const [formData, setFormData] = useState(() => {
     if (appointmentData) {
+      // Populăm cache-ul înainte de a transforma datele
+      if (patients.length > 0 || users.length > 0 || treatments.length > 0) {
+        updateLookupData(patients, users, treatments)
+      }
+      
+      // Transformăm datele pentru UI folosind appointmentManager
+      const uiData = appointmentManager.transformAppointmentForUI(appointmentData)
       return {
-        patient: appointmentData.patient || '',
-        doctor: appointmentData.doctor || '',
-        date: appointmentData.date ? new Date(appointmentData.date).toISOString().split('T')[0] : '',
-        time: appointmentData.time || '',
-        service: appointmentData.service || '',
-        status: appointmentData.status || 'scheduled',
-        postOperativeNotes: appointmentData.postOperativeNotes || '',
-        prescription: appointmentData.prescription || '',
-        price: appointmentData.price || '',
+        ...uiData,
+        // Extragem ID-urile pentru combobox-uri
+        patient: uiData.patient?.id || uiData.patient || '',
+        doctor: uiData.doctor?.id || uiData.doctor || '',
+        service: uiData.service?.id || uiData.service || '',
         images: appointmentData.images || []
       }
     }
@@ -92,16 +110,18 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     setError(null)
     
     try {
-      const appointmentData = {
+      // Validăm datele înainte de salvare
+      appointmentManager.validateAppointment(formData)
+      
+      const dataToSave = {
         ...formData,
-        date: new Date(formData.date).toISOString(),
-        price: parseFloat(formData.price) || 0
+        id: appointmentData?.id // Păstrăm ID-ul pentru actualizare
       }
       
       if (isNewAppointment) {
-        await addAppointment(appointmentData)
+        await addAppointment(dataToSave)
       } else {
-        await updateAppointment(appointmentData.id, appointmentData)
+        await updateAppointment(dataToSave.id, dataToSave)
       }
       
       onClose()
@@ -139,10 +159,11 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     try {
       const updatedData = {
         ...formData,
-        status: 'completed',
-        date: new Date(formData.date).toISOString(),
-        price: parseFloat(formData.price) || 0
+        status: 'completed'
       }
+      
+      // Validăm datele înainte de salvare
+      appointmentManager.validateAppointment(updatedData)
       
       await updateAppointment(appointmentData.id, updatedData)
       onClose()

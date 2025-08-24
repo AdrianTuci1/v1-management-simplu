@@ -13,12 +13,31 @@ class AppointmentService {
     this.invoker = new ResourceInvoker()
   }
 
+  // Funcție utilitară pentru formatarea datelor în format yyyy-mm-dd
+  formatDate(date) {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   // Obține programările pentru o perioadă specifică
   async getAppointments(params = {}) {
     const command = new GetCommand(this.repository, params)
     const result = await this.invoker.run(command)
-    // Asigură-te că rezultatul este întotdeauna un array
-    return Array.isArray(result) ? result : []
+    
+    // Extragem datele din răspunsul API
+    let appointments = []
+    if (result && result.data) {
+      appointments = Array.isArray(result.data) ? result.data : []
+    } else if (Array.isArray(result)) {
+      appointments = result
+    }
+    
+    // Transformăm fiecare programare pentru UI
+    return appointments.map(appointment => 
+      appointmentManager.transformAppointmentForUI(appointment)
+    )
   }
 
   // Obține programările pentru o zi specifică
@@ -30,8 +49,8 @@ class AppointmentService {
     endOfDay.setHours(23, 59, 59, 999)
 
     const params = {
-      startDate: startOfDay.toISOString().split('T')[0], // Format yyyy-mm-dd
-      endDate: endOfDay.toISOString().split('T')[0], // Format yyyy-mm-dd
+      startDate: this.formatDate(startOfDay),
+      endDate: this.formatDate(endOfDay),
     }
 
     const result = await this.getAppointments(params)
@@ -51,8 +70,8 @@ class AppointmentService {
     endOfWeek.setHours(23, 59, 59, 999)
 
     const params = {
-      startDate: monday.toISOString().split('T')[0], // Format yyyy-mm-dd
-      endDate: endOfWeek.toISOString().split('T')[0], // Format yyyy-mm-dd
+      startDate: this.formatDate(monday),
+      endDate: this.formatDate(endOfWeek),
       sortBy: 'date',
       sortOrder: 'asc'
     }
@@ -68,8 +87,8 @@ class AppointmentService {
     endOfMonth.setHours(23, 59, 59, 999)
 
     const params = {
-      startDate: startOfMonth.toISOString().split('T')[0], // Format yyyy-mm-dd
-      endDate: endOfMonth.toISOString().split('T')[0], // Format yyyy-mm-dd
+      startDate: this.formatDate(startOfMonth),
+      endDate: this.formatDate(endOfMonth),
       sortBy: 'date',
       sortOrder: 'asc'
     }
@@ -93,7 +112,10 @@ class AppointmentService {
     }
     
     const command = new AddCommand(this.repository, transformedData)
-    return this.invoker.run(command)
+    const result = await this.invoker.run(command)
+    
+    // Transformăm rezultatul pentru UI înainte de returnare
+    return appointmentManager.transformAppointmentForUI(result)
   }
 
   // Actualizează o programare existentă
@@ -111,7 +133,10 @@ class AppointmentService {
     }
     
     const command = new UpdateCommand(this.repository, id, transformedData)
-    return this.invoker.run(command)
+    const result = await this.invoker.run(command)
+    
+    // Transformăm rezultatul pentru UI înainte de returnare
+    return appointmentManager.transformAppointmentForUI(result)
   }
 
   // Șterge o programare
@@ -122,7 +147,8 @@ class AppointmentService {
 
   // Obține o programare după ID
   async getAppointmentById(id) {
-    return this.repository.getById(id)
+    const appointment = await this.repository.getById(id)
+    return appointment ? appointmentManager.transformAppointmentForUI(appointment) : null
   }
 
   // Obține numărul de programări pentru o dată

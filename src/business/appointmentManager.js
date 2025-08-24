@@ -1,38 +1,16 @@
 import appointmentService from '../services/appointmentService.js'
+import { 
+  transformIdToObject, 
+  transformObjectToId, 
+  validateAppointmentFields,
+  updateLookupCache 
+} from '../utils/appointmentUtils.js'
 
 class AppointmentManager {
   // Validare pentru o programare
   validateAppointment(appointmentData) {
-    const errors = []
-
-    if (!appointmentData.patient) {
-      errors.push('Pacientul este obligatoriu')
-    }
-
-    if (!appointmentData.doctor) {
-      errors.push('Doctorul este obligatoriu')
-    }
-
-    if (!appointmentData.date) {
-      errors.push('Data este obligatorie')
-    } else {
-      const selectedDate = new Date(appointmentData.date)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      if (selectedDate < today) {
-        errors.push('Data nu poate fi în trecut')
-      }
-    }
-
-    if (!appointmentData.time) {
-      errors.push('Ora este obligatorie')
-    }
-
-    if (!appointmentData.service) {
-      errors.push('Serviciul este obligatoriu')
-    }
-
+    const errors = validateAppointmentFields(appointmentData)
+    
     if (errors.length > 0) {
       throw new Error(errors.join(', '))
     }
@@ -40,28 +18,94 @@ class AppointmentManager {
     return true
   }
 
-  // Transformare date pentru API
+  // Transformare date pentru API (UI -> Backend)
   transformAppointmentForAPI(appointmentData) {
-    return {
+    // Funcție pentru formatarea datelor în format yyyy-mm-dd
+    const formatDate = (date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
+    const transformed = {
       ...appointmentData,
-      date: new Date(appointmentData.date).toISOString().split('T')[0], // Format yyyy-mm-dd
+      date: formatDate(new Date(appointmentData.date)),
       time: appointmentData.time,
       price: parseFloat(appointmentData.price) || 0,
       status: appointmentData.status || 'scheduled',
       createdAt: appointmentData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
+
+    // Transformare ID-uri în obiecte pentru backend
+    if (appointmentData.patient && appointmentData.patient !== '') {
+      transformed.patient = transformIdToObject(appointmentData.patient, 'patient')
+    }
+
+    if (appointmentData.doctor && appointmentData.doctor !== '') {
+      transformed.doctor = transformIdToObject(appointmentData.doctor, 'doctor')
+    }
+
+    if (appointmentData.service && appointmentData.service !== '') {
+      transformed.service = transformIdToObject(appointmentData.service, 'treatment')
+    }
+
+    return transformed
   }
 
-  // Transformare date pentru UI
+  // Transformare date pentru UI (Backend -> UI)
   transformAppointmentForUI(appointmentData) {
-    return {
-      ...appointmentData,
-      date: appointmentData.date ? new Date(appointmentData.date).toISOString().split('T')[0] : '',
-      time: appointmentData.time || '',
-      price: appointmentData.price?.toString() || '',
-      status: appointmentData.status || 'scheduled'
+    // Extragem datele din structura nested dacă există
+    const data = appointmentData.data || appointmentData
+    
+    // Funcție pentru formatarea datelor în format yyyy-mm-dd
+    const formatDate = (date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
     }
+    
+    const transformed = {
+      id: appointmentData.resourceId,
+      date: data.date ? formatDate(new Date(data.date)) : '',
+      time: data.time || '',
+      price: data.price?.toString() || '',
+      status: data.status || 'scheduled',
+      prescription: data.prescription || '',
+      postOperativeNotes: data.postOperativeNotes || '',
+      images: data.images || [],
+      createdAt: data.createdAt || '',
+      updatedAt: data.updatedAt || ''
+    }
+
+    // Transformare obiecte în obiecte cu nume pentru afișare
+    if (data.patient) {
+      const patientId = transformObjectToId(data.patient)
+      const patientName = typeof data.patient === 'object' && data.patient.name ? data.patient.name : 'Pacient necunoscut'
+      transformed.patient = { id: patientId || null, name: patientName }
+    }
+
+    if (data.doctor) {
+      const doctorId = transformObjectToId(data.doctor)
+      const doctorName = typeof data.doctor === 'object' && data.doctor.name ? data.doctor.name : 'Doctor necunoscut'
+      transformed.doctor = { id: doctorId || null, name: doctorName }
+    }
+
+    if (data.service) {
+      const serviceId = transformObjectToId(data.service)
+      const serviceName = typeof data.service === 'object' && (data.service.name || data.service.treatmentType) ? 
+        (data.service.name || data.service.treatmentType) : 'Serviciu necunoscut'
+      transformed.service = { id: serviceId || null, name: serviceName }
+    }
+
+    return transformed
+  }
+
+  // Inițializare cache la pornirea aplicației
+  async initializeCache() {
+    await updateLookupCache()
   }
 
   // Verificare conflict programări
@@ -134,17 +178,24 @@ class AppointmentManager {
     }
 
     if (filters.doctor) {
-      filtered = filtered.filter(a => a.doctor === filters.doctor)
+      filtered = filtered.filter(a => {
+        const doctorId = transformObjectToId(a.doctor)
+        return doctorId === filters.doctor
+      })
     }
 
     if (filters.patient) {
-      filtered = filtered.filter(a => 
-        a.patient.toLowerCase().includes(filters.patient.toLowerCase())
-      )
+      filtered = filtered.filter(a => {
+        const patientId = transformObjectToId(a.patient)
+        return patientId === filters.patient
+      })
     }
 
     if (filters.service) {
-      filtered = filtered.filter(a => a.service === filters.service)
+      filtered = filtered.filter(a => {
+        const serviceId = transformObjectToId(a.service)
+        return serviceId === filters.service
+      })
     }
 
     if (filters.dateRange) {
@@ -175,12 +226,12 @@ class AppointmentManager {
           bValue = b.time
           break
         case 'patient':
-          aValue = a.patient
-          bValue = b.patient
+          aValue = transformObjectToId(a.patient)
+          bValue = transformObjectToId(b.patient)
           break
         case 'doctor':
-          aValue = a.doctor
-          bValue = b.doctor
+          aValue = transformObjectToId(a.doctor)
+          bValue = transformObjectToId(b.doctor)
           break
         case 'status':
           aValue = a.status
@@ -216,9 +267,9 @@ class AppointmentManager {
         const rows = appointments.map(a => [
           new Date(a.date).toLocaleDateString('ro-RO'),
           a.time,
-          a.patient,
-          a.doctor,
-          a.service,
+          transformObjectToId(a.patient),
+          transformObjectToId(a.doctor),
+          transformObjectToId(a.service),
           a.status,
           a.price
         ])

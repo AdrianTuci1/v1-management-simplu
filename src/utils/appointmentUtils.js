@@ -2,160 +2,240 @@ import { indexedDb } from '../data/infrastructure/db.js'
 
 // Utilitare pentru gestionarea programărilor
 
-// Generează date de test pentru programări
-export const generateTestAppointments = () => {
-  const today = new Date()
-  const appointments = []
-  
-  const patients = [
-    'Ion Marinescu',
-    'Maria Gheorghiu', 
-    'Andrei Stoica',
-    'Elena Radu',
-    'Vasile Popescu',
-    'Ana Dumitrescu'
-  ]
-  
-  const doctors = [
-    'Dr. Popescu',
-    'Dr. Ionescu',
-    'Dr. Vasilescu'
-  ]
-  
-  const services = [
-    'Control de rutină',
-    'Obturație',
-    'Detartraj',
-    'Extracție molar',
-    'Canal radicular',
-    'Proteză'
-  ]
-  
-  const statuses = ['scheduled', 'in-progress', 'completed', 'urgent']
-  
-  // Generează programări pentru următoarele 7 zile
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today)
-    date.setDate(today.getDate() + i)
-    
-    // 2-4 programări per zi
-    const appointmentsPerDay = Math.floor(Math.random() * 3) + 2
-    
-    for (let j = 0; j < appointmentsPerDay; j++) {
-      const hour = 9 + Math.floor(Math.random() * 8) // 9:00 - 17:00
-      const minute = Math.floor(Math.random() * 4) * 15 // 00, 15, 30, 45
-      
-      appointments.push({
-        id: `app_${Date.now()}_${i}_${j}`,
-        patient: patients[Math.floor(Math.random() * patients.length)],
-        doctor: doctors[Math.floor(Math.random() * doctors.length)],
-        date: date.toISOString(),
-        time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-        service: services[Math.floor(Math.random() * services.length)],
-        status: statuses[Math.floor(Math.random() * statuses.length)],
-        price: Math.floor(Math.random() * 500) + 100,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+// Cache pentru datele de lookup
+let patientsCache = []
+let usersCache = []
+let treatmentsCache = []
+
+// Funcție pentru actualizarea cache-ului cu date externe
+export const updateLookupCache = async (patients = [], users = [], treatments = []) => {
+  try {
+    patientsCache = patients || []
+    usersCache = users || []
+    treatmentsCache = treatments || []
+    // Debug log pentru development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Cache updated:', { 
+        patientsCount: patientsCache.length, 
+        usersCount: usersCache.length, 
+        treatmentsCount: treatmentsCache.length 
       })
     }
+  } catch (error) {
+    console.error('Error updating lookup cache:', error)
   }
-  
-  return appointments
 }
 
-// Populează cache-ul local cu date de test
-export const populateTestData = async () => {
-  try {
-    const testAppointments = generateTestAppointments()
-    await indexedDb.bulkPut('appointments', testAppointments)
-    
-    // Actualizează și cache-ul pentru numărul de programări
-    const appointmentsByDate = {}
-    testAppointments.forEach(appointment => {
-      const dateKey = new Date(appointment.date).toISOString().split('T')[0]
-      if (!appointmentsByDate[dateKey]) {
-        appointmentsByDate[dateKey] = 0
-      }
-      appointmentsByDate[dateKey]++
-    })
-    
-    for (const [dateKey, count] of Object.entries(appointmentsByDate)) {
-      await indexedDb.setAppointmentCount(new Date(dateKey), count)
+// Funcție pentru transformarea ID-ului în obiect cu date reale
+export const transformIdToObject = (id, type) => {
+  // Dacă deja este un obiect, îl returnăm
+  if (typeof id === 'object' && id !== null) {
+    return id
+  }
+
+  // Dacă ID-ul este null sau undefined, returnăm un obiect cu valori implicite
+  if (id === null || id === undefined || id === '') {
+    switch (type) {
+      case 'patient':
+        return { id: null, name: 'Pacient necunoscut' }
+      case 'doctor':
+        return { id: null, name: 'Doctor necunoscut' }
+      case 'treatment':
+        return { id: null, name: 'Serviciu necunoscut' }
+      default:
+        return { id: null, name: 'Necunoscut' }
     }
+  }
+
+  // Pentru ID-uri string, încercăm să le parsezăm ca numere, dar păstrăm string-ul original dacă nu este valid
+  let objectId = id
+  if (typeof id === 'string') {
+    const parsedId = parseInt(id, 10)
+    // Folosim parsedId doar dacă este un număr valid (nu NaN)
+    objectId = isNaN(parsedId) ? id : parsedId
+  }
+
+  switch (type) {
+    case 'patient':
+      // Căutăm atât după ID numeric cât și după ID string
+      const patient = patientsCache.find(p => 
+        p.id === objectId || 
+        p.id?.toString() === objectId?.toString() ||
+        p.resourceId === objectId ||
+        p.resourceId?.toString() === objectId?.toString()
+      )
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Looking for patient with ID: ${objectId}, found:`, patient)
+      }
+      return patient ? { id: patient.id || patient.resourceId, name: patient.patientName || patient.name } : { id: objectId, name: `Patient ${objectId}` }
     
-    console.log('Test data populated successfully')
-    return testAppointments
-  } catch (error) {
-    console.error('Error populating test data:', error)
-    throw error
+    case 'doctor':
+      const doctor = usersCache.find(u => 
+        u.id === objectId || 
+        u.id?.toString() === objectId?.toString() ||
+        u.resourceId === objectId ||
+        u.resourceId?.toString() === objectId?.toString()
+      )
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Looking for doctor with ID: ${objectId}, found:`, doctor)
+      }
+      return doctor ? { id: doctor.id || doctor.resourceId, name: doctor.medicName || doctor.name } : { id: objectId, name: `Doctor ${objectId}` }
+    
+    case 'treatment':
+      const treatment = treatmentsCache.find(t => 
+        t.id === objectId || 
+        t.id?.toString() === objectId?.toString() ||
+        t.resourceId === objectId ||
+        t.resourceId?.toString() === objectId?.toString()
+      )
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Looking for treatment with ID: ${objectId}, found:`, treatment)
+      }
+      return treatment ? { 
+        id: treatment.resourceId || treatment.id, 
+        name: treatment.treatmentType || treatment.name || `Treatment ${treatment.resourceId || treatment.id}` 
+      } : { id: objectId, name: `Treatment ${objectId}` }
+    
+    default:
+      return { id: objectId, name: `Unknown ${objectId}` }
   }
 }
 
-// Curăță toate datele din cache
-export const clearAllData = async () => {
-  try {
-    await indexedDb.clear('appointments')
-    await indexedDb.clear('appointmentCounts')
-    console.log('All data cleared successfully')
-  } catch (error) {
-    console.error('Error clearing data:', error)
-    throw error
+// Funcție pentru transformarea obiectului în ID
+export const transformObjectToId = (obj) => {
+  // Dacă este deja un ID (string sau număr), îl returnăm
+  if (typeof obj === 'string' || typeof obj === 'number') {
+    return obj.toString()
+  }
+
+  // Dacă este un obiect cu id sau resourceId, returnăm id-ul ca string
+  if (obj && typeof obj === 'object') {
+    if (obj.id !== undefined && obj.id !== null) {
+      return obj.id.toString()
+    }
+    if (obj.resourceId !== undefined && obj.resourceId !== null) {
+      return obj.resourceId.toString()
+    }
+  }
+
+  // Fallback pentru cazul când id-ul este null sau undefined
+  return ''
+}
+
+// Funcție pentru validarea câmpurilor esențiale
+export const validateAppointmentFields = (appointmentData) => {
+  const errors = []
+
+  if (!appointmentData.patient) {
+    errors.push('Pacientul este obligatoriu')
+  }
+
+  if (!appointmentData.doctor) {
+    errors.push('Doctorul este obligatoriu')
+  }
+
+  if (!appointmentData.date) {
+    errors.push('Data este obligatorie')
+  } else {
+    const selectedDate = new Date(appointmentData.date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    if (selectedDate < today) {
+      errors.push('Data nu poate fi în trecut')
+    }
+  }
+
+  if (!appointmentData.time) {
+    errors.push('Ora este obligatorie')
+  }
+
+  if (!appointmentData.service) {
+    errors.push('Serviciul este obligatoriu')
+  }
+
+  // Validare format date
+  if (appointmentData.price && isNaN(parseFloat(appointmentData.price))) {
+    errors.push('Prețul trebuie să fie un număr valid')
+  }
+
+  return errors
+}
+
+// Funcție pentru popularea datelor de test
+export const populateTestData = async () => {
+  const { indexedDb } = await import('../data/infrastructure/db.js')
+  
+  const testAppointments = [
+    {
+      id: 1,
+      patient: { id: 1, name: 'Ion Popescu' },
+      doctor: { id: 1, name: 'Dr. Maria Ionescu' },
+      date: '2024-01-15',
+      time: '09:00',
+      service: { id: 1, name: 'Consultatie generala' },
+      status: 'completed',
+      postOperativeNotes: 'Pacientul a răspuns bine la tratament',
+      prescription: 'Paracetamol 500mg, 3x pe zi',
+      price: 150,
+      createdAt: '2024-01-10T08:00:00Z',
+      updatedAt: '2024-01-15T09:30:00Z'
+    },
+    {
+      id: 2,
+      patient: { id: 2, name: 'Ana Dumitrescu' },
+      doctor: { id: 2, name: 'Dr. Alexandru Popa' },
+      date: '2024-01-16',
+      time: '14:30',
+      service: { id: 2, name: 'Extractie masea' },
+      status: 'scheduled',
+      postOperativeNotes: '',
+      prescription: '',
+      price: 300,
+      createdAt: '2024-01-12T10:00:00Z',
+      updatedAt: '2024-01-12T10:00:00Z'
+    },
+    {
+      id: 3,
+      patient: { id: 3, name: 'Mihai Vasilescu' },
+      doctor: { id: 1, name: 'Dr. Maria Ionescu' },
+      date: '2024-01-17',
+      time: '11:00',
+      service: { id: 3, name: 'Canal radicular' },
+      status: 'in-progress',
+      postOperativeNotes: 'Procedura în curs',
+      prescription: 'Ibuprofen 400mg, 2x pe zi',
+      price: 450,
+      createdAt: '2024-01-13T15:30:00Z',
+      updatedAt: '2024-01-17T11:15:00Z'
+    }
+  ]
+
+  // Ștergem datele existente
+  await indexedDb.clear('appointments')
+  
+  // Adăugăm datele de test
+  for (const appointment of testAppointments) {
+    await indexedDb.add('appointments', appointment)
   }
 }
 
-// Verifică starea cache-ului
+// Funcție pentru verificarea statusului cache-ului
 export const checkCacheStatus = async () => {
+  const { indexedDb } = await import('../data/infrastructure/db.js')
+  
   try {
     const appointments = await indexedDb.getAll('appointments')
-    const counts = await indexedDb.getAll('appointmentCounts')
-    
     return {
-      appointmentsCount: appointments.length,
-      appointmentCountsCount: counts.length,
-      hasData: appointments.length > 0
+      hasData: appointments.length > 0,
+      count: appointments.length,
+      lastUpdate: new Date().toISOString()
     }
   } catch (error) {
-    console.error('Error checking cache status:', error)
     return {
-      appointmentsCount: 0,
-      appointmentCountsCount: 0,
       hasData: false,
+      count: 0,
       error: error.message
     }
-  }
-}
-
-// Exportă datele din cache
-export const exportCacheData = async () => {
-  try {
-    const appointments = await indexedDb.getAll('appointments')
-    const counts = await indexedDb.getAll('appointmentCounts')
-    
-    return {
-      appointments,
-      appointmentCounts: counts,
-      exportDate: new Date().toISOString()
-    }
-  } catch (error) {
-    console.error('Error exporting cache data:', error)
-    throw error
-  }
-}
-
-// Importă date în cache
-export const importCacheData = async (data) => {
-  try {
-    if (data.appointments && data.appointments.length > 0) {
-      await indexedDb.bulkPut('appointments', data.appointments)
-    }
-    
-    if (data.appointmentCounts && data.appointmentCounts.length > 0) {
-      await indexedDb.bulkPut('appointmentCounts', data.appointmentCounts)
-    }
-    
-    console.log('Data imported successfully')
-  } catch (error) {
-    console.error('Error importing data:', error)
-    throw error
   }
 }

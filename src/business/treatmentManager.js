@@ -50,6 +50,8 @@ class TreatmentManager {
   transformTreatmentForUI(treatmentData) {
     return {
       ...treatmentData,
+      id: treatmentData.resourceId || treatmentData.id, // Folosim resourceId ca ID principal
+      name: treatmentData.treatmentType || treatmentData.name || '', // Adăugăm name pentru compatibilitate
       treatmentType: treatmentData.treatmentType || '',
       category: treatmentData.category || '',
       duration: treatmentData.duration?.toString() || '',

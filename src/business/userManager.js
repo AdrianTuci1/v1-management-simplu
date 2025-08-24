@@ -60,6 +60,7 @@ class UserManager {
   transformUserForUI(userData) {
     return {
       ...userData,
+      id: userData.resourceId || userData.id, // Folosim resourceId ca ID principal
       fullName: userData.medicName || userData.fullName,
       dutyDays: userData.dutyDays || [],
       // Proprietăți calculate

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Shield, Plus, Search, Filter, Download, MoreVertical, Edit, Trash2, Eye, Users, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { useDrawer } from '../../contexts/DrawerContext'
 import { useRoles } from '../../hooks/useRoles.js'
-import { RoleDrawer } from '../drawers'
 
 const AdminAccess = () => {
   const { openDrawer } = useDrawer()
@@ -11,19 +10,15 @@ const AdminAccess = () => {
     loading, 
     error, 
     stats, 
-    roleCount,
     loadRoles, 
     deleteRole, 
     exportRoles,
     filterRoles,
     sortRoles,
-    resetFilters
   } = useRoles()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [isRoleDrawerOpen, setIsRoleDrawerOpen] = useState(false)
-  const [selectedRoleData, setSelectedRoleData] = useState(null)
 
   // Încarcă statisticile la prima renderizare
   useEffect(() => {
@@ -50,8 +45,10 @@ const AdminAccess = () => {
 
   // Acțiuni pentru roluri
   const handleEditRole = (role) => {
-    setSelectedRoleData(role)
-    setIsRoleDrawerOpen(true)
+    openDrawer({
+      type: 'role',
+      data: role
+    })
   }
 
   const handleDeleteRole = async (roleId) => {
@@ -110,8 +107,9 @@ const AdminAccess = () => {
         </div>
         <button 
           onClick={() => {
-            setSelectedRoleData(null)
-            setIsRoleDrawerOpen(true)
+            openDrawer({
+              type: 'role',
+            })
           }} 
           className="btn btn-primary"
         >
@@ -235,8 +233,7 @@ const AdminAccess = () => {
               <p className="text-muted-foreground mb-4">Creează primul rol pentru a începe.</p>
               <button
                 onClick={() => {
-                  setSelectedRoleData(null)
-                  setIsRoleDrawerOpen(true)
+                  openRoleDrawer(null)
                 }}
                 className="btn btn-primary"
               >
@@ -320,14 +317,7 @@ const AdminAccess = () => {
       </div>
 
       {/* Role Drawer */}
-      <RoleDrawer
-        isOpen={isRoleDrawerOpen}
-        onClose={() => {
-          setIsRoleDrawerOpen(false)
-          setSelectedRoleData(null)
-        }}
-        roleData={selectedRoleData}
-      />
+      {/* The RoleDrawer component is now managed by the DrawerContext */}
     </div>
   )
 }

@@ -60,6 +60,13 @@ export const DrawerProvider = ({ children }) => {
     })
   }
 
+  const openRoleDrawer = (roleData = null) => {
+    openDrawer({
+      type: 'role',
+      data: roleData
+    })
+  }
+
   const value = {
     drawerOpen,
     drawerContent,
@@ -71,7 +78,8 @@ export const DrawerProvider = ({ children }) => {
     openUserDrawer,
     openSearchDrawer,
     openQuickActionsDrawer,
-    openTreatmentDrawer
+    openTreatmentDrawer,
+    openRoleDrawer
   }
 
   return (

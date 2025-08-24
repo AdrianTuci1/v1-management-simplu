@@ -9,7 +9,7 @@ import {
   DrawerFooter 
 } from '../ui/drawer'
 
-const RoleDrawer = ({ isOpen, onClose, roleData = null }) => {
+const RoleDrawer = ({ onClose, roleData = null }) => {
   const { addRole, updateRole, deleteRole } = useRoles()
   const { permissions, loadPermissions } = usePermissions()
   
@@ -46,14 +46,12 @@ const RoleDrawer = ({ isOpen, onClose, roleData = null }) => {
 
   // Încarcă permisiunile la deschiderea drawer-ului
   useEffect(() => {
-    if (isOpen) {
-      loadPermissions()
-    }
-  }, [isOpen, loadPermissions])
+    loadPermissions()
+  }, [loadPermissions])
 
   // Încarcă datele rolului dacă este editare
   useEffect(() => {
-    if (isOpen && roleData) {
+    if (roleData) {
       setFormData({
         name: roleData.name || '',
         description: roleData.description || '',
@@ -61,7 +59,7 @@ const RoleDrawer = ({ isOpen, onClose, roleData = null }) => {
         permissions: roleData.permissions || []
       })
       setIsEditing(true)
-    } else if (isOpen && !roleData) {
+    } else {
       // Reset form pentru rol nou
       setFormData({
         name: '',
@@ -71,7 +69,7 @@ const RoleDrawer = ({ isOpen, onClose, roleData = null }) => {
       })
       setIsEditing(false)
     }
-  }, [isOpen, roleData])
+  }, [roleData])
 
   // Validare formular
   const validateForm = () => {
@@ -196,8 +194,6 @@ const RoleDrawer = ({ isOpen, onClose, roleData = null }) => {
     const resourcePermissions = formData.permissions.filter(p => p.resource === resource)
     return resourcePermissions.length > 0 && resourcePermissions.length < availableActions.length
   }
-
-  if (!isOpen) return null
 
   return (
     <Drawer onClose={onClose} size="default">

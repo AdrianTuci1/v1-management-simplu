@@ -25,7 +25,7 @@ const TreatmentCombobox = ({
   const [searchTerm, setSearchTerm] = React.useState('');
   const { treatments, loading, error, searchTreatments } = useTreatments();
 
-  const selectedTreatment = treatments.find((treatment) => treatment.id.toString() === value);
+  const selectedTreatment = treatments.find((treatment) => (treatment.resourceId || treatment.id).toString() === value);
 
   // Căutare când se deschide combobox-ul sau când se schimbă termenul de căutare
   React.useEffect(() => {
@@ -67,15 +67,15 @@ const TreatmentCombobox = ({
             <CommandGroup>
               {treatments.map((treatment) => (
                 <CommandItem
-                  key={treatment.id}
+                  key={treatment.resourceId || treatment.id}
                   value={treatment.treatmentType}
                   onSelect={() => {
-                    onValueChange(treatment.id.toString());
+                    onValueChange((treatment.resourceId || treatment.id).toString());
                     setOpen(false);
                   }}
                 >
                   <span className="truncate">{treatment.treatmentType}</span>
-                  {value === treatment.id.toString() && <CommandCheck />}
+                  {value === (treatment.resourceId || treatment.id).toString() && <CommandCheck />}
                 </CommandItem>
               ))}
             </CommandGroup>

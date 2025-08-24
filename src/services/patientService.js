@@ -18,8 +18,19 @@ class PatientService {
     const command = new GetCommand(this.repository, params)
 
     const result = await this.invoker.run(command)
-
-    return Array.isArray(result) ? result : []
+    
+    // Extragem datele din răspunsul API
+    let patients = []
+    if (result && result.data) {
+      patients = Array.isArray(result.data) ? result.data : []
+    } else if (Array.isArray(result)) {
+      patients = result
+    }
+    
+    // Transformăm fiecare pacient pentru UI
+    return patients.map(patient => 
+      patientManager.transformPatientForUI(patient)
+    )
   }
 
   // Obține pacienții pentru o pagină specifică

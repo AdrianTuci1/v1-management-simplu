@@ -16,7 +16,19 @@ class TreatmentService {
   async getTreatments(params = {}) {
     const command = new GetCommand(this.repository, params)
     const result = await this.invoker.run(command)
-    return Array.isArray(result) ? result : []
+    
+    // Extragem datele din răspunsul API
+    let treatments = []
+    if (result && result.data) {
+      treatments = Array.isArray(result.data) ? result.data : []
+    } else if (Array.isArray(result)) {
+      treatments = result
+    }
+    
+    // Transformăm fiecare tratament pentru UI
+    return treatments.map(treatment => 
+      treatmentManager.transformTreatmentForUI(treatment)
+    )
   }
 
   // Obține tratamentele după categorie

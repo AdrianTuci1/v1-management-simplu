@@ -7,7 +7,7 @@ class AppDatabase extends Dexie {
     
     // Versiunea bazei de date
     this.version(1).stores({
-      appointments: 'id, date, doctor, patient, status', // Store pentru programări
+      appointments: 'resourceId, date, doctor, patient, status', // Store pentru programări
       appointmentCounts: 'date, count', // Cache pentru numărul de programări
       patients: 'resourceId, name, email, phone, status, city, county', // Store pentru pacienți
       products: 'resourceId, name, category, price, stock, reorderLevel', // Store pentru produse

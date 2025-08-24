@@ -58,7 +58,7 @@ class PatientManager {
   // Transformare date pentru API
   transformPatientForAPI(patientData) {
     return {
-      name: patientData.name?.trim(),
+      patientName: patientData.name?.trim(),
       email: patientData.email?.toLowerCase().trim(),
       phone: patientData.phone?.trim(),
       birthYear: patientData.birthYear ? parseInt(patientData.birthYear) : null,
@@ -76,6 +76,8 @@ class PatientManager {
   transformPatientForUI(patientData) {
     return {
       ...patientData,
+      id: patientData.resourceId || patientData.id, // Folosim resourceId ca ID principal
+      name: patientData.patientName || patientData.name, // Mapăm patientName la name pentru UI
       birthYear: patientData.birthYear ? patientData.birthYear.toString() : '',
       age: patientData.birthYear ? this.calculateAgeFromYear(patientData.birthYear) : null,
       fullAddress: this.formatAddress(patientData),

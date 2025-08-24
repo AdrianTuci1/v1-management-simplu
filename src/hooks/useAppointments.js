@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import appointmentService from '../services/appointmentService.js'
 import { indexedDb } from '../data/infrastructure/db.js'
-import { populateTestData, checkCacheStatus } from '../utils/appointmentUtils.js'
+import { populateTestData, checkCacheStatus, updateLookupCache } from '../utils/appointmentUtils.js'
 
 export const useAppointments = () => {
   const [appointments, setAppointments] = useState([])
@@ -54,6 +54,7 @@ export const useAppointments = () => {
     
     try {
       const data = await appointmentService.getAppointmentsByDate(date)
+      console.log('data', data)
       setAppointments(data)
       return data
     } catch (err) {
@@ -192,13 +193,55 @@ export const useAppointments = () => {
   }, [])
 
   // Funcție pentru încărcarea numărului de programări pentru mai multe date
-  const loadAppointmentsCount = useCallback(async (dates) => {
+  const loadAppointmentsCount = useCallback(async (dates, existingAppointments = null) => {
     try {
-      const counts = {}
-      for (const date of dates) {
-        const count = await appointmentService.getAppointmentsCount(date)
-        counts[date.toISOString().split('T')[0]] = count
+      // Dacă nu avem date, returnăm obiect gol
+      if (!dates || dates.length === 0) {
+        setAppointmentsCount({})
+        return {}
       }
+
+      let allAppointments = existingAppointments
+
+      // Dacă nu avem programări existente, facem o cerere pentru întreaga perioadă
+      if (!allAppointments) {
+        const sortedDates = [...dates].sort((a, b) => a - b)
+        const startDate = sortedDates[0]
+        const endDate = sortedDates[sortedDates.length - 1]
+
+        // Formatăm datele în format yyyy-mm-dd
+        const formatDate = (date) => {
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
+        }
+
+        allAppointments = await appointmentService.getAppointments({
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate)
+        })
+      }
+
+      // Funcție pentru formatarea datelor în format yyyy-mm-dd
+      const formatDate = (date) => {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+
+      // Calculăm numărul de programări pentru fiecare zi
+      const counts = {}
+      dates.forEach(date => {
+        const dateKey = formatDate(date)
+        const dayAppointments = allAppointments.filter(appointment => {
+          const appointmentDate = appointment.date || appointment.startDate
+          return appointmentDate === dateKey
+        })
+        counts[dateKey] = dayAppointments.length
+      })
+
       setAppointmentsCount(counts)
       return counts
     } catch (err) {
@@ -208,7 +251,7 @@ export const useAppointments = () => {
         const counts = {}
         for (const date of dates) {
           const count = await indexedDb.getAppointmentCount(date)
-          counts[date.toISOString().split('T')[0]] = count
+          counts[formatDate(date)] = count
         }
         setAppointmentsCount(counts)
         return counts
@@ -247,6 +290,14 @@ export const useAppointments = () => {
     }
   }, [])
 
+  // Funcție pentru actualizarea cache-ului de lookup
+  const updateLookupData = useCallback(async (patients = [], users = [], treatments = []) => {
+    try {
+      await updateLookupCache(patients, users, treatments)
+    } catch (err) {
+      console.error('Error updating lookup cache:', err)
+    }
+  }, [])
 
 
   return {
@@ -263,6 +314,7 @@ export const useAppointments = () => {
     deleteAppointment,
     loadAppointmentsCount,
     reset,
-    populateWithTestData
+    populateWithTestData,
+    updateLookupData
   }
 }

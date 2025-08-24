@@ -2,7 +2,7 @@ import { Bell, User, Search, Menu, MapPin, Bot } from 'lucide-react'
 import { useDrawer } from '../contexts/DrawerContext'
 
 const Navbar = ({ currentView, currentLocation }) => {
-  const { openMenuDrawer, openNotificationsDrawer, openUserDrawer } = useDrawer()
+  const { openMenuDrawer, openUserDrawer } = useDrawer()
   const getViewTitle = (view) => {
     const titles = {
       dashboard: 'Dashboard',
@@ -66,14 +66,7 @@ const Navbar = ({ currentView, currentLocation }) => {
             <Bot className="h-5 w-5" />
           </button>
 
-          {/* Notifications */}
-          <button
-            onClick={openNotificationsDrawer}
-            className="btn btn-ghost btn-sm relative"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive"></span>
-          </button>
+
 
           {/* User menu */}
           <button
