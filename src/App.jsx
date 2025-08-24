@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard'
 import AuthScreen from './components/AuthScreen'
 import LoadingScreen from './components/LoadingScreen'
 import AccessDenied from './components/AccessDenied'
+import AIAssistantComponent from './components/AIAssistant'
 import authService from './services/authService'
 import { DrawerProvider, useDrawer } from './contexts/DrawerContext'
 
@@ -208,6 +209,8 @@ function AppContent() {
         />
       </div>
       
+      {/* AI Assistant */}
+      <AIAssistantComponent />
     </div>
   )
 }
@@ -215,7 +218,7 @@ function AppContent() {
 function App() {
   return (
     <DrawerProvider>
-      <AppContent />
+        <AppContent />
     </DrawerProvider>
   )
 }

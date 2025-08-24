@@ -1,8 +1,10 @@
 import { Bell, User, Search, Menu, MapPin, Bot } from 'lucide-react'
 import { useDrawer } from '../contexts/DrawerContext'
+import { useAIAssistantStore } from '../stores/aiAssistantStore'
 
 const Navbar = ({ currentView, currentLocation }) => {
   const { openMenuDrawer, openUserDrawer } = useDrawer()
+  const { toggleAIAssistant } = useAIAssistantStore()
   const getViewTitle = (view) => {
     const titles = {
       dashboard: 'Dashboard',
@@ -60,8 +62,9 @@ const Navbar = ({ currentView, currentLocation }) => {
         <div className="flex items-center gap-2">
           {/* Robot AI Assistant */}
           <button
-            onClick={() => {}} // TODO: Implement AI assistant
+            onClick={toggleAIAssistant}
             className="btn btn-ghost btn-sm"
+            title="Deschide AI Assistant"
           >
             <Bot className="h-5 w-5" />
           </button>
