@@ -25,6 +25,7 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
+import { TimePicker } from '../ui/time-picker'
 
 const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
@@ -43,6 +44,19 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       updateLookupData(patients, users, treatments)
     }
   }, [patients, users, treatments, updateLookupData])
+
+  // Utility functions for time format conversion (24-hour format)
+  const convertToTimePickerFormat = (timeString) => {
+    if (!timeString) return ''
+    // For 24-hour format, we can use the time string directly
+    return timeString
+  }
+
+  const convertFromTimePickerFormat = (timePickerValue) => {
+    if (!timePickerValue) return ''
+    // For 24-hour format, we can use the time string directly
+    return timePickerValue
+  }
 
   const [formData, setFormData] = useState(() => {
     if (appointmentData) {
@@ -222,11 +236,11 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       {/* Time */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Ora</label>
-        <input
-          type="time"
-          value={formData.time}
-          onChange={(e) => handleInputChange('time', e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        <TimePicker
+          value={convertToTimePickerFormat(formData.time)}
+          onChange={(value) => handleInputChange('time', convertFromTimePickerFormat(value))}
+          className="w-full"
+          showCurrentTimeButton={true}
         />
       </div>
 

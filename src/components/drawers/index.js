@@ -8,6 +8,7 @@ export { default as MainDrawer } from './MainDrawer.jsx'
 export { default as MenuDrawer } from './MenuDrawer.jsx'
 export { default as NotificationsDrawer } from './NotificationsDrawer.jsx'
 export { default as QuickActionsDrawer } from './QuickActionsDrawer.jsx'
+export { default as SalesDrawer } from './SalesDrawer.jsx'
 
 // Export standardized drawer UI components
 export {

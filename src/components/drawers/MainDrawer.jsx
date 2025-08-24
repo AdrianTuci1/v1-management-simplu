@@ -1,5 +1,5 @@
 import { X, Bell, User, Settings, Search, Calendar } from 'lucide-react'
-import { QuickActionsDrawer, AppointmentDrawer, PatientDrawer, ProductDrawer, UserDrawer, TreatmentDrawer, RoleDrawer } from './index.js'
+import { QuickActionsDrawer, AppointmentDrawer, PatientDrawer, ProductDrawer, UserDrawer, TreatmentDrawer, RoleDrawer, SalesDrawer } from './index.js'
 
 const Drawer = ({ open, content, onClose }) => {
   if (!open) return null
@@ -30,6 +30,8 @@ const Drawer = ({ open, content, onClose }) => {
         return <TreatmentDrawer onClose={onClose} isNewTreatment={content?.isNew} treatmentData={content?.data} />
       case 'role':
         return <RoleDrawer onClose={onClose} roleData={content?.data} />
+      case 'new-sale':
+        return <SalesDrawer isOpen={open} onClose={onClose} />
       default:
         return <DefaultContent />
     }

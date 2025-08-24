@@ -7,60 +7,60 @@ import {
   DollarSign,
   Activity,
   BarChart3,
-  Plus
+  Plus,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
 
-import { useDrawer } from '../../contexts/DrawerContext'
+
 
 const DashboardHome = () => {
-  const { openQuickActionsDrawer } = useDrawer()
+
+  
+  // Get current month name in Romanian
+  const getCurrentMonthName = () => {
+    const months = [
+      'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
+      'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie'
+    ]
+    return months[new Date().getMonth()]
+  }
+
   const kpiData = [
     {
-      title: 'Programări Astăzi',
-      value: '12',
-      icon: Calendar,
-      color: 'bg-blue-500',
-      change: '+2',
-      changeType: 'positive'
-    },
-    {
-      title: 'Clienți Activi',
-      value: '89',
+      title: 'Pacienți Înregistrați',
+      subtitle: `Luna ${getCurrentMonthName()}`,
+      value: '24',
       icon: Users,
-      color: 'bg-green-500',
-      change: '+5',
+      color: 'bg-blue-500',
+      change: '+3',
       changeType: 'positive'
     },
     {
-      title: 'Vânzări Luna',
-      value: '45,230 RON',
-      icon: TrendingUp,
-      color: 'bg-purple-500',
-      change: '+12%',
-      changeType: 'positive'
-    },
-    {
-      title: 'Produse în Stoc',
+      title: 'Vizite Programate',
+      subtitle: `Luna ${getCurrentMonthName()}`,
       value: '156',
-      icon: Package,
-      color: 'bg-orange-500',
-      change: '-3',
-      changeType: 'negative'
+      icon: Calendar,
+      color: 'bg-green-500',
+      change: '+12',
+      changeType: 'positive'
     },
     {
-      title: 'Facturi Neplătite',
-      value: '15',
-      icon: CreditCard,
-      color: 'bg-red-500',
-      change: '+2',
-      changeType: 'negative'
-    },
-    {
-      title: 'Încasări Luna',
-      value: '38,450 RON',
-      icon: DollarSign,
+      title: 'Vizite Finalizate',
+      subtitle: `Luna ${getCurrentMonthName()}`,
+      value: '142',
+      icon: CheckCircle,
       color: 'bg-emerald-500',
-      change: '+8%',
+      change: '+8',
+      changeType: 'positive'
+    },
+    {
+      title: 'Vizite Anulate',
+      subtitle: `Luna ${getCurrentMonthName()}`,
+      value: '8',
+      icon: XCircle,
+      color: 'bg-red-500',
+      change: '-2',
       changeType: 'positive'
     }
   ]
@@ -104,30 +104,23 @@ const DashboardHome = () => {
     <div className="space-y-6">
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpiData.map((kpi, index) => (
           <div key={index} className="card">
-            <div className="card-content">
-              <div className="flex items-center justify-between">
-                <div>
+            <div className="card-conten p-2">
+              <div className="flex flex-row items-center justify-between">
+                <div className="flex flex-col items-start text-left">
                   <p className="text-sm font-medium text-muted-foreground">
                     {kpi.title}
                   </p>
-                  <p className="text-2xl font-bold">{kpi.value}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {kpi.subtitle}
+                  </p>
+                  <p className="text-3xl font-bold">{kpi.value}</p>
                 </div>
-                <div className={`h-12 w-12 rounded-lg ${kpi.color} flex items-center justify-center`}>
-                  <kpi.icon className="h-6 w-6 text-white" />
+                <div className={`h-16 w-16 rounded-lg ${kpi.color} flex items-center justify-center`}>
+                  <kpi.icon className="h-8 w-8 text-white" />
                 </div>
-              </div>
-              <div className="mt-4 flex items-center">
-                <span className={`text-sm font-medium ${
-                  kpi.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {kpi.change}
-                </span>
-                <span className="text-sm text-muted-foreground ml-2">
-                  vs luna trecută
-                </span>
               </div>
             </div>
           </div>

@@ -6,11 +6,13 @@ import {
 } from 'lucide-react'
 import { useDrawer } from '../../contexts/DrawerContext'
 import { useQuickActionsStore } from '../../stores/quickActionsStore'
+import { useSalesDrawerStore } from '../../stores/salesDrawerStore'
 import { cn } from '../../lib/utils'
 
-const QuickActionsDrawer = ({ className, ...props }) => {
+const QuickActionsDrawer = ({ className }) => {
   const { openAppointmentDrawer } = useDrawer()
   const { isOpen, closeQuickActions } = useQuickActionsStore()
+  const { openSalesDrawer } = useSalesDrawerStore()
   
   const quickActions = [
     {
@@ -40,8 +42,7 @@ const QuickActionsDrawer = ({ className, ...props }) => {
       icon: TrendingUp,
       color: 'bg-purple-500',
       action: () => {
-        // TODO: Implement new sale action
-        console.log('New sale')
+        openSalesDrawer()
         closeQuickActions()
       }
     }
@@ -56,7 +57,6 @@ const QuickActionsDrawer = ({ className, ...props }) => {
         "w-[320px] max-h-[400px]",
         className
       )}
-      {...props}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-border">
