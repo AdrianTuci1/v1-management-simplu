@@ -88,7 +88,7 @@ const AIAssistantComponent = () => {
   return (
     <AIAssistant
       position="top-right"
-      size="lg"
+      size="md"
       state={isOpen ? "open" : "closed"}
       className="flex flex-col rounded-lg"
     >

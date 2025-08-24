@@ -13,7 +13,7 @@ const aiAssistantVariants = cva(
         "bottom-left": "bottom-4 left-4",
       },
       size: {
-        sm: "w-80 h-96",
+        sm: "w-42 h-96",
         md: "w-96 h-[500px]",
         lg: "w-[500px] h-[600px]",
         xl: "w-[600px] h-[700px]",

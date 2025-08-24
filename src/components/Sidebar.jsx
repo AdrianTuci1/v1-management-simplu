@@ -15,7 +15,9 @@ import {
   Shield,
   User,
   Settings,
-  Home
+  Home,
+  Bot,
+  Pill,
 } from 'lucide-react'
 import LocationSwitcher from './LocationSwitcher'
 
@@ -49,7 +51,7 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocati
         {
           id: 'operations-treatments',
           label: 'Tratamente',
-          icon: Activity,
+          icon: Pill,
           view: 'operations-treatments'
         }
       ]
@@ -76,7 +78,7 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocati
     {
       id: 'ai-agent',
       label: 'AI AGENT',
-      icon: Activity,
+      icon: Bot,
       submenu: [
         {
           id: 'operations-activities',

@@ -1,9 +1,9 @@
-import { Bell, User, Search, Menu, MapPin, Bot } from 'lucide-react'
+import { Bell, User, Search, Menu, MapPin, Bot, Plus,  } from 'lucide-react'
 import { useDrawer } from '../contexts/DrawerContext'
 import { useAIAssistantStore } from '../stores/aiAssistantStore'
 
 const Navbar = ({ currentView, currentLocation }) => {
-  const { openMenuDrawer, openUserDrawer } = useDrawer()
+  const { openMenuDrawer, openUserDrawer, openQuickActionsDrawer } = useDrawer()
   const { toggleAIAssistant } = useAIAssistantStore()
   const getViewTitle = (view) => {
     const titles = {
@@ -68,6 +68,14 @@ const Navbar = ({ currentView, currentLocation }) => {
           >
             <Bot className="h-5 w-5" />
           </button>
+
+
+          <button
+                      onClick={openQuickActionsDrawer}
+          className="btn btn-ghost btn-sm"
+        >
+          <Plus className="h-5 w-5" />
+        </button>
 
 
 
