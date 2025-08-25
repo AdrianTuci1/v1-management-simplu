@@ -230,12 +230,7 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocati
               </div>
             )}
 
-            {/* Collapsed submenu indicator */}
-            {item.submenu && collapsed && (
-              <div className="relative">
-                <div className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary"></div>
-              </div>
-            )}
+
           </div>
         ))}
       </nav>

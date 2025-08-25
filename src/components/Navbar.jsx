@@ -2,11 +2,13 @@ import { Bell, User, Search, Menu, MapPin, Bot, Plus,  } from 'lucide-react'
 import { useDrawer } from '../contexts/DrawerContext'
 import { useAIAssistantStore } from '../stores/aiAssistantStore'
 import { useQuickActionsStore } from '../stores/quickActionsStore'
+import { useBusinessConfig } from '../config/businessConfig'
 
 const Navbar = ({ currentView, currentLocation }) => {
   const { openMenuDrawer, openUserDrawer } = useDrawer()
   const { toggleAIAssistant } = useAIAssistantStore()
   const { toggleQuickActions } = useQuickActionsStore()
+  const { businessName, BusinessIcon } = useBusinessConfig()
   
   const getViewTitle = (view) => {
     const titles = {
@@ -41,15 +43,9 @@ const Navbar = ({ currentView, currentLocation }) => {
           </button>
           
           <div className="hidden lg:block">
-            <h1 className="text-lg font-semibold">
-              🏢 Business Dashboard
+            <h1 className="text-lg font-semibold flex items-center gap-2">
+              <BusinessIcon className="h-5 w-5" />
             </h1>
-            {currentLocation && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="h-3 w-3" />
-                <span>{currentLocation.name}</span>
-              </div>
-            )}
           </div>
           
           <div className="lg:hidden">
