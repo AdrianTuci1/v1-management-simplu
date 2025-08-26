@@ -11,12 +11,17 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react'
-
-
+import { useStatistics } from '../../hooks/useStatistics.js'
 
 const DashboardHome = () => {
+  const { 
+    businessStatistics, 
+    recentActivities, 
+    loading, 
+    error, 
+    refresh 
+  } = useStatistics()
 
-  
   // Get current month name in Romanian
   const getCurrentMonthName = () => {
     const months = [
@@ -26,88 +31,163 @@ const DashboardHome = () => {
     return months[new Date().getMonth()]
   }
 
-  const kpiData = [
-    {
-      title: 'Pacienți Înregistrați',
-      subtitle: `Luna ${getCurrentMonthName()}`,
-      value: '24',
-      icon: Users,
-      color: 'bg-blue-500',
-      change: '+3',
-      changeType: 'positive'
-    },
-    {
-      title: 'Vizite Programate',
-      subtitle: `Luna ${getCurrentMonthName()}`,
-      value: '156',
-      icon: Calendar,
-      color: 'bg-green-500',
-      change: '+12',
-      changeType: 'positive'
-    },
-    {
-      title: 'Vizite Finalizate',
-      subtitle: `Luna ${getCurrentMonthName()}`,
-      value: '142',
-      icon: CheckCircle,
-      color: 'bg-emerald-500',
-      change: '+8',
-      changeType: 'positive'
-    },
-    {
-      title: 'Vizite Anulate',
-      subtitle: `Luna ${getCurrentMonthName()}`,
-      value: '8',
-      icon: XCircle,
-      color: 'bg-red-500',
-      change: '-2',
-      changeType: 'positive'
+  // Transform business statistics to KPI format
+  const getKpiData = () => {
+    if (!businessStatistics) {
+      return [
+        {
+          title: 'Pacienți Înregistrați',
+          subtitle: `Luna ${getCurrentMonthName()}`,
+          value: '0',
+          icon: Users,
+          color: 'bg-blue-500',
+          change: '0',
+          changeType: 'neutral'
+        },
+        {
+          title: 'Vizite Programate',
+          subtitle: `Luna ${getCurrentMonthName()}`,
+          value: '0',
+          icon: Calendar,
+          color: 'bg-green-500',
+          change: '0',
+          changeType: 'neutral'
+        },
+        {
+          title: 'Vizite Finalizate',
+          subtitle: `Luna ${getCurrentMonthName()}`,
+          value: '0',
+          icon: CheckCircle,
+          color: 'bg-emerald-500',
+          change: '0',
+          changeType: 'neutral'
+        },
+        {
+          title: 'Vizite Anulate',
+          subtitle: `Luna ${getCurrentMonthName()}`,
+          value: '0',
+          icon: XCircle,
+          color: 'bg-red-500',
+          change: '0',
+          changeType: 'neutral'
+        }
+      ]
     }
-  ]
 
-  const recentActivities = [
-    {
-      type: 'appointment',
-      title: 'Programare nouă',
-      description: 'Ion Marinescu - Control de rutină',
-      time: 'Acum 5 minute',
-      icon: Calendar,
-      color: 'text-blue-500'
-    },
-    {
-      type: 'sale',
-      title: 'Vânzare completată',
-      description: 'Obturație compusă - 350 RON',
-      time: 'Acum 15 minute',
-      icon: TrendingUp,
-      color: 'text-green-500'
-    },
-    {
-      type: 'payment',
-      title: 'Plată primită',
-      description: 'Factura #2024-001 - 350 RON',
-      time: 'Acum 30 minute',
-      icon: CreditCard,
-      color: 'text-emerald-500'
-    },
-    {
-      type: 'inventory',
-      title: 'Stoc actualizat',
-      description: 'Materiale dentare - 5 unități rămase',
-      time: 'Acum 1 oră',
-      icon: Package,
-      color: 'text-orange-500'
+    return [
+      {
+        title: 'Pacienți Înregistrați',
+        subtitle: `Luna ${getCurrentMonthName()}`,
+        value: businessStatistics.registeredPatients?.toString() || '0',
+        icon: Users,
+        color: 'bg-blue-500',
+        change: '+0',
+        changeType: 'positive'
+      },
+      {
+        title: 'Vizite Programate',
+        subtitle: `Luna ${getCurrentMonthName()}`,
+        value: businessStatistics.scheduledVisits?.toString() || '0',
+        icon: Calendar,
+        color: 'bg-green-500',
+        change: '+0',
+        changeType: 'positive'
+      },
+      {
+        title: 'Vizite Finalizate',
+        subtitle: `Luna ${getCurrentMonthName()}`,
+        value: businessStatistics.completedVisits?.toString() || '0',
+        icon: CheckCircle,
+        color: 'bg-emerald-500',
+        change: '+0',
+        changeType: 'positive'
+      },
+      {
+        title: 'Vizite Anulate',
+        subtitle: `Luna ${getCurrentMonthName()}`,
+        value: businessStatistics.canceledVisits?.toString() || '0',
+        icon: XCircle,
+        color: 'bg-red-500',
+        change: '0',
+        changeType: 'neutral'
+      }
+    ]
+  }
+
+  // Transform recent activities from API format to display format
+  const getRecentActivitiesData = () => {
+    if (!recentActivities || recentActivities.length === 0) {
+      return [
+        {
+          type: 'no-data',
+          title: 'Nu există activități recente',
+          description: 'Nu s-au găsit activități în ultima perioadă',
+          time: '',
+          icon: Activity,
+          color: 'text-muted-foreground'
+        }
+      ]
     }
-  ]
+
+    return recentActivities.map(activity => {
+      // Map activity types to icons and colors
+      const getActivityConfig = (activityType) => {
+        switch (activityType) {
+          case 'appointment':
+            return { icon: Calendar, color: 'text-blue-500' }
+          case 'sale':
+            return { icon: TrendingUp, color: 'text-green-500' }
+          case 'payment':
+            return { icon: CreditCard, color: 'text-emerald-500' }
+          case 'inventory':
+            return { icon: Package, color: 'text-orange-500' }
+          default:
+            return { icon: Activity, color: 'text-gray-500' }
+        }
+      }
+
+      const config = getActivityConfig(activity.activityType)
+      
+      // Format time
+      const formatTime = (timestamp) => {
+        const date = new Date(timestamp)
+        const now = new Date()
+        const diffInMinutes = Math.floor((now - date) / (1000 * 60))
+        
+        if (diffInMinutes < 1) return 'Acum câteva secunde'
+        if (diffInMinutes < 60) return `Acum ${diffInMinutes} minute`
+        if (diffInMinutes < 1440) return `Acum ${Math.floor(diffInMinutes / 60)} ore`
+        return `Acum ${Math.floor(diffInMinutes / 1440)} zile`
+      }
+
+      return {
+        type: activity.activityType,
+        title: activity.title || 'Activitate',
+        description: activity.description || 'Activitate în sistem',
+        time: formatTime(activity.updatedAt || activity.createdAt),
+        icon: config.icon,
+        color: config.color
+      }
+    })
+  }
 
   return (
     <div className="space-y-6">
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <XCircle className="h-5 w-5 text-red-500" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {kpiData.map((kpi, index) => (
+        {getKpiData().map((kpi, index) => (
           <div key={index} className="card">
-            <div className="card-conten p-2">
+            <div className="card-content p-2">
               <div className="flex flex-row items-center justify-between">
                 <div className="flex flex-col items-start text-left">
                   <p className="text-sm font-medium text-muted-foreground">
@@ -116,7 +196,9 @@ const DashboardHome = () => {
                   <p className="text-xs text-muted-foreground">
                     {kpi.subtitle}
                   </p>
-                  <p className="text-3xl font-bold">{kpi.value}</p>
+                  <p className="text-3xl font-bold">
+                    {loading ? '...' : kpi.value}
+                  </p>
                 </div>
                 <div className={`h-16 w-16 rounded-lg ${kpi.color} flex items-center justify-center`}>
                   <kpi.icon className="h-8 w-8 text-white" />
@@ -138,20 +220,28 @@ const DashboardHome = () => {
             </div>
           </div>
           <div className="card-content">
-            <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-start gap-3">
-                  <div className={`h-8 w-8 rounded-full bg-muted flex items-center justify-center ${activity.color}`}>
-                    <activity.icon className="h-4 w-4" />
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {getRecentActivitiesData().map((activity, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className={`h-8 w-8 rounded-full bg-muted flex items-center justify-center ${activity.color}`}>
+                      <activity.icon className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{activity.title}</p>
+                      <p className="text-sm text-muted-foreground">{activity.description}</p>
+                      {activity.time && (
+                        <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{activity.title}</p>
-                    <p className="text-sm text-muted-foreground">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="card-footer">
             <button className="btn btn-outline btn-sm">

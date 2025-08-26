@@ -15,7 +15,8 @@ class AppDatabase extends Dexie {
       users: 'resourceId, email, licenseNumber, specialization, status, role', // Store pentru utilizatori (medici)
       roles: 'resourceId, name, description, status', // Store pentru roluri
       permissions: 'resourceId, resource, action, description', // Store pentru permisiuni
-      treatments: 'resourceId, treatmentType, category, duration, price' // Store pentru tratamente
+      treatments: 'resourceId, treatmentType, category, duration, price', // Store pentru tratamente
+      statistics: 'id, timestamp' // Store pentru statistici și activități recente
     });
   }
 }
