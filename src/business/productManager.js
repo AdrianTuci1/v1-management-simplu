@@ -64,7 +64,7 @@ class ProductManager {
   // Transformă datele pentru UI
   transformForUI(productData) {
     return {
-      id: productData.id,
+      id: productData.resourceId,
       name: productData.name,
       price: parseFloat(productData.price).toFixed(2),
       category: productData.category,

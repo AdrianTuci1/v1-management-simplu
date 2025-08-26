@@ -1,24 +1,42 @@
 import { useState, useEffect } from 'react'
 import { MapPin, ChevronDown, Building, Check } from 'lucide-react'
+import businessInfoRepository from '../data/repositories/BusinessInfoRepository.js'
 
 const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [locations, setLocations] = useState([])
 
   useEffect(() => {
-    // Load accessible locations from cognito data
-    const savedCognitoData = localStorage.getItem('cognito-data')
-    if (savedCognitoData) {
-      const cognitoData = JSON.parse(savedCognitoData)
-      const accessibleLocations = cognitoData.availableLocations.filter(location => {
-        const userRoleForLocation = cognitoData.locations[location.id]
+    const loadLocations = () => {
+      try {
+        // Get business info locations
+        const businessInfo = businessInfoRepository.getStoredBusinessInfo()
+        const businessLocations = businessInfo?.locations || []
         
-        // User can access location if they have any role for it (not 'user' role which means no access)
-        return userRoleForLocation && userRoleForLocation !== 'user'
-      })
-      
-      setLocations(accessibleLocations)
+        // Get user data for roles
+        const savedCognitoData = localStorage.getItem('cognito-data')
+        if (savedCognitoData) {
+          const userData = JSON.parse(savedCognitoData)
+          const userRoles = userData.locations || {}
+          
+          // Filter accessible locations based on user roles
+          const accessibleLocations = businessLocations.filter(location => {
+            const userRoleForLocation = userRoles[location.id]
+            return userRoleForLocation && userRoleForLocation !== 'user'
+          })
+          
+          setLocations(accessibleLocations)
+        } else {
+          // If no user data, show all business locations
+          setLocations(businessLocations)
+        }
+      } catch (error) {
+        console.error('Error loading locations:', error)
+        setLocations([])
+      }
     }
+
+    loadLocations()
   }, [])
 
   const handleLocationSelect = (location) => {

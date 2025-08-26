@@ -206,12 +206,7 @@ export const indexedDb = {
       .first();
   },
   
-  async getUserByLicense(licenseNumber) {
-    return db.users
-      .where('licenseNumber')
-      .equals(licenseNumber)
-      .first();
-  },
+
   
   async getUsersByRole(role) {
     return db.users

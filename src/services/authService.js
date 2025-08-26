@@ -1,3 +1,7 @@
+import businessInfoRepository from '../data/repositories/BusinessInfoRepository.js'
+import userRolesRepository from '../data/repositories/UserRolesRepository.js'
+import { GetCommand } from '../data/commands/GetCommand.js'
+
 // Mock data structure for Cognito Authorizer response
 const mockCognitoData = {
   user: {
@@ -6,42 +10,10 @@ const mockCognitoData = {
     name: 'Dr. Popescu'
   },
   locations: {
-    '1': 'admin',    // Sediu Central - utilizatorul are rol admin
-    '2': 'manager',  // Filiala Pipera - utilizatorul are rol manager
-    '3': 'user'      // Centrul Medical Militari - utilizatorul are rol user (fără acces)
-  },
-  availableLocations: [
-    {
-      id: 1,
-      name: 'Sediu Central',
-      address: 'Strada Florilor, Nr. 15',
-      city: 'București, Sector 1',
-      phone: '021 123 4567',
-      email: 'central@cabinet-popescu.ro',
-      schedule: 'Luni-Vineri 8:00-18:00',
-      type: 'central'
-    },
-    {
-      id: 2,
-      name: 'Filiala Pipera',
-      address: 'Bulevardul Pipera, Nr. 45',
-      city: 'București, Sector 1',
-      phone: '021 987 6543',
-      email: 'pipera@cabinet-popescu.ro',
-      schedule: 'Luni-Vineri 9:00-17:00',
-      type: 'branch'
-    },
-    {
-      id: 3,
-      name: 'Centrul Medical Militari',
-      address: 'Strada Militari, Nr. 123',
-      city: 'București, Sector 6',
-      phone: '021 555 1234',
-      email: 'militari@cabinet-popescu.ro',
-      schedule: 'Luni-Sâmbătă 7:00-19:00',
-      type: 'branch'
-    }
-  ]
+    'L0100001': 'admin',    // Premier Central - utilizatorul are rol admin
+    'L0100002': 'manager',  // Filiala Pipera - utilizatorul are rol manager
+    'L0100003': 'user'      // Centrul Medical Militari - utilizatorul are rol user (fără acces)
+  }
 }
 
 class AuthService {
@@ -49,30 +21,139 @@ class AuthService {
     this.isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
   }
 
-  // Simulate getting data from Cognito Authorizer
-  async getCognitoData() {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
+  // Initialize authentication and business data
+  async initialize() {
+    try {
+      // First, get business info using command pattern
+      const getBusinessInfoCommand = new GetCommand(businessInfoRepository, {})
+      const businessInfo = await getBusinessInfoCommand.execute()
+      
+      // Then get user data (either from Cognito or demo mode)
+      const userData = await this.getUserData()
+      
+      // Get user roles for locations
+      let userRoles = null
+      try {
+        const getUserRolesCommand = new GetCommand(userRolesRepository, {})
+        userRoles = await getUserRolesCommand.execute()
+      } catch (error) {
+        console.log('Could not fetch user roles, using demo data:', error)
+        // In demo mode or if API fails, use demo roles
+        userRoles = userData.locations ? { locations: userData.locations } : null
+      }
+      
+      // Combine all data
+      const combinedData = {
+        ...userData,
+        businessInfo,
+        userRoles
+      }
+      
+      return combinedData
+    } catch (error) {
+      console.error('Error initializing auth service:', error)
+      throw error
+    }
+  }
+
+  // Get user data based on authentication method
+  async getUserData() {
     if (this.isDemoMode) {
-      return mockCognitoData
+      return this.getDemoUserData()
+    } else {
+      return this.getCognitoUserData()
+    }
+  }
+
+  // Get demo user data from localStorage
+  getDemoUserData() {
+    const authToken = localStorage.getItem('auth-token')
+    const savedCognitoData = localStorage.getItem('cognito-data')
+    
+    if (savedCognitoData) {
+      return JSON.parse(savedCognitoData)
     }
     
-    // In real app, this would be the actual Cognito Authorizer response
+    if (authToken) {
+      // Create demo data structure
+      const demoData = {
+        id_token: authToken,
+        access_token: authToken,
+        refresh_token: 'demo-refresh-token',
+        profile: {
+          email: localStorage.getItem('user-email') || 'demo@cabinet-popescu.ro',
+          name: 'Demo User'
+        }
+      }
+      
+      // Store for future use
+      localStorage.setItem('cognito-data', JSON.stringify(demoData))
+      return demoData
+    }
+    
+    // Create default demo data if nothing exists
+    const defaultDemoData = {
+      id_token: 'demo-jwt-token',
+      access_token: 'demo-jwt-token',
+      refresh_token: 'demo-refresh-token',
+      profile: {
+        email: 'demo@cabinet-popescu.ro',
+        name: 'Demo User'
+      },
+      locations: {
+        'L0100001': 'admin',    // Premier Central - utilizatorul are rol admin
+        'L0100002': 'manager',  // Filiala Pipera - utilizatorul are rol manager
+        'L0100003': 'user'      // Centrul Medical Militari - utilizatorul are rol user (fără acces)
+      }
+    }
+    
+    // Store default demo data
+    localStorage.setItem('auth-token', 'demo-jwt-token')
+    localStorage.setItem('user-email', 'demo@cabinet-popescu.ro')
+    localStorage.setItem('cognito-data', JSON.stringify(defaultDemoData))
+    
+    return defaultDemoData
+  }
+
+  // Get Cognito user data (for real authentication)
+  async getCognitoUserData() {
+    // This would be called when user is authenticated via Cognito
     // For now, return mock data
     return mockCognitoData
   }
 
+  // Process authenticated user data
+  processUserData(userData, userRoles = null) {
+    const businessInfo = businessInfoRepository.getStoredBusinessInfo()
+    const locations = businessInfo?.locations || []
+    
+    // Use userRoles from API if available, otherwise fall back to userData.locations
+    const locationRoles = userRoles?.locations || userData.locations || {}
+    const accessibleLocations = locations.filter(location => {
+      const userRole = locationRoles[location.id]
+      return userRole && userRole !== 'user'
+    })
+    
+    return {
+      user: userData.user || userData.profile,
+      accessibleLocations,
+      userRoles: locationRoles,
+      businessInfo
+    }
+  }
+
   // Get user's accessible locations based on their roles for each location
-  getAccessibleLocations(cognitoData) {
-    const { locations, availableLocations } = cognitoData
+  getAccessibleLocations(userData) {
+    const businessInfo = businessInfoRepository.getStoredBusinessInfo()
+    const locations = businessInfo?.locations || []
+    const userRoles = userData.locations || {}
     
     console.log('Getting accessible locations')
-    console.log('Available locations:', availableLocations)
-    console.log('User roles per location:', locations)
+    console.log('Available locations:', locations)
+    console.log('User roles per location:', userRoles)
 
-    const accessibleLocations = availableLocations.filter(location => {
-      const userRoleForLocation = locations[location.id]
+    const accessibleLocations = locations.filter(location => {
+      const userRoleForLocation = userRoles[location.id]
       console.log(`Location ${location.id} (${location.name}): user role for this location = ${userRoleForLocation}`)
       
       // User can access location if they have any role for it (not 'user' role which means no access)
@@ -90,8 +171,8 @@ class AuthService {
   }
 
   // Get default location for user
-  getDefaultLocation(cognitoData) {
-    const accessibleLocations = this.getAccessibleLocations(cognitoData)
+  getDefaultLocation(userData) {
+    const accessibleLocations = this.getAccessibleLocations(userData)
     console.log('Getting default location from accessible locations:', accessibleLocations)
     
     // Return first accessible location
@@ -101,31 +182,52 @@ class AuthService {
   }
 
   // Check if user has admin access
-  hasAdminAccess(cognitoData) {
-    const userRole = cognitoData.user.role
-    return userRole === 'admin' || userRole === 'manager'
+  hasAdminAccess(userData) {
+    const userRoles = userData.locations || {}
+    return Object.values(userRoles).some(role => role === 'admin')
   }
 
   // Check if user should be denied access (no valid roles for any location)
-  shouldDenyAccess(cognitoData) {
-    const { locations } = cognitoData
-    const hasValidRole = Object.values(locations).some(role => role && role !== 'user')
+  shouldDenyAccess(userData) {
+    const userRoles = userData.locations || {}
+    const hasValidRole = Object.values(userRoles).some(role => role && role !== 'user')
     return !hasValidRole
   }
 
   // Check if user can access a specific location
-  canAccessLocation(cognitoData, locationId) {
-    const { locations } = cognitoData
-    const userRoleForLocation = locations[locationId]
+  canAccessLocation(userData, locationId) {
+    const userRoles = userData.locations || {}
+    const userRoleForLocation = userRoles[locationId]
 
     // User can access location if they have any role for it (not 'user' role which means no access)
     return userRoleForLocation && userRoleForLocation !== 'user'
   }
 
   // Get user's role for a specific location
-  getUserRoleForLocation(cognitoData, locationId) {
-    const { locations } = cognitoData
-    return locations[locationId] || null
+  getUserRoleForLocation(userData, locationId) {
+    const userRoles = userData.locations || {}
+    return userRoles[locationId] || null
+  }
+
+  // Store user data in localStorage
+  storeUserData(userData) {
+    localStorage.setItem('auth-token', userData.access_token || userData.id_token)
+    localStorage.setItem('user-email', userData.profile?.email || userData.user?.email)
+    localStorage.setItem('cognito-data', JSON.stringify(userData))
+  }
+
+  // Clear user data from localStorage
+  clearUserData() {
+    localStorage.removeItem('auth-token')
+    localStorage.removeItem('user-email')
+    localStorage.removeItem('cognito-data')
+  }
+
+  // Check if user is authenticated (has stored data)
+  isAuthenticated() {
+    const authToken = localStorage.getItem('auth-token')
+    const savedCognitoData = localStorage.getItem('cognito-data')
+    return !!(authToken || savedCognitoData)
   }
 }
 

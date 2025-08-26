@@ -1,10 +1,12 @@
-import { Bell, User, Search, Menu, MapPin, Bot, Plus,  } from 'lucide-react'
+import { Bell, User, Search, Menu, MapPin, Bot, Plus, LogOut } from 'lucide-react'
+import { useAuth } from "react-oidc-context"
 import { useDrawer } from '../contexts/DrawerContext'
 import { useAIAssistantStore } from '../stores/aiAssistantStore'
 import { useQuickActionsStore } from '../stores/quickActionsStore'
 import { useBusinessConfig } from '../config/businessConfig'
 
 const Navbar = ({ currentView, currentLocation }) => {
+  const auth = useAuth()
   const { openMenuDrawer, openUserDrawer } = useDrawer()
   const { toggleAIAssistant } = useAIAssistantStore()
   const { toggleQuickActions } = useQuickActionsStore()
@@ -29,6 +31,15 @@ const Navbar = ({ currentView, currentLocation }) => {
     }
     return titles[view] || 'Dashboard'
   }
+
+  const handleSignOut = () => {
+    const clientId = "ar2m2qg3gp4a0b4cld09aegdb";
+    const logoutUri = window.location.href;
+    const cognitoDomain = "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_KUaE0MTcQ";
+    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+  }
+
+  const userEmail = auth.user?.profile?.email || localStorage.getItem('user-email') || 'Demo User'
 
   return (
     <header className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -55,8 +66,6 @@ const Navbar = ({ currentView, currentLocation }) => {
           </div>
         </div>
 
-
-
         {/* Right side - Robot, Notifications and user */}
         <div className="flex items-center gap-2">
           {/* Robot AI Assistant */}
@@ -68,7 +77,6 @@ const Navbar = ({ currentView, currentLocation }) => {
             <Bot className="h-5 w-5" />
           </button>
 
-
           <button
             onClick={toggleQuickActions}
             className="btn btn-ghost btn-sm"
@@ -76,7 +84,6 @@ const Navbar = ({ currentView, currentLocation }) => {
           >
             <Plus className="h-5 w-5" />
           </button>
-
 
 
           {/* User menu */}
@@ -88,9 +95,19 @@ const Navbar = ({ currentView, currentLocation }) => {
               <User className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="hidden sm:block text-sm font-medium">
-              Admin User
+              {userEmail}
             </span>
           </button>
+
+          {/* Sign Out Button */}
+          <button
+            onClick={handleSignOut}
+            className="btn btn-ghost btn-sm"
+            title="Deconectare"
+          >
+            <LogOut className="h-5 w-5" />
+          </button>
+
         </div>
       </div>
     </header>
