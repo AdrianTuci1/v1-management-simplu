@@ -278,7 +278,7 @@ export const usePatients = () => {
         await indexedDb.put('patients', { ...ui, _isOptimistic: false })
         
         // Caută în outbox pentru a găsi operația optimistă
-        const outboxEntry = await indexedDb.outboxFindByTempId(patientId)
+        const outboxEntry = await indexedDb.outboxFindByResourceId(patientId, 'patients')
         
         if (outboxEntry) {
           // Găsește pacientul optimist în shared state prin tempId

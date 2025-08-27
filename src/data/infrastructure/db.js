@@ -90,6 +90,19 @@ export const indexedDb = {
   async outboxFindByTempId(tempId) {
     return db.table('outbox').where('tempId').equals(tempId).first()
   },
+  async outboxFindByResourceId(resourceId, resourceType) {
+    // Caută în outbox o intrare care să corespundă resource-ului creat/actualizat
+    // Această metodă va fi folosită când primim confirmarea de la server
+    const entries = await db.table('outbox')
+      .where('resourceType')
+      .equals(resourceType)
+      .and(entry => entry.status === 'pending' || entry.status === 'retry')
+      .toArray()
+    
+    // Pentru moment, returnăm prima intrare găsită pentru tipul de resource
+    // Într-o implementare mai robustă, am putea folosi timestamp-uri sau alte criterii
+    return entries.length > 0 ? entries[0] : null
+  },
   
   // Metode specifice pentru programări
   async getAppointmentsByDate(date) {

@@ -65,10 +65,26 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         updateLookupData(patients, users, treatments)
       }
       
+      // Debug: să vedem ce conține appointmentData
+      console.log('AppointmentDrawer - appointmentData:', appointmentData)
+      
       // Transformăm datele pentru UI folosind appointmentManager
       const uiData = appointmentManager.transformAppointmentForUI(appointmentData)
+      console.log('AppointmentDrawer - uiData:', uiData)
+      
+      // Găsim ID-ul valid - verificăm toate posibilitățile
+      const appointmentId = appointmentData.id || appointmentData.resourceId || uiData.id || uiData.resourceId
+      console.log('AppointmentDrawer - appointmentId:', appointmentId)
+      
+      // Dacă tot nu avem ID, ar trebui să fie o programare nouă
+      if (!appointmentId && !isNewAppointment) {
+        console.error('AppointmentDrawer - Nu s-a găsit ID valid pentru programarea de editat:', { appointmentData, uiData })
+      }
+      
       return {
         ...uiData,
+        // Păstrăm ID-ul original pentru actualizare
+        id: appointmentId,
         // Extragem ID-urile pentru combobox-uri
         patient: uiData.patient?.id || uiData.patient || '',
         doctor: uiData.doctor?.id || uiData.doctor || '',
@@ -124,18 +140,21 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     setError(null)
     
     try {
+      // Debug: să vedem ce avem în formData
+      console.log('AppointmentDrawer - handleSave - formData:', formData)
+      console.log('AppointmentDrawer - handleSave - isNewAppointment:', isNewAppointment)
+      console.log('AppointmentDrawer - handleSave - formData.id:', formData.id)
+      
       // Validăm datele înainte de salvare
       appointmentManager.validateAppointment(formData)
       
-      const dataToSave = {
-        ...formData,
-        id: appointmentData?.id // Păstrăm ID-ul pentru actualizare
-      }
-      
       if (isNewAppointment) {
-        await addAppointment(dataToSave)
+        await addAppointment(formData)
       } else {
-        await updateAppointment(dataToSave.id, dataToSave)
+        if (!formData.id) {
+          throw new Error('Nu s-a găsit ID valid pentru programarea de editat. Vă rugăm să încercați din nou.')
+        }
+        await updateAppointment(formData.id, formData)
       }
       
       onClose()
@@ -148,7 +167,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   }
 
   const handleDelete = async () => {
-    if (!appointmentData?.id) return
+    if (!formData.id) return
     
     if (!confirm('Sigur doriți să ștergeți această programare?')) return
     
@@ -156,7 +175,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     setError(null)
     
     try {
-      await deleteAppointment(appointmentData.id)
+      await deleteAppointment(formData.id)
       onClose()
     } catch (err) {
       setError(err.message)
@@ -179,7 +198,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       // Validăm datele înainte de salvare
       appointmentManager.validateAppointment(updatedData)
       
-      await updateAppointment(appointmentData.id, updatedData)
+      await updateAppointment(formData.id, updatedData)
       onClose()
     } catch (err) {
       setError(err.message)

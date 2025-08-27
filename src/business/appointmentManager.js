@@ -56,6 +56,9 @@ class AppointmentManager {
 
   // Transformare date pentru UI (Backend -> UI)
   transformAppointmentForUI(appointmentData) {
+    // Debug: să vedem ce primim
+    console.log('appointmentManager.transformAppointmentForUI - input:', appointmentData)
+    
     // Extragem datele din structura nested dacă există
     const data = appointmentData.data || appointmentData
     
@@ -67,8 +70,13 @@ class AppointmentManager {
       return `${year}-${month}-${day}`
     }
     
+    // Găsim ID-ul valid
+    const appointmentId = appointmentData.resourceId || appointmentData.id
+    console.log('appointmentManager.transformAppointmentForUI - appointmentId:', appointmentId)
+    
     const transformed = {
-      id: appointmentData.resourceId,
+      ...appointmentData, // Preserve toate proprietățile existente, inclusiv _isOptimistic, _isDeleting, _tempId
+      id: appointmentId,
       date: data.date ? formatDate(new Date(data.date)) : '',
       time: data.time || '',
       price: data.price?.toString() || '',
@@ -79,6 +87,17 @@ class AppointmentManager {
       createdAt: data.createdAt || '',
       updatedAt: data.updatedAt || ''
     }
+    
+    console.log('appointmentManager.transformAppointmentForUI - input flags:', {
+      _isOptimistic: appointmentData._isOptimistic,
+      _isDeleting: appointmentData._isDeleting,
+      _tempId: appointmentData._tempId
+    })
+    console.log('appointmentManager.transformAppointmentForUI - output flags:', {
+      _isOptimistic: transformed._isOptimistic,
+      _isDeleting: transformed._isDeleting,
+      _tempId: transformed._tempId
+    })
 
     // Transformare obiecte în obiecte cu nume pentru afișare
     if (data.patient) {

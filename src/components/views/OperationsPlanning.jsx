@@ -1,4 +1,4 @@
-import { Calendar, Plus, Edit, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { Calendar, Plus, Edit, ChevronLeft, ChevronRight, Loader2, RotateCw, Trash2 } from 'lucide-react'
 
 import { useState, useMemo, useEffect } from 'react'
 import { useAppointments } from '../../hooks/useAppointments.js'
@@ -19,12 +19,10 @@ const OperationsPlanning = () => {
     loading,
     error,
     appointmentsCount,
-    loadAppointmentsByDate,
-    loadAppointmentsByWeek,
-    loadAppointmentsByMonth,
     loadAppointmentsCount,
     populateWithTestData,
-    loadAppointments
+    loadAppointments,
+    getSortedAppointments
   } = useAppointments()
 
   const getStatusColor = (status) => {
@@ -187,10 +185,14 @@ const OperationsPlanning = () => {
 
 
 
-  // Filtrează programările pentru afișare
+  // Filtrează programările pentru afișare cu sortare optimistă
   const filteredAppointments = useMemo(() => {
-    return appointments.slice(0, appointmentsLimit)
-  }, [appointments, appointmentsLimit])
+    if (!appointments || appointments.length === 0) return []
+    
+    // Aplică sortarea optimistă pentru a prioritiza elementele în proces
+    const sortedAppointments = getSortedAppointments('time', 'asc')
+    return sortedAppointments.slice(0, appointmentsLimit)
+  }, [appointments, appointmentsLimit, getSortedAppointments])
 
   // Check if date is current date
   const isCurrentDate = (date) => {
@@ -378,16 +380,27 @@ const OperationsPlanning = () => {
             <div className="space-y-3">
               {filteredAppointments.length > 0 ? (
                 filteredAppointments.map((appointment, index) => (
-                  <div key={appointment.id || index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div 
+                    key={appointment.id || appointment._tempId || index} 
+                    className={`flex items-center justify-between p-3 border rounded-lg ${
+                      appointment._isDeleting ? 'opacity-50' : ''
+                    }`}
+                  >
                     <div className="flex items-center gap-4">
+                      <div className="flex flex-col">
                       <div className="text-sm font-medium w-16">{appointment.time}</div>
+                      <div className="text-xs text-muted-foreground">
+                          {appointment.date ? new Date(appointment.date).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' }) : ''}
+                        </div>
+                        </div>
                       <div>
-                        <div className="font-medium">
+                        <div className={`font-medium ${appointment._isDeleting ? 'line-through' : ''}`}>
                           {appointment.patient?.name || appointment.patient || 'Pacient necunoscut'}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {appointment.service?.name || appointment.service || 'Serviciu necunoscut'}
                         </div>
+
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -397,9 +410,26 @@ const OperationsPlanning = () => {
                       <span className={`badge ${getStatusColor(appointment.status)}`}>
                         {getStatusText(appointment.status)}
                       </span>
+                      
+                      {/* Indicator pentru optimistic updates */}
+                      {appointment._isOptimistic && !appointment._isDeleting && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                          <RotateCw className="h-3 w-3 mr-1 animate-spin" />
+                          Salvare...
+                        </span>
+                      )}
+                      
+                      {appointment._isDeleting && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Ștergere...
+                        </span>
+                      )}
+                      
                       <button 
                         onClick={() => openDrawer({ type: 'appointment', data: appointment })}
                         className="btn btn-ghost btn-sm"
+                        disabled={appointment._isOptimistic}
                       >
                         <Edit className="h-4 w-4" />
                       </button>
