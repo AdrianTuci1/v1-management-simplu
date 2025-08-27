@@ -4,39 +4,38 @@ import patientManager from '../business/patientManager.js'
 import { indexedDb } from '../data/infrastructure/db.js'
 import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
 
+// Shared state for all instances
+let sharedPatients = []
+let sharedStats = {
+  total: 0,
+  active: 0,
+  inactive: 0,
+  newThisMonth: 0
+}
+let subscribers = new Set()
+
+function notifySubscribers() {
+  subscribers.forEach(cb => cb(sharedPatients))
+}
+
 export const usePatients = () => {
-  const [patients, setPatients] = useState([])
+  const [patients, setPatients] = useState(sharedPatients)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    inactive: 0,
-    newThisMonth: 0
-  })
+  const [stats, setStats] = useState(sharedStats)
 
-  // Funcție pentru încărcarea pacienților cu gestionarea erorilor
-  const loadPatients = useCallback(async (params = {}) => {
+  // Funcție pentru încărcarea pacienților
+  const loadPatients = useCallback(async () => {
     setLoading(true)
     setError(null)
-    
     try {
-      const data = await patientService.getPatients(params)
+      const data = await patientService.getPatients()
+      sharedPatients = data
       setPatients(data)
-      return data
+      notifySubscribers()
     } catch (err) {
-      // Încearcă să încarce din cache local dacă API-ul eșuează
-      try {
-        console.warn('API failed, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('patients')
-        setPatients(cachedData)
-        setError('Conectare la server eșuată. Se afișează datele din cache local.')
-        return cachedData
-      } catch (cacheErr) {
-        setError(err.message)
-        console.error('Error loading patients:', err)
-        return []
-      }
+      setError(err.message)
+      console.error('Error loading patients:', err)
     } finally {
       setLoading(false)
     }
@@ -46,83 +45,31 @@ export const usePatients = () => {
   const loadPatientsByPage = useCallback(async (page = 1, limit = 20, filters = {}) => {
     setLoading(true)
     setError(null)
-    
     try {
       const data = await patientService.getPatientsByPage(page, limit, filters)
+      sharedPatients = data
       setPatients(data)
-      return data
+      notifySubscribers()
     } catch (err) {
-      try {
-        console.warn('API failed for pagination, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('patients')
-        
-        // Aplică filtrele pe datele din cache
-        let filteredData = cachedData
-        
-        if (filters.status) {
-          filteredData = filteredData.filter(p => p.status === filters.status)
-        }
-        if (filters.city) {
-          filteredData = filteredData.filter(p => p.city === filters.city)
-        }
-        if (filters.search) {
-          const searchTerm = filters.search.toLowerCase()
-          filteredData = filteredData.filter(p => 
-            p.name.toLowerCase().includes(searchTerm) ||
-            p.email.toLowerCase().includes(searchTerm) ||
-            (p.phone && p.phone.includes(searchTerm)) ||
-            (p.cnp && p.cnp.includes(searchTerm))
-          )
-        }
-        
-        // Aplică paginarea
-        const startIndex = (page - 1) * limit
-        const endIndex = startIndex + limit
-        const paginatedData = filteredData.slice(startIndex, endIndex)
-        
-        setPatients(paginatedData)
-        setError('Conectare la server eșuată. Se afișează datele din cache local.')
-        return paginatedData
-      } catch (cacheErr) {
-        setError(err.message)
-        console.error('Error loading patients by page:', err)
-        return []
-      }
+      setError(err.message)
+      console.error('Error loading patients by page:', err)
     } finally {
       setLoading(false)
     }
   }, [])
 
   // Funcție pentru căutarea pacienților
-  const searchPatients = useCallback(async (searchTerm, limit = 50) => {
+  const searchPatients = useCallback(async (query) => {
     setLoading(true)
     setError(null)
-    
     try {
-      const data = await patientService.searchPatients(searchTerm, limit)
+      const data = await patientService.searchPatients(query)
+      sharedPatients = data
       setPatients(data)
-      return data
+      notifySubscribers()
     } catch (err) {
-      try {
-        console.warn('API failed for search, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('patients')
-        
-        const searchTermLower = searchTerm.toLowerCase()
-        const filteredData = cachedData.filter(p => 
-          p.name.toLowerCase().includes(searchTermLower) ||
-          p.email.toLowerCase().includes(searchTermLower) ||
-          (p.phone && p.phone.includes(searchTerm)) ||
-          (p.cnp && p.cnp.includes(searchTerm))
-        ).slice(0, limit)
-        
-        setPatients(filteredData)
-        setError('Conectare la server eșuată. Se afișează datele din cache local.')
-        return filteredData
-      } catch (cacheErr) {
-        setError(err.message)
-        console.error('Error searching patients:', err)
-        return []
-      }
+      setError(err.message)
+      console.error('Error searching patients:', err)
     } finally {
       setLoading(false)
     }
@@ -130,102 +77,72 @@ export const usePatients = () => {
 
   // Funcție pentru obținerea unui pacient după ID
   const getPatientById = useCallback(async (id) => {
-    setLoading(true)
-    setError(null)
-    
     try {
-      const patient = await patientService.getPatientById(id)
-      return patient
+      return await patientService.getPatientById(id)
     } catch (err) {
-      try {
-        console.warn('API failed for patient by ID, trying local cache:', err.message)
-        const patient = await indexedDb.get('patients', id)
-        return patient
-      } catch (cacheErr) {
-        setError(err.message)
-        console.error('Error getting patient by ID:', err)
-        return null
-      }
-    } finally {
-      setLoading(false)
+      setError(err.message)
+      console.error('Error getting patient by ID:', err)
+      throw err
     }
   }, [])
 
   // Funcție pentru adăugarea unui pacient
   const addPatient = useCallback(async (patientData) => {
-    setLoading(true)
     setError(null)
-    
     try {
-      const added = await patientService.addPatient(patientData)
-      // Actualizare optimistă în memorie
-      const uiPatient = patientManager.transformPatientForUI(added)
-      setPatients(prev => [uiPatient, ...prev])
-      // Dacă serverul a returnat rezultat final (non-optimist), sincronizează din sursa oficială
-      if (!added._isOptimistic) {
-        await loadPatients()
-      }
-      return added
+      const newPatient = await patientService.addPatient(patientData)
+      sharedPatients = [newPatient, ...sharedPatients]
+      setPatients(sharedPatients)
+      notifySubscribers()
+      return newPatient
     } catch (err) {
       setError(err.message)
       console.error('Error adding patient:', err)
       throw err
-    } finally {
-      setLoading(false)
     }
-  }, [loadPatients])
+  }, [])
 
   // Funcție pentru actualizarea unui pacient
   const updatePatient = useCallback(async (id, patientData) => {
-    setLoading(true)
     setError(null)
-    
     try {
-      const updated = await patientService.updatePatient(id, patientData)
-      const uiUpdated = patientManager.transformPatientForUI({ ...updated, resourceId: updated.resourceId || id, id })
-      // Actualizare optimistă în memorie
-      setPatients(prev => prev.map(p => (p.id === id ? { ...p, ...uiUpdated } : p)))
-      if (!updated._isOptimistic) {
-        await loadPatients()
-      }
-      return updated
+      const updatedPatient = await patientService.updatePatient(id, patientData)
+      sharedPatients = sharedPatients.map(p => p.id === id ? updatedPatient : p)
+      setPatients(sharedPatients)
+      notifySubscribers()
+      return updatedPatient
     } catch (err) {
       setError(err.message)
       console.error('Error updating patient:', err)
       throw err
-    } finally {
-      setLoading(false)
     }
-  }, [loadPatients])
+  }, [])
 
   // Funcție pentru ștergerea unui pacient
   const deletePatient = useCallback(async (id) => {
-    setLoading(true)
     setError(null)
-    
     try {
-      // Eliminare optimistă în memorie
-      setPatients(prev => prev.filter(p => p.id !== id))
       await patientService.deletePatient(id)
-      // Pentru răspuns non-optimist putem valida cu o încărcare, însă așteptăm reconcilierea via websocket
+      sharedPatients = sharedPatients.filter(p => p.id !== id)
+      setPatients(sharedPatients)
+      notifySubscribers()
     } catch (err) {
       setError(err.message)
       console.error('Error deleting patient:', err)
       throw err
-    } finally {
-      setLoading(false)
     }
-  }, [loadPatients])
+  }, [])
 
-  // Funcție pentru obținerea statisticilor
+  // Funcție pentru încărcarea statisticilor
   const loadStats = useCallback(async () => {
     try {
-      const statsData = await patientService.getPatientStats()
-      setStats(statsData)
-      return statsData
+      const data = await patientService.getPatientStats()
+      sharedStats = data
+      setStats(data)
     } catch (err) {
-      console.error('Error loading patient stats:', err)
-      return {
+      console.error('Error loading stats:', err)
+      // Fallback stats
+      sharedStats = {
         total: 0,
         active: 0,
         inactive: 0,
@@ -247,58 +164,85 @@ export const usePatients = () => {
 
   // Încarcă datele la montarea componentei
   useEffect(() => {
+    // Initialize from shared state and subscribe to updates
+    setPatients(sharedPatients)
+    setStats(sharedStats)
+    const unsub = (cb => { subscribers.add(cb); return () => subscribers.delete(cb) })(setPatients)
+    
+    // Initial data load
     loadPatients()
     loadStats()
-    // Subscribe la actualizări prin websocket pentru reconcilierea ID-urilor temporare
+    
+    // Subscribe la actualizări prin websocket
     const handler = async (message) => {
-      const { type, data, tempId, realId, operation, resourceType } = message
-      if (!resourceType || (resourceType !== 'patient' && resourceType !== 'patients')) return
-      // Normalize operations coming from worker (create/update/delete)
-      const op = operation || (type && type.replace('resource_', '').replace('_resolved', ''))
-      if (!op) return
-      const finalId = realId || data?.resourceId || data?.id
-      if (op === 'create') {
-        if (finalId) {
-          const ui = patientManager.transformPatientForUI({ ...data, id: finalId, resourceId: finalId })
-          await indexedDb.put('patients', { ...ui, _isOptimistic: false })
-          setPatients(prev => {
-            // Replace by temp match or add if not present
-            const byTemp = tempId ? prev.findIndex(p => p._tempId === tempId) : -1
-            if (byTemp >= 0) {
-              const next = [...prev]
-              next[byTemp] = { ...ui }
-              return next
-            }
-            // Try to match by email/phone/name if tempId is missing
-            const byHeuristic = prev.findIndex(p => (
-              (p.email && ui.email && p.email === ui.email) ||
-              (p.phone && ui.phone && p.phone === ui.phone) ||
-              (p.name && ui.name && p.name === ui.name)
-            ))
-            if (byHeuristic >= 0) {
-              const next = [...prev]
-              next[byHeuristic] = { ...ui }
-              return next
-            }
-            return [ui, ...prev]
-          })
+      const { type, data, resourceType } = message
+      
+      // Verifică dacă este pentru pacienți
+      if (resourceType !== 'patient') return
+      
+      // Extrage operația din tipul mesajului
+      const operation = type?.replace('resource_', '') || 'unknown'
+      const patientId = data?.id
+      
+      if (!patientId) return
+      
+      // Procesează operația
+      if (operation === 'created' || operation === 'updated') {
+        const ui = patientManager.transformPatientForUI({ ...data, id: patientId, resourceId: patientId })
+        
+        // Actualizează IndexedDB cu datele reale
+        await indexedDb.put('patients', { ...ui, _isOptimistic: false })
+        
+        // Caută în outbox pentru a găsi operația optimistă
+        const outboxEntry = await indexedDb.outboxFindByTempId(patientId)
+        
+        if (outboxEntry) {
+          // Găsește pacientul optimist în shared state prin tempId
+          const optimisticIndex = sharedPatients.findIndex(p => p._tempId === outboxEntry.tempId)
+          
+          if (optimisticIndex >= 0) {
+            // Înlocuiește pacientul optimist cu datele reale
+            sharedPatients[optimisticIndex] = { ...ui, _isOptimistic: false }
+            console.log('Replaced optimistic patient with real data from outbox')
+          }
+          
+          // Șterge din outbox
+          await indexedDb.outboxDelete(outboxEntry.id)
+        } else {
+          // Dacă nu găsește în outbox, caută prin ID normal
+          const existingIndex = sharedPatients.findIndex(p => p.id === patientId || p.resourceId === patientId)
+          
+          if (existingIndex >= 0) {
+            // Actualizează pacientul existent
+            sharedPatients[existingIndex] = { ...ui, _isOptimistic: false }
+          } else {
+            // Adaugă pacientul nou
+            sharedPatients = [{ ...ui, _isOptimistic: false }, ...sharedPatients]
+          }
         }
-      } else if (op === 'update') {
-        if (finalId) {
-          const ui = patientManager.transformPatientForUI({ ...data, id: finalId, resourceId: finalId })
-          await indexedDb.put('patients', { ...ui, _isOptimistic: false })
-          setPatients(prev => prev.map(p => (p.id === finalId ? { ...p, ...ui } : p)))
-        }
-      } else if (op === 'delete') {
-        if (finalId) {
-          await indexedDb.delete('patients', finalId)
-          setPatients(prev => prev.filter(p => p.id !== finalId))
-        }
+        
+        setPatients(sharedPatients)
+        notifySubscribers()
+        
+      } else if (operation === 'deleted') {
+        // Șterge din IndexedDB
+        await indexedDb.delete('patients', patientId)
+        
+        // Șterge din shared state
+        sharedPatients = sharedPatients.filter(p => p.id !== patientId && p.resourceId !== patientId)
+        setPatients(sharedPatients)
+        notifySubscribers()
       }
     }
+    
     const unsubPlural = onResourceMessage('patients', handler)
     const unsubSingular = onResourceMessage('patient', handler)
-    return () => { unsubPlural(); unsubSingular() }
+    
+    return () => { 
+      unsubPlural(); 
+      unsubSingular(); 
+      unsub() 
+    }
   }, [loadPatients, loadStats])
 
   return {

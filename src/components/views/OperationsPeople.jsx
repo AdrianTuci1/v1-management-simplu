@@ -99,8 +99,17 @@ const OperationsPeople = () => {
     }
   }
 
-  // Sortează pacienții
-  const sortedPatients = patientManager.sortPatients(patients, sortBy, sortOrder)
+  // Sortează pacienții și prioritizează elementele optimiste (neconfirmate încă)
+  const sortedPatients = (() => {
+    const baseSorted = patientManager.sortPatients(patients, sortBy, sortOrder)
+    // Aduce elementele cu _isOptimistic în față pentru feedback instant
+    return [...baseSorted].sort((a, b) => {
+      const aOpt = !!a._isOptimistic
+      const bOpt = !!b._isOptimistic
+      if (aOpt === bOpt) return 0
+      return aOpt ? -1 : 1
+    })
+  })()
 
   // Calculează vârsta
   const calculateAge = (birthDate, birthYear) => {
@@ -366,7 +375,14 @@ const OperationsPeople = () => {
                     <tr key={patient.id} className="border-b hover:bg-muted/50">
                       <td className="p-3">
                         <div>
-                          <div className="font-medium">{patient.name}</div>
+                          <div className="font-medium flex items-center gap-2">
+                            <span>{patient.name}</span>
+                            {patient._isOptimistic && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                                în curs 
+                              </span>
+                            )}
+                          </div>
                           {patient.cnp && (
                             <div className="text-sm text-muted-foreground">
                               CNP: {patient.cnp}
@@ -445,7 +461,7 @@ const OperationsPeople = () => {
                           <button
                             onClick={() => openDrawer({ 
                               type: 'edit-person', 
-                              patientData: patient 
+                              data: patient 
                             })}
                             className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent"
                             title="Editează"

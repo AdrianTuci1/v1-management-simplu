@@ -57,6 +57,32 @@ function createWorker() {
           }
           break;
           
+        case 'resource_update':
+          // Extract data from the payload as per documentation
+          const payload = data.data;
+          
+          // Get operation type from payload.type
+          const operation = payload.type || 'unknown';
+          const normalizedData = {
+            type: operation,
+            data: payload.data,
+            resourceType: payload.resourceType,
+            resourceId: payload.resourceId,
+            tempId: payload.tempId,
+            businessId: payload.businessId,
+            locationId: payload.locationId,
+            timestamp: payload.timestamp
+          };
+          
+          // Send to general listeners
+          listeners.forEach((cb) => cb(normalizedData));
+          
+          // Send to specific resource listeners
+          if (normalizedData.resourceType && resourceListeners.has(normalizedData.resourceType)) {
+            resourceListeners.get(normalizedData.resourceType).forEach(cb => cb(normalizedData));
+          }
+          break;
+          
         case 'log':
           const logLevel = data.kind === 'error' ? 'error' : data.kind === 'warn' ? 'warn' : 'log';
           console[logLevel](`[WebSocket Worker] ${data.msg}`, data);

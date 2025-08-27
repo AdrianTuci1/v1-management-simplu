@@ -35,6 +35,7 @@ function connectWebSocket(url, channelName) {
     connectionStatus = 'connecting';
     sendToMain('status', { status: 'connecting' });
     
+    // Create Phoenix Socket following the documentation
     socket = new Phoenix.Socket(url, {
       logger: (kind, msg) => {
         // Do not forward Phoenix's logger "data" (can contain non-cloneable Event/Window)
@@ -64,52 +65,31 @@ function connectWebSocket(url, channelName) {
         sendToMain('status', { status: 'timeout' });
       });
     
-    // Listen for messages on the channel
-    channel.on("message", (payload) => {
-      sendToMain('message', { type: 'message', data: payload });
+    // Listen for resource_update events as per documentation
+    channel.on("resource_update", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'RAW resource_update', data: payload });
+      sendToMain('message', { type: 'resource_update', data: payload });
     });
-    
-
-    // Support individual event names commonly used by backend
-    const forward = (operation, payload) => {
-      const realId = (payload && (payload.resourceId || (payload.data && (payload.data.resourceId || payload.data.id)))) || undefined;
-      const normalized = {
-        operation,
-        realId,
-        tempId: payload && payload.tempId,
-        resourceType: payload && payload.resourceType,
-        data: payload && payload.data
-      };
-      sendToMain('message', { type: 'resource_update', data: normalized });
-    };
-
-    channel.on("resource_created", (payload) => forward('create', payload));
-    channel.on("resource_updated", (payload) => forward('update', payload));
-    channel.on("resource_deleted", (payload) => forward('delete', payload));
     
     // Handle socket connection events
     socket.onOpen(() => {
-      sendToMain('log', { kind: 'info', msg: 'WebSocket connection opened' });
       connectionStatus = 'connected';
       sendToMain('status', { status: 'connected' });
     });
     
     socket.onError((error) => {
       const safe = { type: (error && error.type) || 'error', message: (error && error.message) || undefined };
-      sendToMain('log', { kind: 'error', msg: 'WebSocket error', data: safe });
       connectionStatus = 'error';
       sendToMain('status', { status: 'error', data: safe });
     });
     
     socket.onClose((event) => {
       const safe = { type: (event && event.type) || 'close' };
-      sendToMain('log', { kind: 'info', msg: 'WebSocket connection closed', data: safe });
       connectionStatus = 'disconnected';
       sendToMain('status', { status: 'disconnected', data: safe });
     });
     
   } catch (error) {
-    sendToMain('log', { kind: 'error', msg: 'Error connecting to WebSocket', data: error });
     connectionStatus = 'error';
     sendToMain('status', { status: 'error', data: error });
   }

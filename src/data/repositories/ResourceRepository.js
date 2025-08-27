@@ -8,6 +8,24 @@ export class ResourceRepository {
     this.store = store;
   }
 
+  // Remove all optimistic entries for this store once real data arrives
+  async clearOptimisticEntries() {
+    try {
+      const table = db.table(this.store)
+      const optimistics = await table.filter(item => item && item._isOptimistic === true).toArray()
+      if (optimistics.length > 0) {
+        const keys = optimistics
+          .map(item => item.resourceId || item.id)
+          .filter(Boolean)
+        if (keys.length > 0) {
+          await table.bulkDelete(keys)
+        }
+      }
+    } catch (e) {
+      console.warn(`Failed to clear optimistic entries for ${this.store}:`, e)
+    }
+  }
+
   async request(path = "", options = {}) {
     try {
       // Folosește buildResourcesEndpoint pentru a construi URL-ul corect
@@ -106,6 +124,8 @@ export class ResourceRepository {
       
       if (normalized.length > 0) {
         await db.table(this.store).bulkPut(normalized);
+        // After receiving fresh data, clear any leftover optimistic entries for this store
+        await this.clearOptimisticEntries()
       }
       
       return normalized;
@@ -130,6 +150,8 @@ export class ResourceRepository {
         resourceId: transformedData.resourceId || transformedData.id
       }
       await db.table(this.store).put(transformedData);
+      // Clear optimistic entries when a concrete item is received
+      await this.clearOptimisticEntries()
       return transformedData;
     }
     
@@ -149,16 +171,19 @@ export class ResourceRepository {
     
     // Transform nested data structure to flat structure
     if (data && data.data && typeof data.data === 'object') {
-      return {
+      const normalized = {
         ...data.data,
         id: data.id || data.data.id,
         businessId: data.businessId,
         locationId: data.locationId,
         resourceType: data.resourceType,
-        resourceId: data.resourceId,
+        resourceId: data.resourceId || data.id || data.data.id,
         timestamp: data.timestamp,
         lastUpdated: data.lastUpdated
       };
+      try { await db.table(this.store).put(normalized) } catch (_) {}
+      await this.clearOptimisticEntries()
+      return normalized;
     }
     
     return data;
@@ -204,6 +229,23 @@ export class ResourceRepository {
         data = response.data;
       }
       
+      // If server responded without a concrete payload/id, fallback to optimistic entry
+      if (!data || (typeof data === 'object' && !data.id && !data.resourceId && !data.data)) {
+        const tempId = generateTempId(this.store)
+        const nowIso = new Date().toISOString()
+        const optimisticEntry = {
+          ...resource,
+          id: tempId,
+          resourceId: tempId,
+          _isOptimistic: true,
+          _tempId: tempId,
+          _createdAt: nowIso
+        }
+        // Best-effort local cache; if it fails, just return optimistic entry
+        try { await db.table(this.store).put(optimisticEntry) } catch (_) {}
+        return optimisticEntry
+      }
+      
       // Transform nested data structure to flat structure
       if (data && data.data && typeof data.data === 'object') {
         data = {
@@ -218,9 +260,16 @@ export class ResourceRepository {
         };
       }
       
-      // Ensure resourceId exists
-      const normalized = { ...data, resourceId: data.resourceId || data.id }
-      await db.table(this.store).put(normalized);
+      // Ensure resourceId exists and is a valid key
+      const normalized = { ...data };
+      if (!normalized.resourceId) {
+        normalized.resourceId = normalized.id || generateTempId(this.store)
+      }
+      try {
+        await db.table(this.store).put(normalized);
+      } catch (e) {
+        console.warn('Failed to persist newly added resource, continuing optimistically:', e)
+      }
       return normalized;
     } catch (error) {
       // Dacă serverul a răspuns fără body util sau cererea e acceptată async, generăm un ID temporar
@@ -288,6 +337,22 @@ export class ResourceRepository {
         data = response.data;
       }
       
+      // If server responded without a concrete payload/id, fallback to optimistic update
+      if (!data || (typeof data === 'object' && !data.id && !data.resourceId && !data.data)) {
+        const tempId = generateTempId(this.store)
+        const nowIso = new Date().toISOString()
+        const optimisticEntry = {
+          ...resource,
+          id,
+          resourceId: id,
+          _isOptimistic: true,
+          _tempId: tempId,
+          _updatedAt: nowIso
+        }
+        try { await db.table(this.store).put(optimisticEntry) } catch (_) {}
+        return optimisticEntry
+      }
+      
       // Transform nested data structure to flat structure
       if (data && data.data && typeof data.data === 'object') {
         data = {
@@ -302,8 +367,15 @@ export class ResourceRepository {
         };
       }
       
-      const normalized = { ...data, resourceId: data.resourceId || data.id }
-      await db.table(this.store).put(normalized);
+      const normalized = { ...data };
+      if (!normalized.resourceId) {
+        normalized.resourceId = normalized.id || id || generateTempId(this.store)
+      }
+      try {
+        await db.table(this.store).put(normalized);
+      } catch (e) {
+        console.warn('Failed to persist updated resource, continuing optimistically:', e)
+      }
       return normalized;
     } catch (error) {
       // Optimistic local update with temp operation
