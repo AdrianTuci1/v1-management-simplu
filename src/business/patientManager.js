@@ -76,7 +76,7 @@ class PatientManager {
   transformPatientForUI(patientData) {
     return {
       ...patientData,
-      id: patientData.resourceId || patientData.id, // Folosim resourceId ca ID principal
+      id: patientData._tempId || patientData.resourceId || patientData.id, // Prioritizează tempId pentru optimistic updates
       name: patientData.patientName || patientData.name, // Mapăm patientName la name pentru UI
       birthYear: patientData.birthYear ? patientData.birthYear.toString() : '',
       age: patientData.birthYear ? this.calculateAgeFromYear(patientData.birthYear) : null,
@@ -205,6 +205,11 @@ class PatientManager {
         case 'status':
           aValue = a.status || ''
           bValue = b.status || ''
+          break
+        case 'id':
+          // Pentru sortarea după ID, folosim ID-ul real sau tempId
+          aValue = a.resourceId || a._tempId || a.id || ''
+          bValue = b.resourceId || b._tempId || b.id || ''
           break
         default:
           aValue = a[sortBy] || ''

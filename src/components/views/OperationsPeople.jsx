@@ -12,7 +12,8 @@ import {
   MapPin,
   Calendar,
   Shield,
-  Loader2
+  Loader2,
+  RotateCw
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
@@ -103,11 +104,22 @@ const OperationsPeople = () => {
   const sortedPatients = (() => {
     const baseSorted = patientManager.sortPatients(patients, sortBy, sortOrder)
     // Aduce elementele cu _isOptimistic în față pentru feedback instant
+    // Dar pune elementele cu _isDeleting la sfârșit
     return [...baseSorted].sort((a, b) => {
-      const aOpt = !!a._isOptimistic
-      const bOpt = !!b._isOptimistic
-      if (aOpt === bOpt) return 0
-      return aOpt ? -1 : 1
+      const aOpt = !!a._isOptimistic && !a._isDeleting
+      const bOpt = !!b._isOptimistic && !b._isDeleting
+      const aDel = !!a._isDeleting
+      const bDel = !!b._isDeleting
+      
+      // Prioritizează optimistic updates
+      if (aOpt && !bOpt) return -1
+      if (!aOpt && bOpt) return 1
+      
+      // Pune elementele în ștergere la sfârșit
+      if (aDel && !bDel) return 1
+      if (!aDel && bDel) return -1
+      
+      return 0
     })
   })()
 
@@ -353,7 +365,6 @@ const OperationsPeople = () => {
                         )}
                       </button>
                     </th>
-                    <th className="text-left p-3 font-medium">Asigurare</th>
                     <th className="text-left p-3 font-medium">
                       <button 
                         onClick={() => handleSort('status')}
@@ -376,21 +387,28 @@ const OperationsPeople = () => {
                       <td className="p-3">
                         <div>
                           <div className="font-medium flex items-center gap-2">
-                            <span>{patient.name}</span>
-                            {patient._isOptimistic && (
+                            <span className={patient._isDeleting ? 'line-through opacity-50' : ''}>
+                              {patient.name}
+                            </span>
+                            {patient._isOptimistic && !patient._isDeleting && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
-                                în curs 
+                                <RotateCw className="h-3 w-3" />
+                              </span>
+                            )}
+                            {patient._isDeleting && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                                Ștergere...
                               </span>
                             )}
                           </div>
-                          {patient.cnp && (
-                            <div className="text-sm text-muted-foreground">
-                              CNP: {patient.cnp}
-                            </div>
-                          )}
-                          {patient.resourceId && (
+                          {patient.resourceId && !patient._tempId && (
                             <div className="text-sm text-muted-foreground">
                               ID: {patient.resourceId}
+                            </div>
+                          )}
+                          {patient._tempId && (
+                            <div className="text-sm text-muted-foreground">
+                              ID temporar: {patient._tempId}
                             </div>
                           )}
                         </div>
@@ -442,16 +460,6 @@ const OperationsPeople = () => {
                         )}
                       </td>
                       <td className="p-3">
-                        {patient.insuranceProvider ? (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Shield className="h-3 w-3" />
-                            {patient.insuranceProvider}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </td>
-                      <td className="p-3">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(patient.status)}`}>
                           {getStatusLabel(patient.status)}
                         </span>
@@ -463,15 +471,17 @@ const OperationsPeople = () => {
                               type: 'edit-person', 
                               data: patient 
                             })}
-                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent"
+                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Editează"
+                            disabled={patient._isOptimistic || patient._isDeleting}
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDeletePatient(patient.id)}
-                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-destructive"
+                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Șterge"
+                            disabled={patient._isOptimistic || patient._isDeleting}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
