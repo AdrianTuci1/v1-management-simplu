@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import patientService from '../services/patientService.js'
+import patientManager from '../business/patientManager.js'
 import { indexedDb } from '../data/infrastructure/db.js'
+import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
 
 export const usePatients = () => {
   const [patients, setPatients] = useState([])
@@ -155,10 +157,15 @@ export const usePatients = () => {
     setError(null)
     
     try {
-      const newPatient = await patientService.addPatient(patientData)
-      // Reîncarcă lista de pacienți
-      await loadPatients()
-      return newPatient
+      const added = await patientService.addPatient(patientData)
+      // Actualizare optimistă în memorie
+      const uiPatient = patientManager.transformPatientForUI(added)
+      setPatients(prev => [uiPatient, ...prev])
+      // Dacă serverul a returnat rezultat final (non-optimist), sincronizează din sursa oficială
+      if (!added._isOptimistic) {
+        await loadPatients()
+      }
+      return added
     } catch (err) {
       setError(err.message)
       console.error('Error adding patient:', err)
@@ -174,10 +181,14 @@ export const usePatients = () => {
     setError(null)
     
     try {
-      const updatedPatient = await patientService.updatePatient(id, patientData)
-      // Reîncarcă lista de pacienți
-      await loadPatients()
-      return updatedPatient
+      const updated = await patientService.updatePatient(id, patientData)
+      const uiUpdated = patientManager.transformPatientForUI({ ...updated, resourceId: updated.resourceId || id, id })
+      // Actualizare optimistă în memorie
+      setPatients(prev => prev.map(p => (p.id === id ? { ...p, ...uiUpdated } : p)))
+      if (!updated._isOptimistic) {
+        await loadPatients()
+      }
+      return updated
     } catch (err) {
       setError(err.message)
       console.error('Error updating patient:', err)
@@ -193,9 +204,10 @@ export const usePatients = () => {
     setError(null)
     
     try {
+      // Eliminare optimistă în memorie
+      setPatients(prev => prev.filter(p => p.id !== id))
       await patientService.deletePatient(id)
-      // Reîncarcă lista de pacienți
-      await loadPatients()
+      // Pentru răspuns non-optimist putem valida cu o încărcare, însă așteptăm reconcilierea via websocket
     } catch (err) {
       setError(err.message)
       console.error('Error deleting patient:', err)
@@ -237,6 +249,56 @@ export const usePatients = () => {
   useEffect(() => {
     loadPatients()
     loadStats()
+    // Subscribe la actualizări prin websocket pentru reconcilierea ID-urilor temporare
+    const handler = async (message) => {
+      const { type, data, tempId, realId, operation, resourceType } = message
+      if (!resourceType || (resourceType !== 'patient' && resourceType !== 'patients')) return
+      // Normalize operations coming from worker (create/update/delete)
+      const op = operation || (type && type.replace('resource_', '').replace('_resolved', ''))
+      if (!op) return
+      const finalId = realId || data?.resourceId || data?.id
+      if (op === 'create') {
+        if (finalId) {
+          const ui = patientManager.transformPatientForUI({ ...data, id: finalId, resourceId: finalId })
+          await indexedDb.put('patients', { ...ui, _isOptimistic: false })
+          setPatients(prev => {
+            // Replace by temp match or add if not present
+            const byTemp = tempId ? prev.findIndex(p => p._tempId === tempId) : -1
+            if (byTemp >= 0) {
+              const next = [...prev]
+              next[byTemp] = { ...ui }
+              return next
+            }
+            // Try to match by email/phone/name if tempId is missing
+            const byHeuristic = prev.findIndex(p => (
+              (p.email && ui.email && p.email === ui.email) ||
+              (p.phone && ui.phone && p.phone === ui.phone) ||
+              (p.name && ui.name && p.name === ui.name)
+            ))
+            if (byHeuristic >= 0) {
+              const next = [...prev]
+              next[byHeuristic] = { ...ui }
+              return next
+            }
+            return [ui, ...prev]
+          })
+        }
+      } else if (op === 'update') {
+        if (finalId) {
+          const ui = patientManager.transformPatientForUI({ ...data, id: finalId, resourceId: finalId })
+          await indexedDb.put('patients', { ...ui, _isOptimistic: false })
+          setPatients(prev => prev.map(p => (p.id === finalId ? { ...p, ...ui } : p)))
+        }
+      } else if (op === 'delete') {
+        if (finalId) {
+          await indexedDb.delete('patients', finalId)
+          setPatients(prev => prev.filter(p => p.id !== finalId))
+        }
+      }
+    }
+    const unsubPlural = onResourceMessage('patients', handler)
+    const unsubSingular = onResourceMessage('patient', handler)
+    return () => { unsubPlural(); unsubSingular() }
   }, [loadPatients, loadStats])
 
   return {

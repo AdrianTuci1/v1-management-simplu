@@ -12,6 +12,7 @@ import QuickActionsDrawer from './components/drawers/QuickActionsDrawer'
 import SalesDrawer from './components/drawers/SalesDrawer'
 import authService from './services/authService'
 import { DrawerProvider, useDrawer } from './contexts/DrawerContext'
+import { connectWebSocket } from './data/infrastructure/websocketClient'
 
 function AppContent() {
   const auth = useAuth()
@@ -68,6 +69,16 @@ function AppContent() {
     }
 
     initializeApp()
+  }, [])
+
+  // Initializează WebSocket după ce avem locația selectată
+  useEffect(() => {
+    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:4000/socket'
+    try {
+      connectWebSocket(wsUrl)
+    } catch (e) {
+      console.warn('WebSocket init failed', e)
+    }
   }, [])
 
   // Store auth data when user is authenticated via Cognito

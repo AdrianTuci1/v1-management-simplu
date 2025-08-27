@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import appointmentService from '../services/appointmentService.js'
 import { indexedDb } from '../data/infrastructure/db.js'
+import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
 import { populateTestData, checkCacheStatus, updateLookupCache } from '../utils/appointmentUtils.js'
 
 export const useAppointments = () => {
@@ -64,6 +65,34 @@ export const useAppointments = () => {
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  // Subscribe la actualizări prin websocket pentru reconcilierea ID-urilor temporare
+  useEffect(() => {
+    const handler = async (message) => {
+      const { type, data, tempId, realId, operation } = message
+      if ((type && type.endsWith('_resolved')) || ['create','update','delete'].includes(operation)) {
+        if (operation === 'create' || type === 'create_resolved') {
+          if (tempId && realId) {
+            await indexedDb.put('appointments', { ...data, id: realId, resourceId: realId, _isOptimistic: false })
+            setAppointments(prev => prev.map(a => (a._tempId === tempId ? { ...data, id: realId, resourceId: realId } : a)))
+          }
+        } else if (operation === 'update' || type === 'update_resolved') {
+          if (realId) {
+            await indexedDb.put('appointments', { ...data, id: realId, resourceId: realId, _isOptimistic: false })
+            setAppointments(prev => prev.map(a => (a.id === realId ? { ...a, ...data, resourceId: realId } : a)))
+          }
+        } else if (operation === 'delete' || type === 'delete_resolved') {
+          if (realId) {
+            await indexedDb.delete('appointments', realId)
+            setAppointments(prev => prev.filter(a => a.id !== realId))
+          }
+        }
+      }
+    }
+    const unsubPlural = onResourceMessage('appointments', handler)
+    const unsubSingular = onResourceMessage('appointment', handler)
+    return () => { unsubPlural(); unsubSingular() }
   }, [])
 
   // Funcție pentru încărcarea programărilor pentru o săptămână

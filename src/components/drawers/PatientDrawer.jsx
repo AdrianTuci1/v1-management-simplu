@@ -10,7 +10,8 @@ import {
   MapPin,
   Tag,
   Pill,
-  Clock
+  Clock,
+  X
 } from 'lucide-react'
 import { useState } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'

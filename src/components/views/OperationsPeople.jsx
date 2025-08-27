@@ -64,11 +64,7 @@ const OperationsPeople = () => {
     if (confirm('Ești sigur că vrei să ștergi acest pacient?')) {
       try {
         await deletePatient(patientId)
-        // Reîncarcă lista după ștergere
-        await loadPatientsByPage(currentPage, 20, {
-          name: searchTerm,
-          status: statusFilter
-        })
+        // Nu mai reîncărcăm imediat; lista este actualizată optimist prin hook și va fi reconciliată via websocket
       } catch (error) {
         console.error('Error deleting patient:', error)
       }

@@ -6,17 +6,19 @@ class AppDatabase extends Dexie {
     super('AppDB');
     
     // Versiunea bazei de date
-    this.version(1).stores({
+    this.version(2).stores({
       appointments: 'resourceId, date, doctor, patient, status', // Store pentru programări
       appointmentCounts: 'date, count', // Cache pentru numărul de programări
       patients: 'resourceId, name, email, phone, status, city, county', // Store pentru pacienți
       products: 'resourceId, name, category, price, stock, reorderLevel', // Store pentru produse
       productCounts: 'category, count', // Cache pentru numărul de produse per categorie
       users: 'resourceId, email, licenseNumber, specialization, status, role', // Store pentru utilizatori (medici)
+      sales: 'resourceId, date, amount, status, customerId', // Store pentru vânzări
       roles: 'resourceId, name, description, status', // Store pentru roluri
       permissions: 'resourceId, resource, action, description', // Store pentru permisiuni
       treatments: 'resourceId, treatmentType, category, duration, price', // Store pentru tratamente
-      statistics: 'id, timestamp' // Store pentru statistici și activități recente
+      statistics: 'id, timestamp', // Store pentru statistici și activități recente
+      outbox: '++id, tempId, resourceType, operation, createdAt, status' // Outbox pentru operații trimise spre procesare
     });
   }
 }
@@ -66,6 +68,27 @@ export const indexedDb = {
   
   async clear(storeName) {
     return db.table(storeName).clear();
+  },
+  
+  // Outbox helpers
+  async outboxAdd(entry) {
+    return db.table('outbox').add(entry)
+  },
+  async outboxUpdate(id, updates) {
+    return db.table('outbox').update(id, updates)
+  },
+  async outboxDelete(id) {
+    return db.table('outbox').delete(id)
+  },
+  async outboxGetPending(limit = 50) {
+    return db.table('outbox')
+      .where('status')
+      .anyOf('pending', 'retry')
+      .limit(limit)
+      .toArray()
+  },
+  async outboxFindByTempId(tempId) {
+    return db.table('outbox').where('tempId').equals(tempId).first()
   },
   
   // Metode specifice pentru programări

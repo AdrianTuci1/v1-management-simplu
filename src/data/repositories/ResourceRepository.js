@@ -1,5 +1,6 @@
-import { db } from "../infrastructure/db";
+import { db, indexedDb } from "../infrastructure/db";
 import { buildResourcesEndpoint } from "../infrastructure/apiClient.js";
+import { generateTempId } from "../../lib/utils";
 
 export class ResourceRepository {
   constructor(resourceType, store = "resources") {
@@ -35,6 +36,21 @@ export class ResourceRepository {
 
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
+      }
+
+      // Încercăm să detectăm conținutul răspunsului
+      const contentType = res.headers.get('content-type') || '';
+      const contentLength = res.headers.get('content-length');
+
+      // Dacă răspunsul nu este JSON sau body-ul e gol, întoarcem un obiect cu accepted
+      if (!contentType.includes('application/json') || contentLength === '0' || res.status === 201 || res.status === 202) {
+        try {
+          // Unele servere trimit JSON chiar și pe 201/202
+          const maybeJson = await res.json();
+          return maybeJson;
+        } catch (_) {
+          return { accepted: res.status === 201 || res.status === 202, status: res.status };
+        }
       }
 
       return res.json();
@@ -82,12 +98,17 @@ export class ResourceRepository {
         }
         return true;
       });
+      // Ensure resourceId fallback to id when missing
+      const normalized = validData.map(item => ({
+        ...item,
+        resourceId: item.resourceId || item.id
+      }))
       
-      if (validData.length > 0) {
-        await db.table(this.store).bulkPut(validData);
+      if (normalized.length > 0) {
+        await db.table(this.store).bulkPut(normalized);
       }
       
-      return validData;
+      return normalized;
     } else if (data && data.id) {
       // Handle single item
       let transformedData = data;
@@ -98,12 +119,16 @@ export class ResourceRepository {
           businessId: data.businessId,
           locationId: data.locationId,
           resourceType: data.resourceType,
-          resourceId: data.resourceId,
+          resourceId: data.resourceId || data.id || data.data.id,
           timestamp: data.timestamp,
           lastUpdated: data.lastUpdated
         };
       }
-      
+      // Ensure resourceId exists
+      transformedData = {
+        ...transformedData,
+        resourceId: transformedData.resourceId || transformedData.id
+      }
       await db.table(this.store).put(transformedData);
       return transformedData;
     }
@@ -140,72 +165,202 @@ export class ResourceRepository {
   }
 
   async add(resource) {
-    const response = await this.request("", {
-      method: "POST",
-      body: JSON.stringify(resource),
-    });
-    
-    // Extract data from API response structure
-    let data = response;
-    if (response && response.success && response.data) {
-      data = response.data;
-    } else if (response && response.data) {
-      data = response.data;
+    // Trimite cererea dar tratează și cazul când serverul răspunde 201/202 fără body util
+    try {
+      const response = await this.request("", {
+        method: "POST",
+        body: JSON.stringify(resource),
+      });
+      
+      // Dacă serverul a acceptat procesarea asincronă fără body util
+      if (response && response.accepted === true) {
+        const tempId = generateTempId(this.store)
+        const nowIso = new Date().toISOString()
+        const optimisticEntry = {
+          ...resource,
+          id: tempId,
+          resourceId: tempId,
+          _isOptimistic: true,
+          _tempId: tempId,
+          _createdAt: nowIso
+        }
+        await db.table(this.store).put(optimisticEntry)
+        await indexedDb.outboxAdd({
+          tempId,
+          resourceType: this.store,
+          operation: 'create',
+          payload: resource,
+          createdAt: Date.now(),
+          status: 'pending'
+        })
+        return optimisticEntry
+      }
+
+      // Extract data from API response structure
+      let data = response;
+      if (response && response.success && response.data) {
+        data = response.data;
+      } else if (response && response.data) {
+        data = response.data;
+      }
+      
+      // Transform nested data structure to flat structure
+      if (data && data.data && typeof data.data === 'object') {
+        data = {
+          ...data.data,
+          id: data.id || data.data.id,
+          businessId: data.businessId,
+          locationId: data.locationId,
+          resourceType: data.resourceType,
+          resourceId: data.resourceId,
+          timestamp: data.timestamp,
+          lastUpdated: data.lastUpdated
+        };
+      }
+      
+      // Ensure resourceId exists
+      const normalized = { ...data, resourceId: data.resourceId || data.id }
+      await db.table(this.store).put(normalized);
+      return normalized;
+    } catch (error) {
+      // Dacă serverul a răspuns fără body util sau cererea e acceptată async, generăm un ID temporar
+      const tempId = generateTempId(this.store)
+      const nowIso = new Date().toISOString()
+      const optimisticEntry = {
+        ...resource,
+        id: tempId,
+        resourceId: tempId,
+        _isOptimistic: true,
+        _tempId: tempId,
+        _createdAt: nowIso
+      }
+      // Salvează în store local
+      await db.table(this.store).put(optimisticEntry)
+      // Pune în outbox pentru reconciliere când vine evenimentul de pe websocket
+      await indexedDb.outboxAdd({
+        tempId,
+        resourceType: this.store,
+        operation: 'create',
+        payload: resource,
+        createdAt: Date.now(),
+        status: 'pending'
+      })
+      return optimisticEntry
     }
-    
-    // Transform nested data structure to flat structure
-    if (data && data.data && typeof data.data === 'object') {
-      data = {
-        ...data.data,
-        id: data.id || data.data.id,
-        businessId: data.businessId,
-        locationId: data.locationId,
-        resourceType: data.resourceType,
-        resourceId: data.resourceId,
-        timestamp: data.timestamp,
-        lastUpdated: data.lastUpdated
-      };
-    }
-    
-    await db.table(this.store).put(data);
-    return data;
   }
 
   async update(id, resource) {
-    const response = await this.request(`/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(resource),
-    });
-    
-    // Extract data from API response structure
-    let data = response;
-    if (response && response.success && response.data) {
-      data = response.data;
-    } else if (response && response.data) {
-      data = response.data;
+    try {
+      const response = await this.request(`/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(resource),
+      });
+      
+      if (response && response.accepted === true) {
+        const tempId = generateTempId(this.store)
+        const nowIso = new Date().toISOString()
+        const optimisticEntry = {
+          ...resource,
+          id,
+          resourceId: id,
+          _isOptimistic: true,
+          _tempId: tempId,
+          _updatedAt: nowIso
+        }
+        await db.table(this.store).put(optimisticEntry)
+        await indexedDb.outboxAdd({
+          tempId,
+          resourceType: this.store,
+          operation: 'update',
+          targetId: id,
+          payload: resource,
+          createdAt: Date.now(),
+          status: 'pending'
+        })
+        return optimisticEntry
+      }
+
+      // Extract data from API response structure
+      let data = response;
+      if (response && response.success && response.data) {
+        data = response.data;
+      } else if (response && response.data) {
+        data = response.data;
+      }
+      
+      // Transform nested data structure to flat structure
+      if (data && data.data && typeof data.data === 'object') {
+        data = {
+          ...data.data,
+          id: data.id || data.data.id,
+          businessId: data.businessId,
+          locationId: data.locationId,
+          resourceType: data.resourceType,
+          resourceId: data.resourceId,
+          timestamp: data.timestamp,
+          lastUpdated: data.lastUpdated
+        };
+      }
+      
+      const normalized = { ...data, resourceId: data.resourceId || data.id }
+      await db.table(this.store).put(normalized);
+      return normalized;
+    } catch (error) {
+      // Optimistic local update with temp operation
+      const tempId = generateTempId(this.store)
+      const nowIso = new Date().toISOString()
+      const optimisticEntry = {
+        ...resource,
+        id,
+        resourceId: id,
+        _isOptimistic: true,
+        _tempId: tempId,
+        _updatedAt: nowIso
+      }
+      await db.table(this.store).put(optimisticEntry)
+      await indexedDb.outboxAdd({
+        tempId,
+        resourceType: this.store,
+        operation: 'update',
+        targetId: id,
+        payload: resource,
+        createdAt: Date.now(),
+        status: 'pending'
+      })
+      return optimisticEntry
     }
-    
-    // Transform nested data structure to flat structure
-    if (data && data.data && typeof data.data === 'object') {
-      data = {
-        ...data.data,
-        id: data.id || data.data.id,
-        businessId: data.businessId,
-        locationId: data.locationId,
-        resourceType: data.resourceType,
-        resourceId: data.resourceId,
-        timestamp: data.timestamp,
-        lastUpdated: data.lastUpdated
-      };
-    }
-    
-    await db.table(this.store).put(data);
-    return data;
   }
 
   async remove(id) {
-    await this.request(`/${id}`, { method: "DELETE" });
-    await db.table(this.store).delete(id);
+    try {
+      const response = await this.request(`/${id}`, { method: "DELETE" });
+      if (response && response.accepted === true) {
+        const tempId = generateTempId(this.store)
+        await db.table(this.store).put({ id, resourceId: id, _deleted: true, _isOptimistic: true, _tempId: tempId })
+        await indexedDb.outboxAdd({
+          tempId,
+          resourceType: this.store,
+          operation: 'delete',
+          targetId: id,
+          createdAt: Date.now(),
+          status: 'pending'
+        })
+        return true
+      }
+      await db.table(this.store).delete(id);
+    } catch (error) {
+      const tempId = generateTempId(this.store)
+      await db.table(this.store).put({ id, resourceId: id, _deleted: true, _isOptimistic: true, _tempId: tempId })
+      await indexedDb.outboxAdd({
+        tempId,
+        resourceType: this.store,
+        operation: 'delete',
+        targetId: id,
+        createdAt: Date.now(),
+        status: 'pending'
+      })
+      return true
+    }
   }
 
   async syncFromEvent(event) {
