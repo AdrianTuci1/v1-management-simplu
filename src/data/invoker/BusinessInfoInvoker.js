@@ -19,9 +19,9 @@ class BusinessInfoInvoker {
   }
 
   getBusinessIdFromUrl() {
-    // Try to get business ID from URL or use default
-    const urlParams = new URLSearchParams(window.location.search)
-    const businessId = urlParams.get('businessId') || 'B0100001'
+    // // Try to get business ID from URL or use default
+    // const urlParams = new URLSearchParams(window.location.search)
+    const businessId = 'B0100001'
     return businessId
   }
 }

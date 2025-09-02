@@ -2,18 +2,121 @@ import { useState, useEffect, useCallback } from 'react'
 import { userService } from '../services/userService.js'
 import { userManager } from '../business/userManager.js'
 import { indexedDb } from '../data/infrastructure/db.js'
+import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
+
+// Stare partajată la nivel de modul pentru sincronizare între instanțe
+let sharedUsers = []
+let sharedStats = null
+let sharedUserCount = 0
+const subscribers = new Set()
+
+// Funcție pentru notificarea abonaților
+const notifySubscribers = () => {
+  subscribers.forEach(callback => callback(sharedUsers, sharedStats, sharedUserCount))
+}
+
+// Generare ID temporar pentru optimistic updates
+const generateTempId = () => {
+  return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
 
 export const useUsers = () => {
-  const [users, setUsers] = useState([])
+  const [users, setUsers] = useState(sharedUsers)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [stats, setStats] = useState(null)
+  const [stats, setStats] = useState(sharedStats)
   const [filters, setFilters] = useState({})
   const [sortBy, setSortBy] = useState('lastName')
   const [sortOrder, setSortOrder] = useState('asc')
+  const [userCount, setUserCount] = useState(sharedUserCount)
 
-  // Cache pentru numărul de utilizatori
-  const [userCount, setUserCount] = useState(0)
+  // Abonare la schimbările de stare partajată
+  useEffect(() => {
+    const handleStateChange = (newUsers, newStats, newCount) => {
+      setUsers(newUsers)
+      setStats(newStats)
+      setUserCount(newCount)
+    }
+    
+    subscribers.add(handleStateChange)
+    return () => subscribers.delete(handleStateChange)
+  }, [])
+
+  // WebSocket handling pentru utilizatori
+  useEffect(() => {
+    const handler = async (message) => {
+      const { type, data, resourceType } = message
+      
+      // Verifică dacă este un mesaj pentru utilizatori
+      if (resourceType !== 'users' && resourceType !== 'user') return
+      
+      const operation = type?.replace('resource_', '') || 'unknown'
+      const userId = data?.id || data?.resourceId
+      
+      if (!userId) return
+      
+      try {
+        if (operation === 'created') {
+          // Înlocuiește utilizatorul optimist cu datele reale
+          const ui = userManager.transformUserForUI({ ...data, id: userId, resourceId: userId })
+          
+          // Caută în outbox pentru a găsi operația optimistă
+          const outboxEntry = await indexedDb.outboxFindByTempId?.(userId)
+          
+          if (outboxEntry) {
+            const optimisticIndex = sharedUsers.findIndex(u => u._tempId === outboxEntry.tempId)
+            if (optimisticIndex >= 0) {
+              sharedUsers[optimisticIndex] = { ...ui, _isOptimistic: false }
+              notifySubscribers()
+            }
+            await indexedDb.outboxDelete?.(outboxEntry.id)
+          } else {
+            // Euristică: caută după email sau nume
+            const optimisticIndex = sharedUsers.findIndex(u => 
+              u._isOptimistic && (
+                u.email === data.email ||
+                u.medicName === data.medicName ||
+                u.fullName === data.fullName
+              )
+            )
+            if (optimisticIndex >= 0) {
+              sharedUsers[optimisticIndex] = { ...ui, _isOptimistic: false }
+              notifySubscribers()
+            }
+          }
+        } else if (operation === 'updated') {
+          // Dezactivează flag-ul optimistic
+          const existingIndex = sharedUsers.findIndex(u => 
+            u.id === userId || u.resourceId === userId
+          )
+          if (existingIndex >= 0) {
+            const ui = userManager.transformUserForUI({ ...data, id: userId, resourceId: userId })
+            sharedUsers[existingIndex] = { ...ui, _isOptimistic: false }
+            notifySubscribers()
+          }
+        } else if (operation === 'deleted') {
+          // Elimină utilizatorul din lista locală
+          sharedUsers = sharedUsers.filter(u => {
+            const matches = u.id === userId || u.resourceId === userId
+            return !matches
+          })
+          sharedUserCount = sharedUsers.length
+          notifySubscribers()
+        }
+      } catch (err) {
+        console.error('Error handling WebSocket message for users:', err)
+      }
+    }
+
+    // Abonează-te la mesajele WebSocket pentru utilizatori
+    const unsubPlural = onResourceMessage('users', handler)
+    const unsubSingular = onResourceMessage('user', handler)
+
+    return () => {
+      unsubPlural()
+      unsubSingular()
+    }
+  }, [])
 
   // Încarcă toți utilizatorii
   const loadUsers = useCallback(async (customFilters = {}) => {
@@ -28,8 +131,10 @@ export const useUsers = () => {
       let filteredUsers = userManager.filterUsers(usersData, allFilters)
       filteredUsers = userManager.sortUsers(filteredUsers, sortBy, sortOrder)
       
-      setUsers(filteredUsers)
-      setUserCount(filteredUsers.length)
+      // Actualizează starea partajată
+      sharedUsers = filteredUsers
+      sharedUserCount = filteredUsers.length
+      notifySubscribers()
     } catch (err) {
       // Încearcă să încarce din cache local dacă API-ul eșuează
       try {
@@ -52,8 +157,10 @@ export const useUsers = () => {
         // Aplică sortarea
         filteredUsers = userManager.sortUsers(filteredUsers, sortBy, sortOrder)
         
-        setUsers(filteredUsers)
-        setUserCount(filteredUsers.length)
+        // Actualizează starea partajată
+        sharedUsers = filteredUsers
+        sharedUserCount = filteredUsers.length
+        notifySubscribers()
         setError('Conectare la server eșuată. Se afișează datele din cache local.')
       } catch (cacheErr) {
         setError(err.message)
@@ -66,20 +173,36 @@ export const useUsers = () => {
 
   // Obține un utilizator după ID din lista locală
   const getUserById = useCallback((id) => {
-    return users.find(user => user.id === id) || null
+    return users.find(user => user.id === id || user.resourceId === id) || null
   }, [users])
 
-  // Adaugă un utilizator nou
+  // Adaugă un utilizator nou cu optimistic update
   const addUser = useCallback(async (userData) => {
     setLoading(true)
     setError(null)
     
+    const tempId = generateTempId()
+    const optimisticUser = {
+      ...userManager.transformUserForUI(userData),
+      _tempId: tempId,
+      _isOptimistic: true,
+      id: tempId,
+      resourceId: tempId
+    }
+    
+    // Adaugă optimist în starea partajată
+    sharedUsers = [optimisticUser, ...sharedUsers]
+    sharedUserCount = sharedUsers.length
+    notifySubscribers()
+    
     try {
       const newUser = await userService.addUser(userData)
-      setUsers(prev => [...prev, newUser])
-      setUserCount(prev => prev + 1)
       return newUser
     } catch (err) {
+      // Rollback în caz de eroare
+      sharedUsers = sharedUsers.filter(user => user._tempId !== tempId)
+      sharedUserCount = sharedUsers.length
+      notifySubscribers()
       setError(err.message)
       console.error('Error adding user:', err)
       throw err
@@ -88,18 +211,39 @@ export const useUsers = () => {
     }
   }, [])
 
-  // Actualizează un utilizator
+  // Actualizează un utilizator cu optimistic update
   const updateUser = useCallback(async (id, userData) => {
     setLoading(true)
     setError(null)
     
+    // Găsește utilizatorul existent
+    const existingIndex = sharedUsers.findIndex(user => 
+      user.id === id || user.resourceId === id
+    )
+    
+    if (existingIndex >= 0) {
+      // Marchează ca optimist
+      sharedUsers[existingIndex] = {
+        ...sharedUsers[existingIndex],
+        ...userManager.transformUserForUI(userData),
+        _isOptimistic: true
+      }
+      notifySubscribers()
+    }
+    
     try {
       const updatedUser = await userService.updateUser(id, userData)
-      setUsers(prev => prev.map(user => 
-        user.id === id ? updatedUser : user
-      ))
       return updatedUser
     } catch (err) {
+      // Rollback în caz de eroare
+      if (existingIndex >= 0) {
+        // Restaurează starea anterioară
+        sharedUsers[existingIndex] = {
+          ...sharedUsers[existingIndex],
+          _isOptimistic: false
+        }
+        notifySubscribers()
+      }
       setError(err.message)
       console.error('Error updating user:', err)
       throw err
@@ -108,17 +252,38 @@ export const useUsers = () => {
     }
   }, [])
 
-  // Șterge un utilizator
+  // Șterge un utilizator cu optimistic update
   const deleteUser = useCallback(async (id) => {
     setLoading(true)
     setError(null)
     
+    // Marchează pentru ștergere optimistă
+    const existingIndex = sharedUsers.findIndex(user => 
+      user.id === id || user.resourceId === id
+    )
+    
+    if (existingIndex >= 0) {
+      sharedUsers[existingIndex] = {
+        ...sharedUsers[existingIndex],
+        _isOptimistic: true,
+        _isDeleting: true
+      }
+      notifySubscribers()
+    }
+    
     try {
       await userService.deleteUser(id)
-      setUsers(prev => prev.filter(user => user.id !== id))
-      setUserCount(prev => prev - 1)
       return true
     } catch (err) {
+      // Rollback în caz de eroare
+      if (existingIndex >= 0) {
+        sharedUsers[existingIndex] = {
+          ...sharedUsers[existingIndex],
+          _isOptimistic: false,
+          _isDeleting: false
+        }
+        notifySubscribers()
+      }
       setError(err.message)
       console.error('Error deleting user:', err)
       throw err
@@ -134,8 +299,12 @@ export const useUsers = () => {
     
     try {
       const searchResults = await userService.searchUsers(query, { ...searchFilters, limit })
-      setUsers(searchResults)
-      setUserCount(searchResults.length)
+      
+      // Actualizează starea partajată
+      sharedUsers = searchResults
+      sharedUserCount = searchResults.length
+      notifySubscribers()
+      
       return searchResults
     } catch (err) {
       // Încearcă să încarce din cache local dacă API-ul eșuează
@@ -145,13 +314,15 @@ export const useUsers = () => {
         
         const searchTermLower = query.toLowerCase()
         const filteredData = cachedData.filter(user => 
-          user.name.toLowerCase().includes(searchTermLower) ||
-          user.email.toLowerCase().includes(searchTermLower) ||
+          user.name?.toLowerCase().includes(searchTermLower) ||
+          user.email?.toLowerCase().includes(searchTermLower) ||
           (user.phone && user.phone.includes(query))
         ).slice(0, limit)
         
-        setUsers(filteredData)
-        setUserCount(filteredData.length)
+        // Actualizează starea partajată
+        sharedUsers = filteredData
+        sharedUserCount = filteredData.length
+        notifySubscribers()
         setError('Conectare la server eșuată. Se afișează datele din cache local.')
         return filteredData
       } catch (cacheErr) {
@@ -171,7 +342,8 @@ export const useUsers = () => {
     
     try {
       const userStats = await userService.getUserStats()
-      setStats(userStats)
+      sharedStats = userStats
+      notifySubscribers()
       return userStats
     } catch (err) {
       setError(err.message)
@@ -252,9 +424,10 @@ export const useUsers = () => {
         await deleteUser(id)
       }
       
-      setUsers([])
-      setUserCount(0)
-      setStats(null)
+      sharedUsers = []
+      sharedUserCount = 0
+      sharedStats = null
+      notifySubscribers()
       return true
     } catch (err) {
       setError(err.message)

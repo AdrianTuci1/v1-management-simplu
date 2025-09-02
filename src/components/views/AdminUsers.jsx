@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { 
-  User, Plus, RefreshCw, Edit, Eye, Mail, Phone, GraduationCap
+  User, Plus, RefreshCw, Edit, Eye, Mail, Phone, GraduationCap, RotateCw, Loader2, Download, Filter, Search
 } from 'lucide-react'
 import { useUsers } from '../../hooks/useUsers.js'
 import { useDrawer } from '../../contexts/DrawerContext'
-
+import { userManager } from '../../business/userManager.js'
 
 const AdminUsers = () => {
   const { openDrawer } = useDrawer()
@@ -12,13 +12,40 @@ const AdminUsers = () => {
     users,
     loading,
     error,
+    stats,
     populateTestData,
-    clearAllData
+    clearAllData,
+    exportUsers
   } = useUsers()
 
   const [selectedUsers, setSelectedUsers] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [roleFilter, setRoleFilter] = useState('')
+  const [sortBy, setSortBy] = useState('medicName')
+  const [sortOrder, setSortOrder] = useState('asc')
+  const [showFilters, setShowFilters] = useState(false)
 
-
+  // Sortare cu prioritizare pentru optimistic updates
+  const sortedUsers = (() => {
+    const baseSorted = userManager.sortUsers(users, sortBy, sortOrder)
+    return [...baseSorted].sort((a, b) => {
+      const aOpt = !!a._isOptimistic && !a._isDeleting
+      const bOpt = !!b._isOptimistic && !b._isDeleting
+      const aDel = !!a._isDeleting
+      const bDel = !!b._isDeleting
+      
+      // Prioritizează optimistic updates
+      if (aOpt && !bOpt) return -1
+      if (!aOpt && bOpt) return 1
+      
+      // Pune elementele în ștergere la sfârșit
+      if (aDel && !bDel) return 1
+      if (!aDel && bDel) return -1
+      
+      return 0
+    })
+  })()
 
   // Selectare utilizator
   const handleUserSelect = (userId) => {
@@ -31,14 +58,40 @@ const AdminUsers = () => {
 
   // Selectare toți
   const handleSelectAll = () => {
-    if (selectedUsers.length === users.length) {
+    if (selectedUsers.length === sortedUsers.length) {
       setSelectedUsers([])
     } else {
-      setSelectedUsers(users.map(user => user.id))
+      setSelectedUsers(sortedUsers.map(user => user.id))
     }
   }
 
+  // Funcție pentru sortare
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(field)
+      setSortOrder('asc')
+    }
+  }
 
+  // Funcție pentru export
+  const handleExport = async () => {
+    try {
+      const csvData = await exportUsers('csv')
+      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      link.setAttribute('download', `medici_${new Date().toISOString().split('T')[0]}.csv`)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      console.error('Error exporting users:', error)
+    }
+  }
 
   // Populează cu date de test
   const handlePopulateTestData = async () => {
@@ -54,7 +107,51 @@ const AdminUsers = () => {
     }
   }
 
+  // Obține eticheta pentru status
+  const getStatusLabel = (status) => {
+    const statusLabels = {
+      active: 'Activ',
+      inactive: 'Inactiv',
+      suspended: 'Suspendat',
+      retired: 'Pensionat'
+    }
+    return statusLabels[status] || status
+  }
 
+  // Obține clasa pentru status
+  const getStatusClass = (status) => {
+    const statusClasses = {
+      active: 'bg-green-100 text-green-800',
+      inactive: 'bg-yellow-100 text-yellow-800',
+      suspended: 'bg-red-100 text-red-800',
+      retired: 'bg-gray-100 text-gray-800'
+    }
+    return statusClasses[status] || 'bg-gray-100 text-gray-800'
+  }
+
+  // Obține eticheta pentru rol
+  const getRoleLabel = (role) => {
+    const roleLabels = {
+      doctor: 'Medic',
+      nurse: 'Asistent',
+      specialist: 'Specialist',
+      resident: 'Rezident',
+      admin: 'Admin'
+    }
+    return roleLabels[role] || role
+  }
+
+  // Obține clasa pentru rol
+  const getRoleClass = (role) => {
+    const roleClasses = {
+      doctor: 'bg-blue-100 text-blue-700',
+      nurse: 'bg-green-100 text-green-700',
+      specialist: 'bg-purple-100 text-purple-700',
+      resident: 'bg-orange-100 text-orange-700',
+      admin: 'bg-red-100 text-red-700'
+    }
+    return roleClasses[role] || 'bg-gray-100 text-gray-700'
+  }
 
   return (
     <div className="space-y-6">
@@ -64,14 +161,22 @@ const AdminUsers = () => {
           <h1 className="text-3xl font-bold">Medici</h1>
           <p className="text-muted-foreground">Gestionează medicii sistemului</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex gap-2">
           <button 
             onClick={handlePopulateTestData}
-            className="btn btn-secondary flex items-center gap-2"
+            className="btn btn-outline flex items-center gap-2"
             disabled={loading}
           >
             <RefreshCw className="h-4 w-4" />
             Date Test
+          </button>
+          <button
+            onClick={handleExport}
+            className="btn btn-outline"
+            disabled={loading}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export
           </button>
           <button 
             onClick={() => openDrawer({ type: 'medic' })} 
@@ -83,131 +188,296 @@ const AdminUsers = () => {
         </div>
       </div>
 
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="card">
+            <div className="card-content p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total medici</p>
+                  <p className="text-2xl font-bold">{stats.total || users.length}</p>
+                </div>
+                <User className="h-8 w-8 text-primary" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="card">
+            <div className="card-content p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Activi</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.active || users.filter(u => u.status === 'active').length}</p>
+                </div>
+                <User className="h-8 w-8 text-green-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="card">
+            <div className="card-content p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Inactivi</p>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.inactive || users.filter(u => u.status === 'inactive').length}</p>
+                </div>
+                <User className="h-8 w-8 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="card">
+            <div className="card-content p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Suspendati</p>
+                  <p className="text-2xl font-bold text-red-600">{stats.suspended || users.filter(u => u.status === 'suspended').length}</p>
+                </div>
+                <User className="h-8 w-8 text-red-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-
-
-
-      {/* Lista utilizatori */}
+      {/* Filters and Search */}
       <div className="card">
-        <div className="card-content p-0">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-muted-foreground">Se încarcă utilizatorii...</p>
+        <div className="card-content">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Caută medici după nume, email, telefon..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
             </div>
-          ) : error ? (
-            <div className="p-8 text-center">
-              <p className="text-red-500">Eroare: {error}</p>
+            
+            <div className="flex gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Toate statusurile</option>
+                <option value="active">Activ</option>
+                <option value="inactive">Inactiv</option>
+                <option value="suspended">Suspendat</option>
+                <option value="retired">Pensionat</option>
+              </select>
+              
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Toate rolurile</option>
+                <option value="doctor">Medic</option>
+                <option value="nurse">Asistent</option>
+                <option value="specialist">Specialist</option>
+                <option value="resident">Rezident</option>
+                <option value="admin">Admin</option>
+              </select>
+              
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="btn btn-outline"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filtrează
+              </button>
             </div>
-          ) : users.length === 0 ? (
-            <div className="p-8 text-center">
+          </div>
+        </div>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="card">
+          <div className="card-content">
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md text-destructive">
+              {error}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Users List */}
+      <div className="card">
+        <div className="card-header">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              <h3 className="card-title">Lista Medici</h3>
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {sortedUsers.length} medici afișați
+            </p>
+          </div>
+        </div>
+        
+        <div className="card-content">
+          {loading && sortedUsers.length === 0 ? (
+            <div className="text-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Se încarcă medicii...</p>
+            </div>
+          ) : sortedUsers.length === 0 ? (
+            <div className="text-center py-12">
               <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Nu există medici</h3>
-              <p className="text-muted-foreground mb-4">Începe prin a adăuga primul medic.</p>
-              <button 
-                onClick={() => openDrawer({ type: 'medic' })}
-                className="btn btn-primary"
-              >
-                Adaugă medic
-              </button>
+              <p className="text-muted-foreground mb-4">
+                {searchTerm || statusFilter || roleFilter
+                  ? 'Nu s-au găsit medici cu criteriile specificate.'
+                  : 'Aici vei putea gestiona medicii sistemului.'
+                }
+              </p>
+              {!searchTerm && !statusFilter && !roleFilter && (
+                <button 
+                  onClick={() => openDrawer({ type: 'medic' })}
+                  className="btn btn-primary"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adaugă primul medic
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium">
                       <input
                         type="checkbox"
-                        checked={selectedUsers.length === users.length}
+                        checked={selectedUsers.length === sortedUsers.length}
                         onChange={handleSelectAll}
                         className="rounded"
                       />
                     </th>
-                    <th className="px-4 py-3 text-left">Nume</th>
-                    <th className="px-4 py-3 text-left">Contact</th>
-                    <th className="px-4 py-3 text-left">Rol</th>
-                    <th className="px-4 py-3 text-left">Zile Serviciu</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left">Acțiuni</th>
+                    <th className="text-left p-3 font-medium">
+                      <button 
+                        onClick={() => handleSort('medicName')}
+                        className="flex items-center gap-1 hover:text-primary"
+                      >
+                        Nume
+                        {sortBy === 'medicName' && (
+                          <span className="text-xs">
+                            {sortOrder === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
+                    </th>
+                    <th className="text-left p-3 font-medium">Contact</th>
+                    <th className="text-left p-3 font-medium">
+                      <button 
+                        onClick={() => handleSort('role')}
+                        className="flex items-center gap-1 hover:text-primary"
+                      >
+                        Rol
+                        {sortBy === 'role' && (
+                          <span className="text-xs">
+                            {sortOrder === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
+                    </th>
+                    <th className="text-left p-3 font-medium">Zile Serviciu</th>
+                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {users.map(user => (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
+                <tbody>
+                  {sortedUsers.map((user) => (
+                    <tr key={user.id} className={`border-b hover:bg-muted/50 ${
+                      user._isDeleting ? 'opacity-50' : ''
+                    }`}>
+                      <td className="p-3">
                         <input
                           type="checkbox"
                           checked={selectedUsers.includes(user.id)}
                           onChange={() => handleUserSelect(user.id)}
                           className="rounded"
+                          disabled={user._isDeleting}
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="p-3">
                         <div>
-                          <p className="font-medium">{user.fullName}</p>
+                          <div className="font-medium flex items-center gap-2">
+                            <span className={user._isDeleting ? 'line-through opacity-50' : ''}>
+                              {user.fullName || user.medicName || 'Nume indisponibil'}
+                            </span>
+                            {user._isOptimistic && !user._isDeleting && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                                <RotateCw className="h-3 w-3 animate-spin" />
+                                În curs
+                              </span>
+                            )}
+                            {user._isDeleting && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                                Ștergere...
+                              </span>
+                            )}
+                          </div>
+                          {user.resourceId && !user._tempId && (
+                            <div className="text-sm text-muted-foreground">
+                              ID: {user.resourceId}
+                            </div>
+                          )}
+                          {user._tempId && (
+                            <div className="text-sm text-muted-foreground">
+                              ID temporar: {user._tempId}
+                            </div>
+                          )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="p-3">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-1 text-sm">
                             <Mail className="h-3 w-3" />
-                            {user.email}
+                            {user.email || 'Email indisponibil'}
                           </div>
-                          <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-1 text-sm">
                             <Phone className="h-3 w-3" />
-                            {user.phone}
+                            {user.phone || 'Telefon indisponibil'}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          user.role === 'doctor' ? 'bg-blue-100 text-blue-700' :
-                          user.role === 'nurse' ? 'bg-green-100 text-green-700' :
-                          user.role === 'specialist' ? 'bg-purple-100 text-purple-700' :
-                          user.role === 'resident' ? 'bg-orange-100 text-orange-700' :
-                          user.role === 'admin' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {user.role === 'doctor' ? 'Medic' :
-                           user.role === 'nurse' ? 'Asistent' :
-                           user.role === 'specialist' ? 'Specialist' :
-                           user.role === 'resident' ? 'Rezident' :
-                           user.role === 'admin' ? 'Admin' : user.role}
+                      <td className="p-3">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleClass(user.role)}`}>
+                          {getRoleLabel(user.role)}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="p-3">
                         <div className="flex flex-wrap gap-1">
                           {user.dutyDays?.map((day, index) => (
                             <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
                               {day}
                             </span>
                           ))}
+                          {(!user.dutyDays || user.dutyDays.length === 0) && (
+                            <span className="text-xs text-gray-500">Fără zile setate</span>
+                          )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          user.status === 'active' ? 'bg-green-100 text-green-700' :
-                          user.status === 'inactive' ? 'bg-red-100 text-red-700' :
-                          user.status === 'suspended' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {user.statusText}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
+                      <td className="p-3">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => openDrawer({ type: 'medic', data: user })}
-                            className="p-1 hover:bg-gray-100 rounded"
+                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Editează"
+                            disabled={user._isOptimistic || user._isDeleting}
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => openDrawer({ type: 'medic', data: user })}
-                            className="p-1 hover:bg-gray-100 rounded"
+                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Vezi detalii"
+                            disabled={user._isOptimistic || user._isDeleting}
                           >
                             <Eye className="h-4 w-4" />
                           </button>

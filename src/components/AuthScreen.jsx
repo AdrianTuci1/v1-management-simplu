@@ -9,7 +9,8 @@ const AuthScreen = () => {
   const handleSignIn = async () => {
     setIsLoading(true)
     try {
-      await auth.signinRedirect()
+      const state = btoa(JSON.stringify({ redirect: window.location.href }));
+      auth.signinRedirect({ state });
     } catch (error) {
       console.error('Sign in error:', error)
     } finally {

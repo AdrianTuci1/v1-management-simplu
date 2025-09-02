@@ -1,5 +1,4 @@
 import { db } from "../infrastructure/db";
-import { buildResourcesEndpoint } from "../infrastructure/apiClient.js";
 
 export class StatisticsDataRepository {
   constructor() {

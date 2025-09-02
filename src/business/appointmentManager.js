@@ -72,7 +72,6 @@ class AppointmentManager {
     
     // Găsim ID-ul valid
     const appointmentId = appointmentData.resourceId || appointmentData.id
-    console.log('appointmentManager.transformAppointmentForUI - appointmentId:', appointmentId)
     
     const transformed = {
       ...appointmentData, // Preserve toate proprietățile existente, inclusiv _isOptimistic, _isDeleting, _tempId
@@ -88,16 +87,7 @@ class AppointmentManager {
       updatedAt: data.updatedAt || ''
     }
     
-    console.log('appointmentManager.transformAppointmentForUI - input flags:', {
-      _isOptimistic: appointmentData._isOptimistic,
-      _isDeleting: appointmentData._isDeleting,
-      _tempId: appointmentData._tempId
-    })
-    console.log('appointmentManager.transformAppointmentForUI - output flags:', {
-      _isOptimistic: transformed._isOptimistic,
-      _isDeleting: transformed._isDeleting,
-      _tempId: transformed._tempId
-    })
+
 
     // Transformare obiecte în obiecte cu nume pentru afișare
     if (data.patient) {

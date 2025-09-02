@@ -7,7 +7,10 @@ import {
   AlertTriangle,
   Edit,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Loader2,
+  RotateCw,
+  Filter
 } from 'lucide-react'
 
 import { useProducts } from '../../hooks/useProducts.js'
@@ -22,16 +25,40 @@ const BusinessInventory = () => {
     error, 
     stats,
     searchProducts, 
+    loadProducts,
     loadProductsByCategory,
     loadLowStockProducts,
     exportProducts 
   } = useProducts()
+
+  // Debug logging pentru a vedea când se schimbă produsele
+  console.log('BusinessInventory render - products count:', products.length, 'products:', products)
+  
+  // Debug logging pentru a vedea când se schimbă loading și error
+  console.log('BusinessInventory render - loading:', loading, 'error:', error)
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [showLowStock, setShowLowStock] = useState(false)
   const [sortBy, setSortBy] = useState('name')
   const [sortOrder, setSortOrder] = useState('asc')
+
+  // Sortare cu prioritizare pentru optimistic updates și filtrare pentru produsele în ștergere
+  const sortedProducts = (() => {
+    // Filtrează produsele în ștergere din afișare
+    const filteredProducts = products.filter(p => !p._isDeleting)
+    const baseSorted = productManager.sortProducts(filteredProducts, sortBy, sortOrder)
+    return [...baseSorted].sort((a, b) => {
+      const aOpt = !!a._isOptimistic
+      const bOpt = !!b._isOptimistic
+      
+      // Prioritizează optimistic updates
+      if (aOpt && !bOpt) return -1
+      if (!aOpt && bOpt) return 1
+      
+      return 0
+    })
+  })()
 
   // Gestionează căutarea
   const handleSearch = (e) => {
@@ -70,9 +97,6 @@ const BusinessInventory = () => {
     }
   }
 
-  // Sortează produsele
-  const sortedProducts = productManager.sortProducts(products, sortBy, sortOrder)
-
   // Gestionează exportul
   const handleExport = async (format) => {
     try {
@@ -94,13 +118,27 @@ const BusinessInventory = () => {
   // Obține categoriile disponibile
   const categories = productManager.getCategories()
 
+  // Obține eticheta pentru status
+  const getStatusLabel = (product) => {
+    if (product.stock === 0) return 'Fără stoc'
+    if (product.isLowStock) return 'Stoc scăzut'
+    return 'În stoc'
+  }
+
+  // Obține clasa pentru status
+  const getStatusClass = (product) => {
+    if (product.stock === 0) return 'bg-red-100 text-red-800'
+    if (product.isLowStock) return 'bg-orange-100 text-orange-800'
+    return 'bg-green-100 text-green-800'
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Inventar</h1>
-          <p className="text-gray-500">Gestionează stocul și produsele</p>
+          <p className="text-muted-foreground">Gestionează stocul și produsele</p>
         </div>
         <button 
           onClick={() => openDrawer({ type: 'product' })} 
@@ -118,10 +156,10 @@ const BusinessInventory = () => {
             <div className="card-content p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Total Produse</p>
+                  <p className="text-sm font-medium text-muted-foreground">Total Produse</p>
                   <p className="text-2xl font-bold">{stats.totalProducts}</p>
                 </div>
-                <Package className="h-8 w-8 text-blue-500" />
+                <Package className="h-8 w-8 text-primary" />
               </div>
             </div>
           </div>
@@ -130,10 +168,10 @@ const BusinessInventory = () => {
             <div className="card-content p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Valoare Totală</p>
-                  <p className="text-2xl font-bold">{stats.totalValue.toFixed(2)} RON</p>
+                  <p className="text-sm font-medium text-muted-foreground">Valoare Totală</p>
+                  <p className="text-2xl font-bold">{stats.totalValue?.toFixed(2) || '0.00'} RON</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-green-500" />
+                <TrendingUp className="h-8 w-8 text-green-600" />
               </div>
             </div>
           </div>
@@ -142,10 +180,10 @@ const BusinessInventory = () => {
             <div className="card-content p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Stoc Scăzut</p>
+                  <p className="text-sm font-medium text-muted-foreground">Stoc Scăzut</p>
                   <p className="text-2xl font-bold text-orange-600">{stats.lowStockCount}</p>
                 </div>
-                <AlertTriangle className="h-8 w-8 text-orange-500" />
+                <AlertTriangle className="h-8 w-8 text-orange-600" />
               </div>
             </div>
           </div>
@@ -154,10 +192,10 @@ const BusinessInventory = () => {
             <div className="card-content p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Fără Stoc</p>
+                  <p className="text-sm font-medium text-muted-foreground">Fără Stoc</p>
                   <p className="text-2xl font-bold text-red-600">{stats.outOfStockCount}</p>
                 </div>
-                <TrendingDown className="h-8 w-8 text-red-500" />
+                <TrendingDown className="h-8 w-8 text-red-600" />
               </div>
             </div>
           </div>
@@ -166,28 +204,24 @@ const BusinessInventory = () => {
 
       {/* Filtre și Căutare */}
       <div className="card">
-        <div className="card-content p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Căutare */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Caută produse..."
-                  value={searchTerm}
-                  onChange={handleSearch}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+        <div className="card-content">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Caută produse după nume, categorie..."
+                value={searchTerm}
+                onChange={handleSearch}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
             </div>
-
-            {/* Filtru Categorie */}
-            <div className="w-full md:w-48">
+            
+            <div className="flex gap-2">
               <select
                 value={selectedCategory}
                 onChange={(e) => handleCategoryFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="">Toate categoriile</option>
                 {categories.map(category => (
@@ -196,26 +230,23 @@ const BusinessInventory = () => {
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Filtru Stoc Scăzut */}
-            <button
-              onClick={handleLowStockFilter}
-              className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${
-                showLowStock 
-                  ? 'bg-orange-50 border-orange-300 text-orange-700' 
-                  : 'bg-white border-gray-300 text-gray-700'
-              }`}
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Stoc scăzut
-            </button>
-
-            {/* Export */}
-            <div className="relative">
+              
+              <button
+                onClick={handleLowStockFilter}
+                className={`h-10 px-4 py-2 rounded-md border flex items-center gap-2 ${
+                  showLowStock 
+                    ? 'bg-orange-50 border-orange-300 text-orange-700' 
+                    : 'bg-background border-input text-foreground'
+                }`}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Stoc scăzut
+              </button>
+              
               <button
                 onClick={() => handleExport('csv')}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                className="btn btn-outline flex items-center gap-2"
+                disabled={loading}
               >
                 <Download className="h-4 w-4" />
                 Export CSV
@@ -225,128 +256,186 @@ const BusinessInventory = () => {
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="card">
+          <div className="card-content">
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md text-destructive">
+              {error}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lista Produse */}
       <div className="card">
-        <div className="card-content p-0">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-muted-foreground">Se încarcă produsele...</p>
+        <div className="card-header">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              <h3 className="card-title">Lista Produse</h3>
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             </div>
-          ) : error ? (
-            <div className="p-8 text-center">
-              <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <p className="text-red-600">Eroare la încărcarea produselor: {error}</p>
+            <p className="text-sm text-muted-foreground">
+              {sortedProducts.length} produse afișate
+            </p>
+          </div>
+        </div>
+        
+        <div className="card-content">
+          {loading && sortedProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Se încarcă produsele...</p>
             </div>
           ) : sortedProducts.length === 0 ? (
-            <div className="p-8 text-center">
+            <div className="text-center py-12">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Nu există produse</h3>
-              <p className="text-muted-foreground">
-                {searchTerm || selectedCategory || showLowStock 
-                  ? 'Nu s-au găsit produse cu criteriile selectate.' 
-                  : 'Adaugă primul produs pentru a începe.'
+              <p className="text-muted-foreground mb-4">
+                {searchTerm || selectedCategory || showLowStock
+                  ? 'Nu s-au găsit produse cu criteriile specificate.'
+                  : 'Aici vei putea gestiona stocul și produsele.'
                 }
               </p>
+              {!searchTerm && !selectedCategory && !showLowStock && (
+                <button 
+                  onClick={() => openDrawer({ type: 'product' })}
+                  className="btn btn-primary"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adaugă primul produs
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('name')}
-                    >
-                      Nume Produs
-                      {sortBy === 'name' && (
-                        <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                      )}
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium">
+                      <button 
+                        onClick={() => handleSort('name')}
+                        className="flex items-center gap-1 hover:text-primary"
+                      >
+                        Nume Produs
+                        {sortBy === 'name' && (
+                          <span className="text-xs">
+                            {sortOrder === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('category')}
-                    >
-                      Categorie
-                      {sortBy === 'category' && (
-                        <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                      )}
+                    <th className="text-left p-3 font-medium">
+                      <button 
+                        onClick={() => handleSort('category')}
+                        className="flex items-center gap-1 hover:text-primary"
+                      >
+                        Categorie
+                        {sortBy === 'category' && (
+                          <span className="text-xs">
+                            {sortOrder === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('price')}
-                    >
-                      Preț (RON)
-                      {sortBy === 'price' && (
-                        <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                      )}
+                    <th className="text-left p-3 font-medium">
+                      <button 
+                        onClick={() => handleSort('price')}
+                        className="flex items-center gap-1 hover:text-primary"
+                      >
+                        Preț (RON)
+                        {sortBy === 'price' && (
+                          <span className="text-xs">
+                            {sortOrder === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('stock')}
-                    >
-                      Stoc
-                      {sortBy === 'stock' && (
-                        <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                      )}
+                    <th className="text-left p-3 font-medium">
+                      <button 
+                        onClick={() => handleSort('stock')}
+                        className="flex items-center gap-1 hover:text-primary"
+                      >
+                        Stoc
+                        {sortBy === 'stock' && (
+                          <span className="text-xs">
+                            {sortOrder === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                      Nivel Reîncărcare
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                      Acțiuni
-                    </th>
+                    <th className="text-left p-3 font-medium">Nivel Reîncărcare</th>
+                    <th className="text-left p-3 font-medium">Status</th>
+                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {sortedProducts.map((product) => (
-                    <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{product.name}</div>
+                    <tr key={product.id} className={`border-b hover:bg-muted/50 ${
+                      product._isDeleting ? 'opacity-50' : ''
+                    }`}>
+                      <td className="p-3">
+                        <div>
+                          <div className="font-medium flex items-center gap-2">
+                            <span className={product._isDeleting ? 'line-through opacity-50' : ''}>
+                              {product.name || 'Nume indisponibil'}
+                            </span>
+                            {product._isOptimistic && !product._isDeleting && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                                <RotateCw className="h-3 w-3 animate-spin" />
+                                În curs
+                              </span>
+                            )}
+                            {product._isDeleting && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                                Ștergere...
+                              </span>
+                            )}
+                          </div>
+                          {product.resourceId && !product._tempId && (
+                            <div className="text-sm text-muted-foreground">
+                              ID: {product.resourceId}
+                            </div>
+                          )}
+                          {product._tempId && (
+                            <div className="text-sm text-muted-foreground">
+                              ID temporar: {product._tempId}
+                            </div>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="p-3">
                         <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                          {product.category}
+                          {product.category || 'Fără categorie'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="font-medium">{product.price} RON</span>
+                      <td className="p-3">
+                        <span className="font-medium">{product.price || '0.00'} RON</span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="p-3">
                         <span className={`font-medium ${
                           product.stock === 0 ? 'text-red-600' : 
                           product.isLowStock ? 'text-orange-600' : 'text-gray-900'
                         }`}>
-                          {product.stock}
+                          {product.stock || 0}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-500">{product.reorderLevel}</span>
+                      <td className="p-3">
+                        <span className="text-sm text-muted-foreground">{product.reorderLevel || 0}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        {product.stock === 0 ? (
-                          <span className="inline-flex px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-                            Fără stoc
-                          </span>
-                        ) : product.isLowStock ? (
-                          <span className="inline-flex px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
-                            Stoc scăzut
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                            În stoc
-                          </span>
-                        )}
+                      <td className="p-3">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(product)}`}>
+                          {getStatusLabel(product)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => openDrawer({ type: 'product', data: product })}
-                            className="p-1 text-gray-400 hover:text-blue-600"
+                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Editează"
+                            disabled={product._isOptimistic || product._isDeleting}
                           >
                             <Edit className="h-4 w-4" />
                           </button>

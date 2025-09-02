@@ -83,7 +83,7 @@ function AppContent() {
 
   // Store auth data when user is authenticated via Cognito
   useEffect(() => {
-    if (auth.isAuthenticated && auth.user && !isDemoMode) {
+    if (auth.user && !isDemoMode) {
       const authData = {
         id_token: auth.user.id_token,
         access_token: auth.user.access_token,

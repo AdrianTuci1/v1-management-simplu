@@ -12,6 +12,9 @@ import {
 const ProductDrawer = ({ isOpen, onClose, product = null }) => {
   const { addProduct, updateProduct, deleteProduct, loading, error } = useProducts();
   
+  // Debug logging pentru a vedea când se schimbă starea
+  console.log('ProductDrawer render - loading:', loading, 'error:', error)
+  
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -106,9 +109,12 @@ const ProductDrawer = ({ isOpen, onClose, product = null }) => {
       } else {
         await addProduct(formData);
       }
+      // Închide drawer-ul după operație reușită
+      // Optimistic update-ul va fi vizibil imediat în view
       onClose();
     } catch (err) {
       console.error('Error saving product:', err);
+      // Nu închide drawer-ul în caz de eroare pentru a permite utilizatorului să corecteze
     }
   };
 

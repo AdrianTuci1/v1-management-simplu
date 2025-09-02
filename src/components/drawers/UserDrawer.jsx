@@ -138,9 +138,12 @@ const UserDrawer = ({ onClose, user = null }) => {
       } else {
         await addUser(formData)
       }
+      // Închide drawer-ul după operație reușită
+      // Optimistic update-ul va fi vizibil imediat în view
       onClose()
     } catch (err) {
       console.error('Error saving user:', err)
+      // Nu închide drawer-ul în caz de eroare pentru a permite utilizatorului să corecteze
     } finally {
       setIsSubmitting(false)
     }
@@ -152,9 +155,12 @@ const UserDrawer = ({ onClose, user = null }) => {
     if (window.confirm('Ești sigur că vrei să ștergi acest utilizator?')) {
       try {
         await deleteUser(user.id)
+        // Închide drawer-ul după operație reușită
+        // Optimistic update-ul va fi vizibil imediat în view
         onClose()
       } catch (err) {
         console.error('Error deleting user:', err)
+        // Nu închide drawer-ul în caz de eroare
       }
     }
   }
@@ -203,6 +209,7 @@ const UserDrawer = ({ onClose, user = null }) => {
                   validationErrors.medicName ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder="Numele complet al medicului"
+                disabled={isSubmitting}
               />
               {validationErrors.medicName && (
                 <p className="text-red-500 text-sm mt-1">{validationErrors.medicName}</p>
@@ -225,6 +232,7 @@ const UserDrawer = ({ onClose, user = null }) => {
                       validationErrors.email ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="email@example.com"
+                    disabled={isSubmitting}
                   />
                 </div>
                 {validationErrors.email && (
@@ -247,6 +255,7 @@ const UserDrawer = ({ onClose, user = null }) => {
                       validationErrors.phone ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="+40 123 456 789 (opțional)"
+                    disabled={isSubmitting}
                   />
                 </div>
                 {validationErrors.phone && (
@@ -266,6 +275,7 @@ const UserDrawer = ({ onClose, user = null }) => {
                 className={`w-full p-3 border rounded-lg ${
                   validationErrors.role ? 'border-red-500' : 'border-gray-300'
                 }`}
+                disabled={isSubmitting}
               >
                 <option value="">Selectează un rol</option>
                 {roles.map((role) => (
@@ -291,6 +301,7 @@ const UserDrawer = ({ onClose, user = null }) => {
                       checked={formData.dutyDays.includes(day)}
                       onChange={() => handleDutyDaysChange(day)}
                       className="rounded border-gray-300"
+                      disabled={isSubmitting}
                     />
                     <span className="text-sm">{day}</span>
                   </label>

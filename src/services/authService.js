@@ -1,12 +1,13 @@
 import businessInfoRepository from '../data/repositories/BusinessInfoRepository.js'
 import userRolesRepository from '../data/repositories/UserRolesRepository.js'
+import authRepository from '../data/repositories/AuthRepository.js'
 import { GetCommand } from '../data/commands/GetCommand.js'
 
 // Mock data structure for Cognito Authorizer response
 const mockCognitoData = {
   user: {
     id: 'user-123',
-    email: 'admin@cabinet-popescu.ro',
+    email: 'admin@simplu.io',
     name: 'Dr. Popescu'
   },
   locations: {
@@ -31,22 +32,35 @@ class AuthService {
       // Then get user data (either from Cognito or demo mode)
       const userData = await this.getUserData()
       
-      // Get user roles for locations
-      let userRoles = null
+      // Get user roles for locations using new auth repository
+      let authUserData = null
       try {
-        const getUserRolesCommand = new GetCommand(userRolesRepository, {})
-        userRoles = await getUserRolesCommand.execute()
+        const getAuthUserCommand = new GetCommand(authRepository, {})
+        authUserData = await getAuthUserCommand.execute()
       } catch (error) {
-        console.log('Could not fetch user roles, using demo data:', error)
+        console.log('Could not fetch auth user data, using demo data:', error)
         // In demo mode or if API fails, use demo roles
-        userRoles = userData.locations ? { locations: userData.locations } : null
+        authUserData = userData.locations ? { 
+          success: true,
+          user: {
+            userId: userData.user?.id || 'demo-user',
+            userName: userData.profile?.name || 'Demo User',
+            email: userData.profile?.email || 'demo@cabinet-popescu.ro',
+            businessId: businessInfo?.businessId || 'B0100001',
+            locations: Object.entries(userData.locations || {}).map(([locationId, role]) => ({
+              locationId,
+              locationName: this.getLocationNameById(locationId, businessInfo),
+              role
+            }))
+          }
+        } : null
       }
       
       // Combine all data
       const combinedData = {
         ...userData,
         businessInfo,
-        userRoles
+        authUserData
       }
       
       return combinedData
@@ -142,13 +156,31 @@ class AuthService {
     }
   }
 
+  // Helper method to get location name by ID
+  getLocationNameById(locationId, businessInfo) {
+    const locations = businessInfo?.locations || []
+    const location = locations.find(loc => loc.id === locationId)
+    return location?.name || `Location ${locationId}`
+  }
+
   // Get user's accessible locations based on their roles for each location
   getAccessibleLocations(userData) {
+    // Try to get data from new auth repository first
+    const authUserData = authRepository.getStoredUserData()
+    if (authUserData?.user?.locations) {
+      const accessibleLocations = authUserData.user.locations.filter(location => 
+        location.role && location.role !== 'user'
+      )
+      console.log('Getting accessible locations from auth repository:', accessibleLocations)
+      return accessibleLocations
+    }
+    
+    // Fallback to old format
     const businessInfo = businessInfoRepository.getStoredBusinessInfo()
     const locations = businessInfo?.locations || []
     const userRoles = userData.locations || {}
     
-    console.log('Getting accessible locations')
+    console.log('Getting accessible locations (fallback)')
     console.log('Available locations:', locations)
     console.log('User roles per location:', userRoles)
 
@@ -183,12 +215,29 @@ class AuthService {
 
   // Check if user has admin access
   hasAdminAccess(userData) {
+    // Try to get data from new auth repository first
+    const authUserData = authRepository.getStoredUserData()
+    if (authUserData?.user?.locations) {
+      return authUserData.user.locations.some(location => location.role === 'admin')
+    }
+    
+    // Fallback to old format
     const userRoles = userData.locations || {}
     return Object.values(userRoles).some(role => role === 'admin')
   }
 
   // Check if user should be denied access (no valid roles for any location)
   shouldDenyAccess(userData) {
+    // Try to get data from new auth repository first
+    const authUserData = authRepository.getStoredUserData()
+    if (authUserData?.user?.locations) {
+      const hasValidRole = authUserData.user.locations.some(location => 
+        location.role && location.role !== 'user'
+      )
+      return !hasValidRole
+    }
+    
+    // Fallback to old format
     const userRoles = userData.locations || {}
     const hasValidRole = Object.values(userRoles).some(role => role && role !== 'user')
     return !hasValidRole
@@ -196,6 +245,14 @@ class AuthService {
 
   // Check if user can access a specific location
   canAccessLocation(userData, locationId) {
+    // Try to get data from new auth repository first
+    const authUserData = authRepository.getStoredUserData()
+    if (authUserData?.user?.locations) {
+      const location = authUserData.user.locations.find(loc => loc.locationId === locationId)
+      return location?.role && location.role !== 'user'
+    }
+    
+    // Fallback to old format
     const userRoles = userData.locations || {}
     const userRoleForLocation = userRoles[locationId]
 
@@ -205,6 +262,14 @@ class AuthService {
 
   // Get user's role for a specific location
   getUserRoleForLocation(userData, locationId) {
+    // Try to get data from new auth repository first
+    const authUserData = authRepository.getStoredUserData()
+    if (authUserData?.user?.locations) {
+      const location = authUserData.user.locations.find(loc => loc.locationId === locationId)
+      return location?.role || null
+    }
+    
+    // Fallback to old format
     const userRoles = userData.locations || {}
     return userRoles[locationId] || null
   }

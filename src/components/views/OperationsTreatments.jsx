@@ -8,9 +8,10 @@ import {
   Clock,
   Stethoscope,
   Loader2,
-  Download
+  Download,
+  RotateCw
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useDrawer } from '../../contexts/DrawerContext'
 import { useTreatments } from '../../hooks/useTreatments.js'
 
@@ -29,7 +30,8 @@ const OperationsTreatments = () => {
     loadTreatmentsByType,
     exportTreatments,
     getUniqueCategories,
-    getUniqueTreatmentTypes
+    getUniqueTreatmentTypes,
+    deleteTreatment
   } = useTreatments()
   
   // State management local
@@ -39,6 +41,43 @@ const OperationsTreatments = () => {
   const [sortBy, setSortBy] = useState('treatmentType')
   const [sortOrder, setSortOrder] = useState('asc')
   const [showFilters, setShowFilters] = useState(false)
+
+  // Sortare cu prioritizare pentru optimistic updates
+  const sortedTreatments = useMemo(() => {
+    // Aplică sortarea de bază
+    const baseSorted = [...treatments].sort((a, b) => {
+      let aValue = a[sortBy] || ''
+      let bValue = b[sortBy] || ''
+      
+      // Convertim la string pentru comparație
+      aValue = String(aValue).toLowerCase()
+      bValue = String(bValue).toLowerCase()
+      
+      if (sortOrder === 'asc') {
+        return aValue.localeCompare(bValue)
+      } else {
+        return bValue.localeCompare(aValue)
+      }
+    })
+    
+    // Aplică sortarea secundară pentru optimistic updates
+    return baseSorted.sort((a, b) => {
+      const aOpt = !!a._isOptimistic && !a._isDeleting
+      const bOpt = !!b._isOptimistic && !b._isDeleting
+      const aDel = !!a._isDeleting
+      const bDel = !!b._isDeleting
+      
+      // Prioritizează optimistic updates
+      if (aOpt && !bOpt) return -1
+      if (!aOpt && bOpt) return 1
+      
+      // Pune elementele în ștergere la sfârșit
+      if (aDel && !bDel) return 1
+      if (!aDel && bDel) return -1
+      
+      return 0
+    })
+  }, [treatments, sortBy, sortOrder])
 
   // Gestionează căutarea
   const handleSearch = (e) => {
@@ -96,8 +135,6 @@ const OperationsTreatments = () => {
   const uniqueCategories = getUniqueCategories()
   const uniqueTreatmentTypes = getUniqueTreatmentTypes()
 
-
-
   // Get treatment type icon
   const getTreatmentTypeIcon = (type) => {
     const iconMap = {
@@ -121,17 +158,12 @@ const OperationsTreatments = () => {
   const handleDeleteTreatment = async (treatmentId) => {
     if (confirm('Ești sigur că vrei să ștergi acest tratament?')) {
       try {
-        // Ștergerea se face prin hook
-        // Nu mai este necesar să actualizez state-ul local
+        await deleteTreatment(treatmentId)
       } catch (error) {
         console.error('Error deleting treatment:', error)
       }
     }
   }
-
-
-
-
 
   return (
     <div className="space-y-6">
@@ -160,8 +192,6 @@ const OperationsTreatments = () => {
           </button>
         </div>
       </div>
-
-
 
       {/* Filters and Search */}
       <div className="card">
@@ -244,12 +274,12 @@ const OperationsTreatments = () => {
         </div>
         
         <div className="card-content">
-          {loading && treatments.length === 0 ? (
+          {loading && sortedTreatments.length === 0 ? (
             <div className="text-center py-12">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
               <p className="text-muted-foreground">Se încarcă tratamentele...</p>
             </div>
-          ) : treatments.length === 0 ? (
+          ) : sortedTreatments.length === 0 ? (
             <div className="text-center py-12">
               <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Nu există tratamente</h3>
@@ -330,46 +360,75 @@ const OperationsTreatments = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {treatments.map((treatment) => {
+                  {sortedTreatments.map((treatment) => {
                     const TypeIcon = getTreatmentTypeIcon(treatment.treatmentType)
                     
                     return (
-                      <tr key={treatment.id} className="border-b hover:bg-muted/50">
+                      <tr key={treatment.id} className={`border-b hover:bg-muted/50 ${
+                        treatment._isDeleting ? 'opacity-50' : ''
+                      }`}>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <TypeIcon className="h-4 w-4 text-primary" />
-                            <span className="font-medium">{treatment.treatmentType}</span>
+                            <span className={`font-medium ${
+                              treatment._isDeleting ? 'line-through' : ''
+                            }`}>
+                              {treatment.treatmentType}
+                            </span>
+                            {treatment._isOptimistic && !treatment._isDeleting && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                                <RotateCw className="h-3 w-3 mr-1 animate-spin" />
+                                În curs
+                              </span>
+                            )}
+                            {treatment._isDeleting && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                                Ștergere...
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm text-muted-foreground">{treatment.category}</span>
+                            <span className={`text-sm text-muted-foreground ${
+                              treatment._isDeleting ? 'line-through' : ''
+                            }`}>
+                              {treatment.category}
+                            </span>
                           </div>
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span>{treatment.duration} min</span>
+                            <span className={treatment._isDeleting ? 'line-through' : ''}>
+                              {treatment.duration} min
+                            </span>
                           </div>
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{treatment.price} RON</span>
+                            <span className={`font-medium ${
+                              treatment._isDeleting ? 'line-through' : ''
+                            }`}>
+                              {treatment.price} RON
+                            </span>
                           </div>
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openDrawer({ type: 'treatment', isNew: false, data: treatment })}
-                              className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent"
+                              className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Editează"
+                              disabled={treatment._isOptimistic || treatment._isDeleting}
                             >
                               <Edit className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleDeleteTreatment(treatment.id)}
-                              className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-destructive"
+                              className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Șterge"
+                              disabled={treatment._isOptimistic || treatment._isDeleting}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>

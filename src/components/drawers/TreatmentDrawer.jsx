@@ -66,16 +66,18 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
     setError(null)
     
     try {
-      const treatmentData = {
+      const updatedTreatmentData = {
         ...formData,
         duration: parseInt(formData.duration) || 0,
         price: parseFloat(formData.price) || 0
       }
       
       if (isNewTreatment) {
-        await addTreatment(treatmentData)
+        await addTreatment(updatedTreatmentData)
       } else {
-        await updateTreatment(treatmentData.id, treatmentData)
+        // Păstrăm ID-ul original din treatmentData prop
+        const treatmentId = treatmentData?.id || treatmentData?.resourceId
+        await updateTreatment(treatmentId, updatedTreatmentData)
       }
       
       onClose()

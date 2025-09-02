@@ -4,9 +4,20 @@ export async function apiRequest(resourceType, endpoint = "", options = {}) {
   const base = import.meta.env.VITE_API_URL || "";
   const url = `${base}${endpoint}`;
 
+  // Get auth token for all requests except business-info
+  let authToken = null;
+  if (resourceType !== 'business-info') {
+    const savedCognitoData = localStorage.getItem('cognito-data');
+    if (savedCognitoData) {
+      const userData = JSON.parse(savedCognitoData);
+      authToken = userData.access_token || userData.id_token;
+    }
+  }
+
   const headers = {
     "Content-Type": "application/json",
     "X-Resource-Type": resourceType,
+    ...(authToken && { "Authorization": `Bearer ${authToken}` }),
     ...(options.headers || {}),
   };
 

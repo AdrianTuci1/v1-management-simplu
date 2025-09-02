@@ -51,7 +51,7 @@ const AIAssistantComponent = () => {
       return 'Bună! Sunt aici să vă ajut cu dashboard-ul de business. Ce informații aveți nevoie?';
     }
     
-    if (input.includes('programări') || input.includes('appointment')) {
+    if (input.includes('programari') || input.includes('appointment')) {
       return 'Pentru programări, puteți accesa secțiunea "Planificare" din meniu. Acolo puteți gestiona programările, pacienții și tratamentele.';
     }
     

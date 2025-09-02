@@ -15,6 +15,14 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
+    proxy: {
+      '/auth/callback': {
+        target: 'https://simplu.io',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace('/auth/callback', '/auth/callback')
+      }
+    }
   },
   build: {
     rollupOptions: {

@@ -9,6 +9,17 @@ class BusinessInfoRepository {
     try {
       const businessInfo = await businessInfoInvoker.getBusinessInfo(businessId)
       
+      // Check if businessInfo is valid before storing
+      if (!businessInfo) {
+        console.warn('BusinessInfoInvoker returned null/undefined, using cached data if available')
+        const cachedData = this.getStoredBusinessInfo()
+        if (cachedData) {
+          console.log('Using cached business info')
+          return cachedData
+        }
+        throw new Error('No business info available from API or cache')
+      }
+      
       // Store essential data in localStorage
       this.storeBusinessInfo(businessInfo)
       
@@ -28,20 +39,28 @@ class BusinessInfoRepository {
   }
 
   storeBusinessInfo(businessInfo) {
+    // Add null check and fallback for businessInfo
+    if (!businessInfo) {
+      console.warn('BusinessInfo is undefined, cannot store business info')
+      return
+    }
+
     const essentialData = {
-      companyName: businessInfo.companyName,
-      businessType: businessInfo.businessType,
-      businessId: businessInfo.businessId,
-      locations: businessInfo.locations.map(location => ({
-        id: location.id,
-        name: location.name,
-        address: location.address,
-        active: location.active,
-        timezone: location.timezone
-      })),
-      settings: businessInfo.settings,
-      ownerEmail: businessInfo.ownerEmail,
-      status: businessInfo.status
+      companyName: businessInfo.companyName || 'Unknown Company',
+      businessType: businessInfo.businessType || 'unknown',
+      businessId: businessInfo.businessId || 'B0100001',
+      locations: (businessInfo.locations && Array.isArray(businessInfo.locations)) 
+        ? businessInfo.locations.map(location => ({
+            id: location.id || 'unknown',
+            name: location.name || 'Unknown Location',
+            address: location.address || 'No address provided',
+            active: location.active !== undefined ? location.active : true,
+            timezone: location.timezone || 'UTC'
+          }))
+        : [],
+      settings: businessInfo.settings || {},
+      ownerEmail: businessInfo.ownerEmail || 'no-email@unknown.com',
+      status: businessInfo.status || 'unknown'
     }
     
     localStorage.setItem(this.storageKey, JSON.stringify(essentialData))
