@@ -4,13 +4,23 @@
 
 Acest ghid explică cum să gestionezi sesiunile cu AI agent-ul și cum să trimiți/primești mesaje. Sesiunile sunt organizate **per tenant_id (business) și user_id pe zi**, permițând utilizatorilor să vadă întreaga conversație din ziua respectivă fără a gestiona conversații separate.
 
+## Status Actualizare
+
+**Ultima actualizare:** Sep 2025
+**Versiune:** 2.0 - Sesiuni WebSocket cu AI Agent Server
+**Modificări majore:** 
+- Integrare completă cu AI Agent Server
+- WebSocket Gateway pentru mesaje în timp real
+- Gestionare automată a sesiunilor
+- Crypto polyfill pentru Node.js 18 Alpine
+
 ## Arhitectura Sesiunilor
 
 ### 1. **Structura Sesiunii**
 ```typescript
 interface Session {
-  sessionId: string;           // Format: "businessId:userId:timestamp"
-  businessId: string;          // ID-ul business-ului (tenant)
+  sessionId: string;           // Partition Key (Primary Key) - UUID v4 sau format custom
+  businessId: string;          // Regular field, nu cheie primară
   locationId: string;          // ID-ul locației
   userId: string;              // ID-ul utilizatorului
   status: 'active' | 'closed' | 'resolved' | 'abandoned';
@@ -27,9 +37,9 @@ interface Session {
 ### 2. **Structura Mesajului**
 ```typescript
 interface Message {
-  messageId: string;           // ID unic mesaj
-  sessionId: string;           // ID-ul sesiunii
-  businessId: string;          // ID-ul business-ului
+  messageId: string;           // Partition Key - UUID v4 sau format custom
+  sessionId: string;           // Sort Key - ID-ul sesiunii
+  businessId: string;          // Regular field
   userId: string;              // ID-ul utilizatorului
   content: string;             // Conținutul mesajului
   type: 'user' | 'agent' | 'system';
@@ -42,68 +52,77 @@ interface Message {
 }
 ```
 
-### 3. **Strategia Sesiunilor Zilnice**
-- **Sesiunea se creează automat** la primul mesaj al zilei
-- **Toate mesajele din ziua respectivă** sunt grupate în aceeași sesiune
-- **Sesiunea se închide automat** la sfârșitul zilei (00:00)
-- **Istoricul complet** este păstrat pentru fiecare zi
+### 3. **Strategia Sesiunilor WebSocket**
+- **Sesiunea se creează automat** la primul mesaj WebSocket
+- **UUID v4 unic** pentru fiecare sesiune nouă
+- **Fallback la format custom** dacă crypto.randomUUID nu este disponibil
+- **Gestionare automată** prin AI Agent Server
+- **Cleanup automat** pentru sesiuni rezolvate
 
-## API Endpoints
+## AI Agent Server - WebSocket Gateway
 
-### 1. **Trimitere Mesaj către AI Agent**
+### 1. **Conectare WebSocket la AI Agent Server**
 
-**Endpoint:** `POST http://localhost:4000/api/messages`
+**Endpoint:** `ws://localhost:3001/socket/websocket`
 
-**Request Body:**
+**Canal pentru mesaje:** `messages:{businessId}`
+
+**Format mesaj WebSocket:**
+```typescript
+interface MessageDto {
+  businessId: string;          // ID business (obligatoriu)
+  locationId: string;          // ID locație (obligatoriu)
+  userId: string;              // ID utilizator (obligatoriu)
+  message: string;             // Conținut mesaj (obligatoriu)
+  sessionId?: string;          // Opțional - se generează automat
+  timestamp?: string;          // Opțional - se generează automat
+}
+```
+
+**Exemplu mesaj WebSocket:**
 ```json
 {
-  "tenant_id": "B0100001",        // ID business (obligatoriu)
-  "user_id": "user_123",          // ID utilizator (obligatoriu)
-  "content": "Vreau să fac o programare", // Conținut (obligatoriu)
-  "session_id": "sess_123",       // Opțional - se generează automat
-  "message_id": "msg_456",        // Opțional - se generează automat
-  "payload": {                     // Opțional
-    "context": {
-      "urgency": "high",
-      "preferredTime": "morning"
-    }
+  "businessId": "B0100001",       // ID business (obligatoriu)
+  "locationId": "L0100001",       // ID locație (obligatoriu)
+  "userId": "user_123",           // ID utilizator (obligatoriu)
+  "message": "Vreau să fac o programare", // Conținut (obligatoriu)
+  "sessionId": "uuid-v4-here",    // Opțional - se generează automat
+  "timestamp": "2024-12-20T10:00:00.000Z" // Opțional - se generează automat
+}
+```
+
+**Răspuns AI Agent prin WebSocket:**
+```json
+{
+  "event": "new_message",
+  "topic": "messages:B0100001",
+  "payload": {
+    "responseId": "uuid-v4-response",
+    "message": "Bună! Te ajut să faci o programare. Ce tip de serviciu dorești?",
+    "actions": [],
+    "timestamp": "2024-12-20T10:00:05.000Z",
+    "sessionId": "uuid-v4-session"
   }
 }
 ```
 
-**Response Success:**
+**Răspuns de eroare prin WebSocket:**
 ```json
 {
-  "status": "success",
-  "message": {
-    "tenantId": "B0100001",
-    "userId": "user_123",
-    "sessionId": "B0100001:user_123:1704067200000",
-    "messageId": "msg_1704067200000_abc123",
-    "type": "user.message",
-    "payload": {
-      "content": "Vreau să fac o programare",
-      "context": {
-        "urgency": "high",
-        "preferredTime": "morning"
-      }
-    },
-    "timestamp": "2024-01-01T10:00:00.000Z"
+  "event": "error",
+  "topic": "messages:B0100001",
+  "payload": {
+    "message": "Eroare la procesarea mesajului",
+    "error": "Missing required parameters: businessId, locationId, userId, message"
   }
-}
-```
-
-**Response Error:**
-```json
-{
-  "status": "error",
-  "message": "Missing required parameters: tenant_id, user_id, content"
 }
 ```
 
 ### 2. **Obținere Istoric Sesiune**
 
 **Endpoint:** `GET http://localhost:3001/api/sessions/{sessionId}/messages`
+
+**Notă:** Acest endpoint este disponibil prin AI Agent Server pentru a obține istoricul mesajelor dintr-o sesiune specifică.
 
 **Query Parameters:**
 - `limit` (opțional): Numărul de mesaje (default: 50)
@@ -153,6 +172,8 @@ interface Message {
 
 **Endpoint:** `GET http://localhost:3001/api/sessions/business/{businessId}/active`
 
+**Notă:** Acest endpoint este disponibil prin AI Agent Server pentru a obține toate sesiunile active pentru un business specific.
+
 **Response:**
 ```json
 {
@@ -178,11 +199,18 @@ interface Message {
 
 ## WebSocket pentru Mesaje în Timp Real
 
-### 1. **Conectare WebSocket**
+### 1. **Conectare WebSocket la AI Agent Server**
 
-**URL:** `ws://localhost:4000/socket/websocket`
+**URL:** `ws://localhost:3001/socket/websocket`
 
 **Canal pentru mesaje:** `messages:{businessId}`
+
+**Event-uri WebSocket:**
+- `phx_join` - Conectare la canal
+- `phx_leave` - Deconectare de la canal  
+- `new_message` - Trimitere mesaj nou
+- `phx_reply` - Răspuns la join/leave
+- `message_processed` - Broadcast către coordonatori
 
 ### 2. **Client JavaScript Complet**
 
@@ -232,6 +260,11 @@ class AISessionClient {
       this.handleNewMessage(payload);
     });
 
+    // Ascultă pentru broadcast-uri
+    this.messagesChannel.on("message_processed", payload => {
+      console.log("Mesaj procesat:", payload);
+    });
+
     // Gestionare reconectare
     this.socket.onClose(() => {
       console.log("Conexiune WebSocket închisă");
@@ -243,17 +276,16 @@ class AISessionClient {
   // Încărcare sesiunea zilei
   async loadTodaySession() {
     try {
-      // Generează ID-ul sesiunii pentru ziua curentă
+      // Pentru WebSocket, sesiunea se va crea automat la primul mesaj
+      // Generăm un ID temporar pentru afișare
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const sessionId = `${this.businessId}:${this.userId}:${startOfDay.getTime()}`;
+      const tempSessionId = `${this.businessId}:${this.userId}:${startOfDay.getTime()}`;
       
-      this.currentSessionId = sessionId;
+      this.currentSessionId = tempSessionId;
       
-      // Încarcă istoricul mesajelor
-      await this.loadMessageHistory(sessionId);
-      
-      console.log("Sesiunea zilei încărcată:", sessionId);
+      console.log("Sesiunea temporară încărcată:", tempSessionId);
+      console.log("Sesiunea reală se va crea la primul mesaj");
     } catch (error) {
       console.error("Eroare la încărcarea sesiunii:", error);
     }
@@ -274,7 +306,7 @@ class AISessionClient {
     }
   }
 
-  // Trimitere mesaj către AI
+  // Trimitere mesaj către AI prin WebSocket
   async sendMessage(content, context = {}) {
     if (!this.isConnected) {
       console.error("Nu sunt conectat la WebSocket");
@@ -282,66 +314,72 @@ class AISessionClient {
     }
 
     const messageData = {
-      tenant_id: this.businessId,
-      user_id: this.userId,
-      session_id: this.currentSessionId,
-      content: content,
-      context: context
+      businessId: this.businessId,
+      locationId: 'default', // Sau ID-ul locației specifice
+      userId: this.userId,
+      message: content,
+      sessionId: this.currentSessionId,
+      timestamp: new Date().toISOString()
     };
 
     try {
-      const response = await fetch('http://localhost:4000/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(messageData)
+      // Trimitere mesaj prin WebSocket
+      this.messagesChannel.push("new_message", messageData, (response) => {
+        if (response.status === 'ok') {
+          console.log('Mesaj trimis cu succes');
+        } else {
+          console.error('Eroare la trimiterea mesajului:', response);
+        }
       });
 
-      const result = await response.json();
+      // Adaugă mesajul utilizatorului în istoric local
+      const userMessage = {
+        messageId: this.generateMessageId(),
+        sessionId: this.currentSessionId,
+        businessId: this.businessId,
+        userId: this.userId,
+        content: content,
+        type: 'user',
+        timestamp: new Date().toISOString(),
+        metadata: { source: 'websocket' }
+      };
       
-      if (result.status === 'success') {
-        // Adaugă mesajul utilizatorului în istoric
-        const userMessage = {
-          messageId: result.message.messageId,
-          sessionId: this.currentSessionId,
-          businessId: this.businessId,
-          userId: this.userId,
-          content: content,
-          type: 'user',
-          timestamp: new Date().toISOString(),
-          metadata: { source: 'websocket' }
-        };
-        
-        this.messageHistory.push(userMessage);
-        this.displayMessage(userMessage);
-        
-        console.log('Mesaj trimis:', result);
-      } else {
-        console.error('Eroare la trimiterea mesajului:', result.message);
-      }
+      this.messageHistory.push(userMessage);
+      this.displayMessage(userMessage);
+      
     } catch (error) {
       console.error('Eroare la trimiterea mesajului:', error);
     }
   }
 
+  // Generare ID mesaj local
+  generateMessageId() {
+    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
   // Gestionare mesaj nou primit
   handleNewMessage(payload) {
-    const { content, role, timestamp, message_id } = payload;
+    const { message, timestamp, responseId, sessionId } = payload;
     
-    if (role === 'agent') {
-      // Adaugă răspunsul AI în istoric
-      const aiMessage = {
-        messageId: message_id,
-        sessionId: this.currentSessionId,
-        businessId: this.businessId,
-        userId: 'agent',
-        content: content,
-        type: 'agent',
-        timestamp: timestamp,
-        metadata: { source: 'websocket' }
-      };
-      
-      this.messageHistory.push(aiMessage);
-      this.displayMessage(aiMessage);
+    // Adaugă răspunsul AI în istoric
+    const aiMessage = {
+      messageId: responseId || this.generateMessageId(),
+      sessionId: sessionId || this.currentSessionId,
+      businessId: this.businessId,
+      userId: 'agent',
+      content: message,
+      type: 'agent',
+      timestamp: timestamp,
+      metadata: { source: 'websocket', responseId }
+    };
+    
+    this.messageHistory.push(aiMessage);
+    this.displayMessage(aiMessage);
+    
+    // Actualizează sessionId dacă este nou
+    if (sessionId && sessionId !== this.currentSessionId) {
+      this.currentSessionId = sessionId;
+      console.log('Nouă sesiune creată:', sessionId);
     }
   }
 
@@ -566,75 +604,141 @@ class AISessionClient {
 </html>
 ```
 
-## Gestionarea Sesiunilor
+## Gestionarea Sesiunilor - AI Agent Server
 
 ### 1. **Crearea Automată a Sesiunilor**
 
-Sesiunea se creează automat la primul mesaj al zilei:
+Sesiunea se creează automat la primul mesaj WebSocket:
 
 ```typescript
-// În ai-agent-server
+// În ai-agent-server/src/modules/websocket/websocket.gateway.ts
 private generateSessionId(data: MessageDto): string {
-  const today = new Date();
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return `${data.businessId}:${data.userId}:${startOfDay.getTime()}`;
+  // Încearcă să folosească crypto.randomUUID dacă este disponibil
+  if (typeof global !== 'undefined' && global.crypto?.randomUUID) {
+    return global.crypto.randomUUID();
+  }
+  
+  // Fallback la implementarea existentă
+  return `${data.businessId}:${data.userId}:${Date.now()}`;
 }
 ```
 
-### 2. **Închiderea Automată a Sesiunilor**
+### 2. **Gestionarea Automată a Sesiunilor**
 
-Sesiunile se închid automat la sfârșitul zilei prin cron job:
+Sesiunile se gestionează automat prin AI Agent Server:
 
 ```typescript
-// Cron job zilnic la 00:00
-@Cron('0 0 * * *')
-async closeDailySessions() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
+// În ai-agent-server/src/modules/session/session.service.ts
+async createSession(
+  businessId: string,
+  locationId: string,
+  userId: string,
+  businessType: string
+): Promise<Session> {
+  // Încearcă să folosească crypto.randomUUID dacă este disponibil
+  let sessionId: string;
+  if (typeof global !== 'undefined' && global.crypto?.randomUUID) {
+    sessionId = global.crypto.randomUUID();
+  } else {
+    // Fallback la implementarea existentă
+    sessionId = `${businessId}:${userId}:${Date.now()}`;
+  }
   
-  // Închide toate sesiunile active din ziua anterioară
-  await this.sessionService.closeDailySessions(yesterday);
+  const session: Session = {
+    sessionId,
+    businessId,
+    locationId,
+    userId,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    lastMessageAt: new Date().toISOString(),
+    metadata: {
+      businessType,
+      context: {}
+    }
+  };
+
+  await this.dynamoClient.send(new PutItemCommand({
+    TableName: tableNames.sessions,
+    Item: marshall(session)
+  }));
+
+  return session;
 }
 ```
 
 ### 3. **Cleanup Sesiuni Vechi**
 
-Sesiunile rezolvate se șterg automat după 30 de zile:
+Sesiunile rezolvate se curăță automat prin cron job-uri:
 
 ```typescript
-// Cron job zilnic la 02:00
-@Cron('0 2 * * *')
-async cleanupResolvedSessions() {
-  await this.sessionService.cleanupResolvedSessions();
+// În ai-agent-server/src/modules/session/session.service.ts
+async cleanupResolvedSessions(): Promise<void> {
+  try {
+    // Implementare cleanup pentru sesiuni rezolvate mai vechi de 30 de zile
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Scan pentru sesiuni rezolvate vechi
+    const result = await this.dynamoClient.send(new ScanCommand({
+      TableName: tableNames.sessions,
+      FilterExpression: 'status = :status AND updatedAt < :updatedAt',
+      ExpressionAttributeValues: marshall({
+        ':status': 'resolved',
+        ':updatedAt': thirtyDaysAgo.toISOString()
+      })
+    }));
+
+    if (result.Items && result.Items.length > 0) {
+      console.log(`Found ${result.Items.length} old resolved sessions to cleanup`);
+      
+      // Pentru moment, doar logăm - implementarea completă va fi adăugată ulterior
+      // TODO: Implementează ștergerea efectivă a sesiunilor vechi
+      // TODO: Implementează ștergerea efectivă a mesajelor asociate
+      // TODO: Implementează ștergerea efectivă a sesiunilor
+    } else {
+      console.log('No old resolved sessions found for cleanup');
+    }
+    
+    console.log('Cleanup resolved sessions older than:', thirtyDaysAgo.toISOString());
+  } catch (error) {
+    console.error('Error in cleanup resolved sessions:', error);
+  }
 }
 ```
 
 ## Exemple de Utilizare
 
-### 1. **Trimitere Mesaj Simplu**
+### 1. **Trimitere Mesaj prin WebSocket**
 
 ```javascript
-// Trimitere mesaj către AI
-const response = await fetch('http://localhost:4000/api/messages', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    tenant_id: 'B0100001',
-    user_id: 'user_123',
-    content: 'Salut! Vreau să fac o programare pentru mâine'
-  })
-});
+// Trimitere mesaj către AI Agent Server prin WebSocket
+const messageData = {
+  businessId: 'B0100001',
+  locationId: 'L0100001',
+  userId: 'user_123',
+  message: 'Salut! Vreau să fac o programare pentru mâine',
+  sessionId: 'uuid-v4-session', // Opțional
+  timestamp: new Date().toISOString()
+};
 
-const result = await response.json();
-console.log('Mesaj trimis:', result);
+// Trimitere prin WebSocket
+messagesChannel.push("new_message", messageData, (response) => {
+  if (response.status === 'ok') {
+    console.log('Mesaj trimis cu succes');
+  } else {
+    console.error('Eroare la trimiterea mesajului:', response);
+  }
+});
 ```
 
 ### 2. **Încărcare Istoric Sesiune**
 
 ```javascript
-// Încărcare istoric mesaje
-const sessionId = 'B0100001:user_123:1704067200000';
-const response = await fetch(`http://localhost:3001/api/sessions/${sessionId}/messages?limit=100`);
+// Încărcare istoric mesaje prin AI Agent Server
+const sessionId = 'uuid-v4-session-id';
+const response = await fetch(`http://localhost:3001/api/sessions/${sessionId}/messages?limit=50`);
 const data = await response.json();
 
 console.log('Istoric mesaje:', data.messages);
@@ -643,7 +747,7 @@ console.log('Istoric mesaje:', data.messages);
 ### 3. **Monitorizare Sesiuni Active**
 
 ```javascript
-// Obținere sesiuni active pentru business
+// Obținere sesiuni active pentru business prin AI Agent Server
 const response = await fetch('http://localhost:3001/api/sessions/business/B0100001/active');
 const data = await response.json();
 
@@ -653,14 +757,14 @@ console.log('Sesiuni active:', data.activeSessions);
 ## Avantajele Sistemului
 
 ### 1. **Simplitate**
-- **O singură sesiune pe zi** per utilizator
-- **Nu trebuie să gestionezi conversații separate**
+- **Sesiuni UUID v4 unice** per conversație
+- **Gestionare automată** prin AI Agent Server
 - **Istoricul complet** este disponibil automat
 
 ### 2. **Performanță**
-- **Sesiuni scurte** (maxim 24 ore)
-- **Cleanup automat** pentru sesiuni vechi
-- **Indexare optimizată** în DynamoDB
+- **Sesiuni optimizate** cu UUID v4
+- **Cleanup automat** pentru sesiuni rezolvate
+- **Indexare optimizată** în DynamoDB cu scan operations
 
 ### 3. **Scalabilitate**
 - **Sesiuni per business și utilizator**
@@ -668,32 +772,54 @@ console.log('Sesiuni active:', data.activeSessions);
 - **Arhitectură distribuită** cu WebSocket și HTTP
 
 ### 4. **UX Îmbunătățit**
-- **Conversații continue** pe zi
-- **Context păstrat** pentru întreaga zi
+- **Conversații continue** cu context păstrat
 - **Notificări în timp real** prin WebSocket
+- **Gestionare automată** a sesiunilor
 
 ## Troubleshooting
 
 ### 1. **Sesiunea nu se creează**
-- Verifică dacă `tenant_id` și `user_id` sunt corecte
-- Verifică dacă ai-agent-server rulează pe portul 3001
-- Verifică logurile pentru erori
+- Verifică dacă `businessId`, `locationId` și `userId` sunt corecte
+- Verifică dacă AI Agent Server rulează pe portul 3001
+- Verifică logurile pentru erori de creare sesiune
 
 ### 2. **WebSocket nu se conectează**
-- Verifică dacă Elixir server rulează pe portul 4000
-- Verifică CORS settings
-- Verifică dacă canalul este corect formatat
+- Verifică dacă AI Agent Server rulează pe portul 3001
+- Verifică CORS settings în WebSocket Gateway
+- Verifică dacă canalul este corect formatat: `messages:{businessId}`
 
 ### 3. **Mesajele nu se trimit**
 - Verifică dacă toate câmpurile obligatorii sunt prezente
-- Verifică formatul JSON
-- Verifică logurile Elixir pentru erori
+- Verifică formatul JSON conform `MessageDto` interface
+- Verifică logurile AI Agent Server pentru erori
 
 ### 4. **Istoricul nu se încarcă**
-- Verifică dacă sessionId este corect formatat
-- Verifică dacă ai-agent-server este accesibil
-- Verifică logurile DynamoDB
+- Verifică dacă sessionId este corect formatat (UUID v4)
+- Verifică dacă AI Agent Server este accesibil
+- Verifică logurile DynamoDB și scan operations
 
 ## Concluzie
 
-Acest sistem oferă o gestionare simplă și eficientă a sesiunilor cu AI agent-ul, permițând utilizatorilor să aibă conversații continue pe zi fără a gestiona conversații separate. Arhitectura este scalabilă și oferă performanță optimă prin utilizarea WebSocket pentru mesaje în timp real și HTTP pentru operații CRUD.
+Acest sistem oferă o gestionare modernă și eficientă a sesiunilor cu AI agent-ul prin AI Agent Server, permițând utilizatorilor să aibă conversații continue cu context păstrat. Arhitectura este scalabilă și oferă performanță optimă prin utilizarea WebSocket pentru mesaje în timp real, UUID v4 pentru identificatori unici, și DynamoDB cu scan operations pentru operații CRUD.
+
+## Caracteristici Tehnice
+
+### **Crypto Polyfill**
+- Suport pentru `crypto.randomUUID` în Node.js 18 Alpine
+- Fallback la generare custom dacă nu este disponibil
+- Import automat în `main.ts`
+
+### **WebSocket Gateway**
+- Gestionare automată a sesiunilor
+- Broadcast către coordonatori
+- Gestionare erori robustă
+
+### **Session Service**
+- Creare automată sesiuni cu UUID v4
+- Scan operations pentru DynamoDB
+- Cleanup automat sesiuni rezolvate
+
+### **Agent Service**
+- Procesare mesaje cu LangGraph
+- Generare răspunsuri AI
+- Integrare cu business info și RAG

@@ -42,7 +42,7 @@ class AuthInvoker {
     const savedCognitoData = localStorage.getItem('cognito-data')
     if (savedCognitoData) {
       const userData = JSON.parse(savedCognitoData)
-      return userData.access_token || userData.id_token || null
+      return userData.id_token || userData.access_token || null
     }
     return null
   }

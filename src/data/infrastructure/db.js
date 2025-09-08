@@ -14,7 +14,7 @@ class AppDatabase extends Dexie {
       productCounts: 'category, count', // Cache pentru numărul de produse per categorie
       users: 'resourceId, email, licenseNumber, specialization, status, role', // Store pentru utilizatori (medici)
       sales: 'resourceId, date, amount, status, customerId', // Store pentru vânzări
-      roles: 'resourceId, name, description, status', // Store pentru roluri
+      role: 'resourceId, name, description, status', // Store pentru roluri
       permissions: 'resourceId, resource, action, description', // Store pentru permisiuni
       treatments: 'resourceId, treatmentType, category, duration, price', // Store pentru tratamente
       statistics: 'id, timestamp', // Store pentru statistici și activități recente

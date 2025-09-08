@@ -10,7 +10,7 @@ export async function apiRequest(resourceType, endpoint = "", options = {}) {
     const savedCognitoData = localStorage.getItem('cognito-data');
     if (savedCognitoData) {
       const userData = JSON.parse(savedCognitoData);
-      authToken = userData.access_token || userData.id_token;
+      authToken = userData.id_token || userData.access_token;
     }
   }
 

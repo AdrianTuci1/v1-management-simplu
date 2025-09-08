@@ -32,10 +32,13 @@ export class ResourceRepository {
       const baseUrl = import.meta.env.VITE_API_URL || "";
       const resourcesEndpoint = buildResourcesEndpoint(path);
       const endpoint = baseUrl ? `${baseUrl}${resourcesEndpoint}` : resourcesEndpoint;
-      
+
+      const authToken = localStorage.getItem('auth-token');
+
       const headers = {
         "X-Resource-Type": this.resourceType,
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${authToken}`,
         ...(options.headers || {}),
       };
       

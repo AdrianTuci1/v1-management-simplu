@@ -10,6 +10,8 @@ export class StatisticsDataRepository {
       // Build the endpoint with businessId-locationId
       const businessId = localStorage.getItem("businessId") || 'B0100001';
       const locationId = localStorage.getItem("locationId") || 'L0100001';
+      const authToken = localStorage.getItem('auth-token');
+      
       const baseUrl = import.meta.env.VITE_API_URL || "";
       const url = `${baseUrl}/api/resources/statistics/${businessId}-${locationId}`;
       
@@ -19,6 +21,7 @@ export class StatisticsDataRepository {
       const headers = {
         "Content-Type": "application/json",
         "X-Resource-Type": statisticsType, // This will be either 'business-statistics' or 'recent-activities'
+        "Authorization": `Bearer ${authToken}`,
       };
       
       console.log('Making statistics API request:', {

@@ -24,21 +24,22 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
 
   // Resurse disponibile pentru permisiuni
   const availableResources = [
-    { value: 'appointments', label: 'Programări' },
-    { value: 'patients', label: 'Pacienți' },
-    { value: 'users', label: 'Utilizatori' },
-    { value: 'roles', label: 'Roluri' },
-    { value: 'products', label: 'Produse' },
-    { value: 'reports', label: 'Rapoarte' },
-    { value: 'settings', label: 'Setări' },
-    { value: 'analytics', label: 'Analize' },
-    { value: 'financial', label: 'Financiar' }
+    { value: 'appointment', label: 'Programări' },
+    { value: 'medic', label: 'Medici' },
+    { value: 'patient', label: 'Pacienți' },
+    { value: 'role', label: 'Roluri' },
+    { value: 'product', label: 'Produse' },
+    { value: 'treatment', label: 'Tratamente' },
+    { value: 'sale', label: 'Vânzări' },
+    { value: 'history', label: 'Istoric' },
+    { value: 'bill', label: 'Facturi' },
+    { value: 'raport', label: 'Rapoarte' }
   ]
 
   const availableActions = [
-    { value: 'view', label: 'Vizualizare' },
+    { value: 'read', label: 'Citire' },
     { value: 'create', label: 'Creare' },
-    { value: 'edit', label: 'Editare' },
+    { value: 'update', label: 'Actualizare' },
     { value: 'delete', label: 'Ștergere' }
   ]
 
@@ -128,50 +129,47 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
   const togglePermission = (resource, action) => {
     const permissionKey = `${resource}:${action}`
     const existingPermission = formData.permissions.find(
-      p => p.resource === resource && p.action === action
+      p => p === permissionKey
     )
 
     if (existingPermission) {
       // Șterge permisiunea
       setFormData(prev => ({
         ...prev,
-        permissions: prev.permissions.filter(
-          p => !(p.resource === resource && p.action === action)
-        )
+        permissions: prev.permissions.filter(p => p !== permissionKey)
       }))
     } else {
       // Adaugă permisiunea
       setFormData(prev => ({
         ...prev,
-        permissions: [...prev.permissions, { resource, action }]
+        permissions: [...prev.permissions, permissionKey]
       }))
     }
   }
 
   // Verifică dacă o permisiune este activă
   const hasPermission = (resource, action) => {
-    return formData.permissions.some(
-      p => p.resource === resource && p.action === action
-    )
+    const permissionKey = `${resource}:${action}`
+    return formData.permissions.includes(permissionKey)
   }
 
   // Selectare/deselectare toate permisiunile pentru o resursă
   const toggleAllPermissionsForResource = (resource) => {
-    const resourcePermissions = formData.permissions.filter(p => p.resource === resource)
-    const allResourcePermissions = availableActions.map(action => ({ resource, action: action.value }))
+    const resourcePermissions = formData.permissions.filter(p => p.startsWith(`${resource}:`))
+    const allResourcePermissions = availableActions.map(action => `${resource}:${action.value}`)
     
     if (resourcePermissions.length === allResourcePermissions.length) {
       // Deselectează toate
       setFormData(prev => ({
         ...prev,
-        permissions: prev.permissions.filter(p => p.resource !== resource)
+        permissions: prev.permissions.filter(p => !p.startsWith(`${resource}:`))
       }))
     } else {
       // Selectează toate
       setFormData(prev => ({
         ...prev,
         permissions: [
-          ...prev.permissions.filter(p => p.resource !== resource),
+          ...prev.permissions.filter(p => !p.startsWith(`${resource}:`)),
           ...allResourcePermissions
         ]
       }))
@@ -180,13 +178,13 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
 
   // Verifică dacă toate permisiunile pentru o resursă sunt selectate
   const allPermissionsSelectedForResource = (resource) => {
-    const resourcePermissions = formData.permissions.filter(p => p.resource === resource)
+    const resourcePermissions = formData.permissions.filter(p => p.startsWith(`${resource}:`))
     return resourcePermissions.length === availableActions.length
   }
 
   // Verifică dacă cel puțin o permisiune pentru o resursă este selectată
   const somePermissionsSelectedForResource = (resource) => {
-    const resourcePermissions = formData.permissions.filter(p => p.resource === resource)
+    const resourcePermissions = formData.permissions.filter(p => p.startsWith(`${resource}:`))
     return resourcePermissions.length > 0 && resourcePermissions.length < availableActions.length
   }
 

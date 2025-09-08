@@ -8,7 +8,7 @@ import { roleManager } from '../business/roleManager.js'
 
 class RoleService {
   constructor() {
-    this.repository = new ResourceRepository('roles', 'roles')
+    this.repository = new ResourceRepository('role', 'role')
     this.invoker = new ResourceInvoker()
   }
 

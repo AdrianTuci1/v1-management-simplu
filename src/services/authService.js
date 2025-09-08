@@ -276,7 +276,7 @@ class AuthService {
 
   // Store user data in localStorage
   storeUserData(userData) {
-    localStorage.setItem('auth-token', userData.access_token || userData.id_token)
+    localStorage.setItem('auth-token', userData.id_token || userData.access_token)
     localStorage.setItem('user-email', userData.profile?.email || userData.user?.email)
     localStorage.setItem('cognito-data', JSON.stringify(userData))
   }

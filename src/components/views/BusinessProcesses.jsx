@@ -1,6 +1,7 @@
-import { RefreshCw, Plus, Power, PowerOff, Mail, MessageSquare, Mic, Facebook, CheckCircle, XCircle, AlertCircle, ExternalLink } from 'lucide-react'
+import { RefreshCw, Plus, Power, PowerOff, Mail, MessageSquare, Mic, Facebook, CheckCircle, XCircle, AlertCircle, ExternalLink, Loader2 } from 'lucide-react'
 import { useDrawer } from '../../contexts/DrawerContext'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import externalApiService from '../../services/externalApiService'
 
 const BusinessProcesses = () => {
   const { openDrawer } = useDrawer();
@@ -12,30 +13,84 @@ const BusinessProcesses = () => {
       active: false,
       authorized: true, // Voice agent doesn't need external authorization
       status: 'inactive',
-      description: 'Agent vocal pentru interacțiuni automate'
+      description: 'Agent vocal pentru interacțiuni automate',
+      loading: false,
+      error: null
     },
     gmail: {
       name: 'Gmail',
       active: false,
       authorized: false,
       status: 'unauthorized',
-      description: 'Integrare cu Gmail pentru comunicări automate'
+      description: 'Integrare cu Gmail pentru comunicări automate',
+      loading: false,
+      error: null
     },
     meta: {
       name: 'Meta',
       active: false,
       authorized: false,
       status: 'unauthorized',
-      description: 'Integrare cu Facebook și Instagram'
+      description: 'Integrare cu Facebook și Instagram',
+      loading: false,
+      error: null
     },
     sms: {
       name: 'SMS',
       active: false,
       authorized: true, // SMS doesn't need external authorization
       status: 'inactive',
-      description: 'Serviciu de mesaje SMS automate'
+      description: 'Serviciu de mesaje SMS automate',
+      loading: false,
+      error: null
     }
   });
+
+  // Loading state for checking all services
+  const [checkingStatus, setCheckingStatus] = useState(false);
+
+  // Check service status on component mount
+  useEffect(() => {
+    checkAllServicesStatus();
+  }, []);
+
+  // Check all services authorization status
+  const checkAllServicesStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const statusResults = await externalApiService.checkAllServicesStatus();
+      
+      setServices(prev => {
+        const updated = { ...prev };
+        
+        // Update Gmail status
+        if (statusResults.gmail) {
+          updated.gmail = {
+            ...updated.gmail,
+            authorized: statusResults.gmail.authorized,
+            status: statusResults.gmail.authorized ? 'authorized' : 'unauthorized',
+            error: statusResults.gmail.error || null
+          };
+        }
+        
+        // Update Meta status
+        if (statusResults.meta) {
+          updated.meta = {
+            ...updated.meta,
+            authorized: statusResults.meta.authorized,
+            status: statusResults.meta.authorized ? 'authorized' : 'unauthorized',
+            error: statusResults.meta.error || null
+          };
+        }
+        
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error checking services status:', error);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
 
   // Handle service toggle
   const toggleService = (serviceKey) => {
@@ -60,21 +115,58 @@ const BusinessProcesses = () => {
   };
 
   // Handle authorization
-  const handleAuthorization = (serviceKey) => {
-    // Simulate authorization process
+  const handleAuthorization = async (serviceKey) => {
     setServices(prev => ({
       ...prev,
       [serviceKey]: {
         ...prev[serviceKey],
-        authorized: true,
-        status: 'authorized'
+        loading: true,
+        error: null
       }
     }));
+
+    try {
+      if (serviceKey === 'gmail') {
+        await externalApiService.connectGmail();
+        // Note: The page will redirect, so we don't need to update state here
+      } else if (serviceKey === 'meta') {
+        await externalApiService.connectMeta();
+        // Note: The page will redirect, so we don't need to update state here
+      } else if (serviceKey === 'voiceAgent') {
+        // Handle voice agent session creation
+        const ephemeralKey = await externalApiService.createElevenLabsSession();
+        console.log('ElevenLabs session created with key:', ephemeralKey);
+        
+        setServices(prev => ({
+          ...prev,
+          [serviceKey]: {
+            ...prev[serviceKey],
+            loading: false,
+            authorized: true,
+            status: 'authorized'
+          }
+        }));
+      }
+    } catch (error) {
+      console.error(`Error authorizing ${serviceKey}:`, error);
+      setServices(prev => ({
+        ...prev,
+        [serviceKey]: {
+          ...prev[serviceKey],
+          loading: false,
+          error: error.message
+        }
+      }));
+    }
   };
 
   // Get status icon and color
   const getStatusInfo = (service) => {
-    if (service.active) {
+    if (service.loading) {
+      return { icon: Loader2, color: 'text-blue-500', text: 'Se conectează...' };
+    } else if (service.error) {
+      return { icon: XCircle, color: 'text-red-500', text: 'Eroare' };
+    } else if (service.active) {
       return { icon: CheckCircle, color: 'text-green-500', text: 'Activ' };
     } else if (service.authorized) {
       return { icon: AlertCircle, color: 'text-yellow-500', text: 'Autorizat' };
@@ -101,10 +193,24 @@ const BusinessProcesses = () => {
           <h1 className="text-3xl font-bold">Procese</h1>
           <p className="text-muted-foreground">Gestionează serviciile și integrarea cu platforme externe</p>
         </div>
-        <button onClick={() => openDrawer({ type: 'new-process' })} className="btn btn-primary">
-          <Plus className="h-4 w-4 mr-2" />
-          Proces nou
-        </button>
+        <div className="flex space-x-3">
+          <button 
+            onClick={checkAllServicesStatus} 
+            disabled={checkingStatus}
+            className="btn btn-outline"
+          >
+            {checkingStatus ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            {checkingStatus ? 'Se verifică...' : 'Verifică Status'}
+          </button>
+          <button onClick={() => openDrawer({ type: 'new-process' })} className="btn btn-primary">
+            <Plus className="h-4 w-4 mr-2" />
+            Proces nou
+          </button>
+        </div>
       </div>
 
       {/* Services Grid */}
@@ -139,6 +245,13 @@ const BusinessProcesses = () => {
                   {service.description}
                 </p>
 
+                {/* Error Message */}
+                {service.error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{service.error}</p>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="space-y-3">
                   {/* Toggle Switch */}
@@ -159,25 +272,43 @@ const BusinessProcesses = () => {
                     </button>
                   </div>
 
-                  {/* Authorization Button (only for Gmail and Meta) */}
-                  {(key === 'gmail' || key === 'meta') && !service.authorized && (
+                  {/* Authorization Button (for Gmail, Meta, and Voice Agent) */}
+                  {((key === 'gmail' || key === 'meta') && !service.authorized) || (key === 'voiceAgent' && !service.authorized) ? (
                     <button
                       onClick={() => handleAuthorization(key)}
-                      className="w-full btn btn-outline btn-sm flex items-center justify-center space-x-2"
+                      disabled={service.loading}
+                      className="w-full btn btn-outline btn-sm flex items-center justify-center space-x-2 disabled:opacity-50"
                     >
-                      <ExternalLink className="h-4 w-4" />
-                      <span>Autorizează {service.name}</span>
+                      {service.loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ExternalLink className="h-4 w-4" />
+                      )}
+                      <span>
+                        {service.loading ? 'Se conectează...' : `Autorizează ${service.name}`}
+                      </span>
                     </button>
-                  )}
+                  ) : null}
 
                   {/* Re-authorize Button (for authorized but inactive services) */}
-                  {(key === 'gmail' || key === 'meta') && service.authorized && !service.active && (
+                  {(key === 'gmail' || key === 'meta') && service.authorized && !service.active && !service.loading && (
                     <button
                       onClick={() => handleAuthorization(key)}
                       className="w-full btn btn-outline btn-sm flex items-center justify-center space-x-2"
                     >
                       <RefreshCw className="h-4 w-4" />
                       <span>Re-autorizează</span>
+                    </button>
+                  )}
+
+                  {/* Voice Agent Session Button */}
+                  {key === 'voiceAgent' && service.authorized && !service.loading && (
+                    <button
+                      onClick={() => handleAuthorization(key)}
+                      className="w-full btn btn-outline btn-sm flex items-center justify-center space-x-2"
+                    >
+                      <Mic className="h-4 w-4" />
+                      <span>Creează Sesiune Voice</span>
                     </button>
                   )}
                 </div>
