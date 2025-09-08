@@ -25,7 +25,7 @@ const TreatmentCombobox = ({
   const [searchTerm, setSearchTerm] = React.useState('');
   const { treatments, loading, error, searchTreatments } = useTreatments();
 
-  const selectedTreatment = treatments.find((treatment) => (treatment.resourceId || treatment.id).toString() === value);
+  const selectedTreatment = treatments.find((treatment) => (treatment.resourceId || treatment.id).toString() === (typeof value === 'string' ? value : value?.id));
 
   // Căutare când se deschide combobox-ul sau când se schimbă termenul de căutare
   React.useEffect(() => {
@@ -48,7 +48,7 @@ const TreatmentCombobox = ({
           disabled={loading}
         >
           <span className={cn('truncate')}>
-            {selectedTreatment ? selectedTreatment.treatmentType : placeholder}
+            {selectedTreatment ? selectedTreatment.treatmentType : (typeof value === 'object' && value?.name ? value.name : placeholder)}
           </span>
           <ButtonArrow />
         </Button>
@@ -70,12 +70,24 @@ const TreatmentCombobox = ({
                   key={treatment.resourceId || treatment.id}
                   value={treatment.treatmentType}
                   onSelect={() => {
-                    onValueChange((treatment.resourceId || treatment.id).toString());
+                    const treatmentData = {
+                      id: (treatment.resourceId || treatment.id).toString(),
+                      name: treatment.treatmentType,
+                      duration: treatment.duration
+                    };
+                    onValueChange(treatmentData);
                     setOpen(false);
                   }}
                 >
-                  <span className="truncate">{treatment.treatmentType}</span>
-                  {value === (treatment.resourceId || treatment.id).toString() && <CommandCheck />}
+                  <div className="flex flex-col">
+                    <span className="truncate">{treatment.treatmentType}</span>
+                    {treatment.duration && (
+                      <span className="text-xs text-muted-foreground">
+                        Durată: {treatment.duration} min
+                      </span>
+                    )}
+                  </div>
+                  {(typeof value === 'string' ? value : value?.id) === (treatment.resourceId || treatment.id).toString() && <CommandCheck />}
                 </CommandItem>
               ))}
             </CommandGroup>

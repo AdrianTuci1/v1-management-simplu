@@ -9,6 +9,10 @@ export { default as MenuDrawer } from './MenuDrawer.jsx'
 export { default as NotificationsDrawer } from './NotificationsDrawer.jsx'
 export { default as QuickActionsDrawer } from './QuickActionsDrawer.jsx'
 export { default as SalesDrawer } from './SalesDrawer.jsx'
+export { default as WorkingHoursDrawer } from './WorkingHoursDrawer.jsx'
+export { default as CurrencyTaxDrawer } from './CurrencyTaxDrawer.jsx'
+export { default as LanguageDrawer } from './LanguageDrawer.jsx'
+export { default as CashRegisterDrawer } from './CashRegisterDrawer.jsx'
 
 // Export standardized drawer UI components
 export {

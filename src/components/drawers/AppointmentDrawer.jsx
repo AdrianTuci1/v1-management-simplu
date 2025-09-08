@@ -89,6 +89,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         patient: uiData.patient?.id || uiData.patient || '',
         doctor: uiData.doctor?.id || uiData.doctor || '',
         service: uiData.service?.id || uiData.service || '',
+        serviceDuration: uiData.service?.duration || '',
         images: appointmentData.images || []
       }
     }
@@ -98,6 +99,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       date: new Date().toISOString().split('T')[0],
       time: '',
       service: '',
+      serviceDuration: '',
       status: 'scheduled',
       postOperativeNotes: '',
       prescription: '',
@@ -268,7 +270,15 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         <label className="text-sm font-medium">Serviciu</label>
         <TreatmentCombobox
           value={formData.service}
-          onValueChange={(value) => handleInputChange('service', value)}
+          onValueChange={(value) => {
+            if (typeof value === 'object' && value.id) {
+              handleInputChange('service', value.id);
+              handleInputChange('serviceDuration', value.duration || '');
+            } else {
+              handleInputChange('service', value);
+              handleInputChange('serviceDuration', '');
+            }
+          }}
           placeholder="Selectează serviciu"
         />
       </div>

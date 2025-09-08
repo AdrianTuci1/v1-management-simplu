@@ -48,7 +48,12 @@ class AppointmentManager {
     }
 
     if (appointmentData.service && appointmentData.service !== '') {
-      transformed.service = transformIdToObject(appointmentData.service, 'treatment')
+      const serviceObject = transformIdToObject(appointmentData.service, 'treatment')
+      // Adăugăm durata dacă este disponibilă
+      if (appointmentData.serviceDuration) {
+        serviceObject.duration = appointmentData.serviceDuration
+      }
+      transformed.service = serviceObject
     }
 
     return transformed
@@ -106,7 +111,12 @@ class AppointmentManager {
       const serviceId = transformObjectToId(data.service)
       const serviceName = typeof data.service === 'object' && (data.service.name || data.service.treatmentType) ? 
         (data.service.name || data.service.treatmentType) : 'Serviciu necunoscut'
-      transformed.service = { id: serviceId || null, name: serviceName }
+      const serviceDuration = typeof data.service === 'object' && data.service.duration ? data.service.duration : null
+      transformed.service = { 
+        id: serviceId || null, 
+        name: serviceName,
+        duration: serviceDuration
+      }
     }
 
     return transformed
