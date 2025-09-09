@@ -22,6 +22,7 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
+import TeethChartTab from '../dental-chart/TeethChartTab'
 
 const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
@@ -329,19 +330,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
       <div className="text-sm font-medium text-muted-foreground">
         Note dentare
       </div>
-      
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Pill className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-medium text-slate-900 mb-2">
-          Note dentare
-        </h3>
-        <p className="text-sm text-slate-600 mb-4">
-          Aici vor fi afișate notele dentare și starea dinților pacientului
-        </p>
-        <button className="btn btn-outline">
-          <Plus className="h-4 w-4 mr-2" />
-          Adaugă notă dentară
-        </button>
+      <div className="border rounded-md p-2">
+        <TeethChartTab patientId={String(patientData?.id || patientData?.resourceId || '')} />
       </div>
     </div>
   )

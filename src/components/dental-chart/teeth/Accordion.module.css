@@ -1,0 +1,22 @@
+.accordion {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 0.5rem;
+  background: var(--background, #fff);
+}
+
+.accordionHeader {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.expanded {
+  background: var(--muted, #f9fafb);
+}
+
+.accordionBody {
+  padding: 0.75rem;
+}
+
+

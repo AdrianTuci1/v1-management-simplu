@@ -1,0 +1,30 @@
+.teethChart {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.teethRow {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 0.25rem;
+}
+
+.separator {
+  width: 1px;
+  height: 3rem;
+  background: var(--border, #e5e7eb);
+}
+
+.tooth {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(0,0,0,0.08);
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+

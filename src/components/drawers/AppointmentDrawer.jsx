@@ -1,6 +1,5 @@
 import { 
   Plus, 
-  CheckCircle, 
   Upload,
   Loader2,
   Trash2,
@@ -26,6 +25,7 @@ import {
   DrawerFooter 
 } from '../ui/drawer'
 import { TimePicker } from '../ui/time-picker'
+
 
 const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
@@ -347,6 +347,8 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
           </span>
         </div>
       </div>
+
+
 
       {/* Error Display */}
       {error && (
