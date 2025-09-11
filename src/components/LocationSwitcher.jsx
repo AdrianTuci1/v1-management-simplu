@@ -14,14 +14,14 @@ const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
         const businessLocations = businessInfo?.locations || []
         
         // Get user data for roles
-        const savedCognitoData = localStorage.getItem('cognito-data')
+        const savedCognitoData = localStorage.getItem('auth-user-data')
         if (savedCognitoData) {
           const userData = JSON.parse(savedCognitoData)
           const userRoles = userData.locations || {}
           
           // Filter accessible locations based on user roles
           const accessibleLocations = businessLocations.filter(location => {
-            const userRoleForLocation = userRoles[location.id]
+            const userRoleForLocation = userRoles[location.role]
             return userRoleForLocation && userRoleForLocation !== 'user'
           })
           

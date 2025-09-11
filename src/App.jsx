@@ -27,6 +27,21 @@ function AppContent() {
   // Check if demo mode is enabled
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
 
+  // Helper function to safely clean URL parameters
+  const cleanUrlParameters = () => {
+    try {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('code') || url.searchParams.has('state')) {
+        url.searchParams.delete('code')
+        url.searchParams.delete('state')
+        window.history.replaceState({}, document.title, url.pathname + url.search)
+        console.log('URL parameters cleaned successfully')
+      }
+    } catch (error) {
+      console.error('Error cleaning URL parameters:', error)
+    }
+  }
+
   // Initialize app data
   useEffect(() => {
     const initializeApp = async () => {
@@ -60,6 +75,12 @@ function AppContent() {
             setSelectedLocation(defaultLocation)
             localStorage.setItem('selected-location', JSON.stringify(defaultLocation))
           }
+        }
+        
+        // Clean up URL parameters AFTER successful initialization to prevent auth loops
+        // but only if we're not in the middle of an OAuth flow
+        if (!auth.isLoading && auth.isAuthenticated) {
+          cleanUrlParameters()
         }
       } catch (error) {
         console.error('Error initializing app:', error)
@@ -110,6 +131,10 @@ function AppContent() {
             setSelectedLocation(defaultLocation)
             localStorage.setItem('selected-location', JSON.stringify(defaultLocation))
           }
+          
+          // Clean up URL by removing authorization code and state parameters
+          // AFTER successful re-initialization
+          cleanUrlParameters()
         } catch (error) {
           console.error('Error reinitializing app:', error)
         } finally {
