@@ -1,6 +1,13 @@
 import React, { useState } from "react";
 import { ToothCondition } from "./utils/toothCondition";
 import styles from "./ToothDrawer.module.css";
+import TreatmentCombobox from "@/components/combobox/TreatmentCombobox.jsx";
+
+interface ToothTreatment {
+  id: string;
+  name: string;
+  duration?: number;
+}
 
 interface ToothDrawerProps {
   selectedTooth: {
@@ -12,9 +19,9 @@ interface ToothDrawerProps {
   setTeethConditions: React.Dispatch<
     React.SetStateAction<Record<number, keyof typeof ToothCondition>>
   >;
-  toothHistory: Record<number, { description: string }[]>;
-  setToothHistory: React.Dispatch<
-    React.SetStateAction<Record<number, { description: string }[]>>
+  toothTreatments: Record<number, ToothTreatment[]>;
+  setToothTreatments: React.Dispatch<
+    React.SetStateAction<Record<number, ToothTreatment[]>>
   >;
 }
 
@@ -23,10 +30,10 @@ const ToothDrawer: React.FC<ToothDrawerProps> = ({
   onClose,
   teethConditions,
   setTeethConditions,
-  toothHistory,
-  setToothHistory,
+  toothTreatments,
+  setToothTreatments,
 }) => {
-  const [historyInput, setHistoryInput] = useState<string>("");
+  const [selectedTreatment, setSelectedTreatment] = useState<ToothTreatment | null>(null);
 
   if (!selectedTooth) return null;
 
@@ -38,83 +45,101 @@ const ToothDrawer: React.FC<ToothDrawerProps> = ({
     }));
   };
 
-  const handleAddHistory = () => {
-    if (historyInput.trim()) {
-      setToothHistory((prev) => ({
+  const handleAddTreatment = (treatment: any) => {
+    if (treatment && treatment.id && treatment.name) {
+      const newTreatment: ToothTreatment = {
+        id: treatment.id,
+        name: treatment.name,
+        duration: treatment.duration
+      };
+      
+      setToothTreatments((prev) => ({
         ...prev,
         [selectedTooth.ISO]: [
           ...(prev[selectedTooth.ISO] || []),
-          { description: historyInput },
+          newTreatment,
         ],
       }));
-      setHistoryInput("");
+      setSelectedTreatment(null);
     }
   };
 
-  const handleRemoveHistory = (entryIndex: number) => {
-    setToothHistory((prev) => ({
+  const handleRemoveTreatment = (treatmentIndex: number) => {
+    setToothTreatments((prev) => ({
       ...prev,
       [selectedTooth.ISO]: prev[selectedTooth.ISO]?.filter(
-        (_, index) => index !== entryIndex
+        (_, index) => index !== treatmentIndex
       ),
     }));
   };
 
   return (
-    <div className={styles.drawer}>
-      <h4 className={styles.title}>Tooth Details</h4>
-      <p>
-        <strong>ISO:</strong> {selectedTooth.ISO}
-      </p>
-      <p>
-        <strong>Name:</strong> {selectedTooth.Name}
-      </p>
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/50 z-50"
+        onClick={onClose}
+      />
+      
+      {/* Drawer */}
+      <div className={styles.drawer}>
+        <h4 className={styles.title}>Tooth Details</h4>
+        <p>
+          <strong>ISO:</strong> {selectedTooth.ISO}
+        </p>
+        <p>
+          <strong>Name:</strong> {selectedTooth.Name}
+        </p>
 
-      <label htmlFor="condition" className={styles.label}>Select Condition:</label>
-      <select
-        id="condition"
-        onChange={handleConditionChange}
-        defaultValue={teethConditions[selectedTooth.ISO] || ""}
-        className={styles.select}
-      >
-        <option value="">Select</option>
-        {Object.keys(ToothCondition).map((key) => (
-          <option key={key} value={key}>
-            {ToothCondition[key as keyof typeof ToothCondition]}
-          </option>
-        ))}
-      </select>
-
-      <div className={styles.historySection}>
-        <h4 className={styles.subtitle}>Tooth History</h4>
-        <ul className={styles.historyList}>
-          {(toothHistory[selectedTooth.ISO] || []).map((entry, index) => (
-            <li key={index} className={styles.historyItem}>
-              <p className={styles.historyText}>{entry.description}</p>
-              <button
-                className={styles.removeHistory}
-                onClick={() => handleRemoveHistory(index)}
-              >
-                Remove
-              </button>
-            </li>
+        <label htmlFor="condition" className={styles.label}>Select Condition:</label>
+        <select
+          id="condition"
+          onChange={handleConditionChange}
+          defaultValue={teethConditions[selectedTooth.ISO] || ""}
+          className={styles.select}
+        >
+          <option value="">Select</option>
+          {Object.keys(ToothCondition).map((key) => (
+            <option key={key} value={key}>
+              {ToothCondition[key as keyof typeof ToothCondition]}
+            </option>
           ))}
-        </ul>
+        </select>
 
-        <div className={styles.historyInput}>
-          <input
-            type="text"
-            value={historyInput}
-            onChange={(e) => setHistoryInput(e.target.value)}
-            placeholder="Add history entry..."
-            className={styles.input}
-          />
-          <button className={styles.addButton} onClick={handleAddHistory}>Add</button>
+        <div className={styles.historySection}>
+          <h4 className={styles.subtitle}>Tooth Treatments</h4>
+          <ul className={styles.historyList}>
+            {(toothTreatments[selectedTooth.ISO] || []).map((treatment, index) => (
+              <li key={index} className={styles.historyItem}>
+                <div className={styles.treatmentInfo}>
+                  <p className={styles.historyText}>{treatment.name}</p>
+                  {treatment.duration && (
+                    <p className={styles.treatmentDuration}>{treatment.duration} min</p>
+                  )}
+                </div>
+                <button
+                  className={styles.removeHistory}
+                  onClick={() => handleRemoveTreatment(index)}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <div className={styles.historyInput}>
+            <TreatmentCombobox
+              value={selectedTreatment}
+              onValueChange={handleAddTreatment}
+              placeholder="Selectează tratament..."
+              className="w-full"
+            />
+          </div>
         </div>
-      </div>
 
-      <button className={styles.closeButton} onClick={onClose}>Close</button>
-    </div>
+        <button className={styles.closeButton} onClick={onClose}>Close</button>
+      </div>
+    </>
   );
 };
 

@@ -7,6 +7,7 @@ import Accordion from "./teeth/Accordion";
 import { Tooth } from "./teeth/Tooth"; // Import the Tooth class
 import { ToothCondition } from "./teeth/utils/toothCondition";
 import DentalHistoryService from "@/services/dentalHistoryService";
+import DentalPlanDrawer from "./DentalPlanDrawer";
 
 
 // React Component to display dental chart
@@ -16,23 +17,24 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
   const [teethConditions, setTeethConditions] = useState<
     Record<number, keyof typeof ToothCondition>
   >({});
-  const [toothHistory, setToothHistory] = useState<
-    Record<number, { description: string }[]>
+  const [toothTreatments, setToothTreatments] = useState<
+    Record<number, { id: string; name: string; duration?: number }[]>
   >({});
   const [selectedTooth, setSelectedTooth] = useState<Tooth | null>(null);
   const [showCharts, setShowCharts] = useState<boolean>(false);
+  const [isPlanOpen, setIsPlanOpen] = useState<boolean>(false);
 
   const dentalHistoryService = new DentalHistoryService();
 
   // Track initial state for change detection
   const initialTeethConditions = useRef<Record<number, keyof typeof ToothCondition>>({});
-  const initialToothHistory = useRef<Record<number, { description: string }[]>>({});
+  const initialToothTreatments = useRef<Record<number, { id: string; name: string; duration?: number }[]>>({});
 
   // Check if there are unsaved changes
   const hasChanges = () => {
     return (
       JSON.stringify(teethConditions) !== JSON.stringify(initialTeethConditions.current) ||
-      JSON.stringify(toothHistory) !== JSON.stringify(initialToothHistory.current)
+      JSON.stringify(toothTreatments) !== JSON.stringify(initialToothTreatments.current)
     );
   };
 
@@ -45,11 +47,14 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
       const teethUpdates = Object.keys(teethConditions).map((toothNumber) => ({
         toothNumber: String(toothNumber),
         condition: teethConditions[Number(toothNumber)],
-        history: toothHistory[Number(toothNumber)] || [],
+        treatments: toothTreatments[Number(toothNumber)] || [],
       }));
 
-      if (teethUpdates.length === 0) return;
+      if (teethUpdates.length === 0) {
+        return;
+      }
 
+      console.log("Saving teeth updates:", teethUpdates);
       const updatedTeeth = await dentalHistoryService.bulkPatchDentalHistory(
         patientId,
         teethUpdates
@@ -58,7 +63,7 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
 
       // Update initial state to match saved data
       initialTeethConditions.current = { ...teethConditions };
-      initialToothHistory.current = { ...toothHistory };
+      initialToothTreatments.current = { ...toothTreatments };
     } catch (error) {
       console.error("Failed to save changes:", error);
     }
@@ -70,19 +75,19 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
       try {
         const data = await dentalHistoryService.getDentalHistory(patientId);
         const conditions: Record<number, keyof typeof ToothCondition> = {};
-        const history: Record<number, { description: string }[]> = {};
+        const treatments: Record<number, { id: string; name: string; duration?: number }[]> = {};
 
         data.forEach((tooth: any) => {
           conditions[tooth.toothNumber] = tooth.condition;
-          history[tooth.toothNumber] = tooth.history || [];
+          treatments[tooth.toothNumber] = tooth.treatments || [];
         });
 
         setTeethConditions(conditions);
-        setToothHistory(history);
+        setToothTreatments(treatments);
 
         // Set initial state references
         initialTeethConditions.current = conditions;
-        initialToothHistory.current = history;
+        initialToothTreatments.current = treatments;
       } catch (error) {
         console.error("Failed to fetch dental history:", error);
       }
@@ -91,12 +96,23 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
     fetchData();
   }, [patientId]);
 
+  // Auto-save with debounce
+  useEffect(() => {
+    if (!hasChanges()) return;
+
+    const timeoutId = setTimeout(() => {
+      handleSaveChanges();
+    }, 2000); // Auto-save after 2 seconds of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [teethConditions, toothTreatments]);
+
   // Save changes when the component unmounts
   useEffect(() => {
     return () => {
       handleSaveChanges();
     };
-  }, [teethConditions, toothHistory]);
+  }, []); // Empty dependency array to only run on unmount
 
   const createTeeth = (startISO: number, endISO: number): Record<number, Tooth> => {
     const teeth: Record<number, Tooth> = {};
@@ -124,8 +140,8 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
   };
 
   return (
-    <div className="p-1">
-      <div className="mb-2">
+    <div className="space-y-3">
+      <div className="mb-3 flex items-center justify-between">
         <label className="inline-flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -135,34 +151,44 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
           />
           {showCharts ? "Teeth Charts" : "Mouth View"}
         </label>
+        <button
+          className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-2 text-white text-sm hover:bg-emerald-700"
+          onClick={() => setIsPlanOpen(true)}
+        >
+          Plan tratament
+        </button>
       </div>
 
       {showCharts ? (
-        <>
+        <div className="space-y-3">
           <Accordion title="Permanent Teeth Chart">
-            <TeethChart
-              teethType="permanent"
-              onSelectTooth={handleSelectTooth}
-              teethConditions={teethConditions}
-            />
+            <div className="overflow-x-auto">
+              <TeethChart
+                teethType="permanent"
+                onSelectTooth={handleSelectTooth}
+                teethConditions={teethConditions}
+              />
+            </div>
           </Accordion>
           <Accordion title="Deciduous Teeth Chart">
-            <TeethChart
-              teethType="deciduous"
-              onSelectTooth={handleSelectTooth}
-              teethConditions={teethConditions}
-            />
+            <div className="overflow-x-auto">
+              <TeethChart
+                teethType="deciduous"
+                onSelectTooth={handleSelectTooth}
+                teethConditions={teethConditions}
+              />
+            </div>
           </Accordion>
-        </>
+        </div>
       ) : (
-        <>
+        <div className="space-y-3">
           <Accordion title="Permanent Teeth Mouth View">
             <MouthViewPermanent teeth={permanentTeeth} onClick={handleSelectTooth} />
           </Accordion>
           <Accordion title="Deciduous Teeth Mouth View">
             <MouthViewDeciduous teeth={deciduousTeeth} onClick={handleSelectTooth} />
           </Accordion>
-        </>
+        </div>
       )}
 
       <ToothDrawer
@@ -170,8 +196,14 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
         onClose={handleCloseDrawer}
         teethConditions={teethConditions}
         setTeethConditions={setTeethConditions}
-        toothHistory={toothHistory}
-        setToothHistory={setToothHistory}
+        toothTreatments={toothTreatments}
+        setToothTreatments={setToothTreatments}
+      />
+
+      <DentalPlanDrawer
+        patientId={patientId}
+        isOpen={isPlanOpen}
+        onClose={() => setIsPlanOpen(false)}
       />
     </div>
   );
