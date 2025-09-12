@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import PlanService from "@/services/planService";
 import DentalHistoryService from "@/services/dentalHistoryService";
 import { Drawer, DrawerHeader, DrawerContent, DrawerFooter } from "@/components/ui/drawer";
 import TreatmentCombobox from "@/components/combobox/TreatmentCombobox.jsx";
@@ -24,11 +25,11 @@ import { CSS } from '@dnd-kit/utilities';
 
 type PlanItem = {
   id: string;
-  toothNumber: number | null;
+  toothNumber?: number | null;
   title: string;
-  durationMinutes: number | null;
-  price: number | null;
-  notes: string;
+  durationMinutes?: number | null;
+  price?: number | null;
+  notes?: string;
   isNew?: boolean;
   treatmentId?: string | null;
   isFromChart?: boolean; // Pentru a distinge tratamentele din chart de cele adăugate manual
@@ -131,7 +132,7 @@ const SortableItem: React.FC<{
             console.log("Delete button clicked for item:", item.id, "isFromChart:", item.isFromChart);
             onRemove(item.id);
           }}
-          title={item.isFromChart ? "Șterge din chart (va fi șters permanent)" : "Șterge tratament"}
+          title={item.isFromChart ? "Șterge din plan (nu afectează chart-ul)" : "Șterge tratament din plan"}
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -142,13 +143,16 @@ const SortableItem: React.FC<{
 
 const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, onClose }) => {
   const [items, setItems] = useState<PlanItem[]>([]);
+  const [chartItems, setChartItems] = useState<PlanItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newTreatment, setNewTreatment] = useState<Partial<PlanItem>>({});
+  const [hasExistingPlan, setHasExistingPlan] = useState<boolean>(false);
 
-  const service = useMemo(() => new DentalHistoryService(), []);
+  const planService = useMemo(() => new PlanService(), []);
+  const dentalHistoryService = useMemo(() => new DentalHistoryService(), []);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -175,22 +179,24 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
   useEffect(() => {
     const load = async () => {
       if (!isOpen || !patientId) return;
-      console.log("Loading dental history for patient:", patientId);
       setIsLoading(true);
       setError("");
       try {
-        const dentalHistory = await service.getDentalHistory(patientId);
-        console.log("Loaded dental history:", dentalHistory);
-        const planItems: PlanItem[] = [];
+        // Load existing plan items
+        const planItems = await planService.getPlan(patientId);
+        setHasExistingPlan(planItems.length > 0);
         
-        // Adaugă tratamentele din chart (cu dinte specificat)
+        // Always load chart treatments for potential import
+        const dentalHistory = await dentalHistoryService.getDentalHistory(patientId);
+        const chartItems: PlanItem[] = [];
+        
+        // Add treatments from chart (with specific tooth)
         dentalHistory.forEach((tooth: any) => {
-          // Verifică atât treatments cât și history pentru compatibilitate
           const treatments = tooth.treatments || (tooth as any).history || [];
           if (Array.isArray(treatments) && treatments.length > 0) {
             treatments.forEach((treatment: any) => {
-              planItems.push({
-                id: `${tooth.toothNumber}-${treatment.id || Math.random()}`,
+              chartItems.push({
+                id: `chart-${tooth.toothNumber}-${treatment.id || Math.random()}`,
                 toothNumber: tooth.toothNumber,
                 title: treatment.name || treatment.description || "Tratament",
                 durationMinutes: treatment.duration || null,
@@ -204,15 +210,15 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
           }
         });
 
-        // Adaugă tratamentele generale (dinte 0) cu numere de la 100 în sus
+        // Add general treatments (tooth 0) with numbers from 100 up
         const generalTooth = dentalHistory.find((tooth: any) => tooth.toothNumber === 0);
         if (generalTooth) {
           const generalTreatments = generalTooth.treatments || [];
           if (Array.isArray(generalTreatments) && generalTreatments.length > 0) {
             generalTreatments.forEach((treatment: any, index: number) => {
-              planItems.push({
-                id: `general-${treatment.id || Math.random()}`,
-                toothNumber: 100 + index, // Numere de la 100 în sus pentru tratamente generale
+              chartItems.push({
+                id: `chart-general-${treatment.id || Math.random()}`,
+                toothNumber: 100 + index, // Numbers from 100 up for general treatments
                 title: treatment.name || treatment.description || "Tratament general",
                 durationMinutes: treatment.duration || null,
                 price: null,
@@ -225,18 +231,24 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
           }
         }
         
-        // Adaugă tratamentele generale (fără dinte specificat) - acestea vor fi stocate separat
-        // Pentru moment, le vom adăuga ca tratamente noi
-        console.log("Final plan items:", planItems);
-        setItems(planItems);
+        setChartItems(chartItems);
+        
+        // If no plan exists, start with empty plan
+        if (planItems.length === 0) {
+          setItems([]);
+        } else {
+          // Use existing plan items
+          setItems(planItems);
+        }
       } catch (e) {
-        setError("Nu am putut încărca tratamentele.");
+        console.error("Error loading plan:", e);
+        setError("Nu am putut încărca planul de tratament.");
       } finally {
         setIsLoading(false);
       }
     };
     load();
-  }, [isOpen, patientId]);
+  }, [isOpen, patientId, planService, dentalHistoryService]);
 
   const handleAddExtra = () => {
     // Găsește următorul număr disponibil de la 100 în sus
@@ -277,6 +289,28 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
     }
   };
 
+  const handleImportFromChart = () => {
+    // Import all chart treatments into the plan
+    const chartTreatmentsToImport = chartItems.filter(chartItem => 
+      !items.some(planItem => planItem.treatmentId === chartItem.treatmentId)
+    );
+    
+    setItems(prev => [...prev, ...chartTreatmentsToImport]);
+  };
+
+  const handleRemoveFromChart = () => {
+    // Remove all chart treatments from the plan
+    setItems(prev => prev.filter(item => !item.isFromChart));
+  };
+
+  const handleCreateNewPlan = () => {
+    // Clear current plan and start fresh
+    if (window.confirm("Ești sigur că vrei să creezi un plan nou? Planul actual va fi șters.")) {
+      setItems([]);
+      setHasExistingPlan(false);
+    }
+  };
+
 
   const removeItem = async (id: string) => {
     console.log("removeItem called with id:", id);
@@ -290,47 +324,16 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
       return;
     }
 
-    console.log("Removing item:", item, "isFromChart:", item.isFromChart);
+    console.log("Removing item from plan:", item.title);
 
-    console.log("Deleting treatment:", item.title);
-
-    // Ștergem tratamentul din dental history
-    console.log("Deleting treatment from dental history...");
-    try {
-      if (item.toothNumber && item.toothNumber < 100) {
-        // Tratament pe dinte specificat - ștergem tratamentul specific
-        console.log("Deleting treatment from tooth:", item.toothNumber, "treatmentId:", item.treatmentId);
-        if (item.treatmentId) {
-          await service.deleteToothHistory(patientId, item.toothNumber, item.treatmentId);
-        } else {
-          // Fallback: șterge toate tratamentele de pe dinte
-          await service.deleteToothHistory(patientId, item.toothNumber);
-        }
-      } else if (item.toothNumber && item.toothNumber >= 100) {
-        // Tratament general - ștergem din dinte 0
-        console.log("Deleting treatment from general tooth (0), treatmentId:", item.treatmentId);
-        if (item.treatmentId) {
-          await service.deleteToothHistory(patientId, 0, item.treatmentId);
-        } else {
-          // Fallback: șterge toate tratamentele generale
-          await service.deleteToothHistory(patientId, 0);
-        }
-      }
-      console.log("Successfully deleted treatment from dental history");
-    } catch (error) {
-      console.error("Failed to delete treatment:", error);
-      setError("Nu am putut șterge tratamentul.");
-      return;
-    }
-
-    // Ștergem din lista locală (pentru toate tratamentele)
+    // Remove from local list only (plan is independent from dental chart)
     console.log("Removing from local list...");
     setItems((prev) => {
       const newItems = prev.filter((it) => it.id !== id);
       console.log("New items after removal:", newItems);
       return newItems;
     });
-    console.log("Item removed successfully");
+    console.log("Item removed successfully from plan");
   };
 
   const savePlan = async () => {
@@ -340,103 +343,16 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
     try {
       console.log("Saving plan with items:", items);
       
-      // Obține toate dinții existenți pentru a șterge tratamentele care nu mai sunt în plan
-      const dentalHistory = await service.getDentalHistory(patientId);
-      const existingToothNumbers = new Set(dentalHistory.map((tooth: any) => tooth.toothNumber));
+      // Save plan using the plan service
+      await planService.upsertPlan(patientId, items);
       
-      // Grupează tratamentele pe dinți
-      const treatmentsByTooth: Record<number, any[]> = {};
-      const generalTreatments: any[] = [];
-      const usedToothNumbers = new Set<number>();
-      
-      items.forEach((item, index) => {
-        console.log(`Processing item ${index + 1}:`, item);
-        
-        // Salvăm toate tratamentele, inclusiv cele din chart
-        if (item.toothNumber && item.toothNumber < 100) {
-          // Tratamente cu dinte specificat (1-99)
-          if (!treatmentsByTooth[item.toothNumber]) {
-            treatmentsByTooth[item.toothNumber] = [];
-          }
-          treatmentsByTooth[item.toothNumber].push({
-            id: item.treatmentId || item.id,
-            name: item.title,
-            duration: item.durationMinutes,
-            order: index, // Păstrăm ordinea
-          });
-          usedToothNumbers.add(item.toothNumber);
-        } else if (item.toothNumber && item.toothNumber >= 100) {
-          // Tratamente generale (100+) - le salvăm ca dinte 0
-          generalTreatments.push({
-            id: item.treatmentId || item.id,
-            name: item.title,
-            duration: item.durationMinutes,
-            order: index, // Păstrăm ordinea
-          });
-          usedToothNumbers.add(0); // Marchează că avem tratamente generale
-        } else {
-          // Tratamente fără dinte specificat - le salvăm ca dinte 0
-          generalTreatments.push({
-            id: item.treatmentId || item.id,
-            name: item.title,
-            duration: item.durationMinutes,
-            order: index, // Păstrăm ordinea
-          });
-          usedToothNumbers.add(0); // Marchează că avem tratamente generale
-        }
-      });
-      
-      console.log("Treatments by tooth:", treatmentsByTooth);
-      console.log("General treatments:", generalTreatments);
-      console.log("Used tooth numbers:", Array.from(usedToothNumbers));
-      
-      // Pregătește lista de actualizări pentru toate dinții
-      const allUpdates: any[] = [];
-      
-      // Adaugă tratamentele pentru dinții cu tratamente
-      for (const [toothNumber, treatments] of Object.entries(treatmentsByTooth)) {
-        if (treatments.length > 0) {
-          console.log(`Adding treatments for tooth ${toothNumber}:`, treatments);
-          allUpdates.push({
-            toothNumber: Number(toothNumber),
-            condition: "sound",
-            treatments: treatments,
-          });
-        }
-      }
-      
-      // Adaugă tratamentele generale
-      if (generalTreatments.length > 0) {
-        console.log("Adding general treatments:", generalTreatments);
-        allUpdates.push({
-          toothNumber: 0, // 0 = tratamente generale
-          condition: "general",
-          treatments: generalTreatments,
-        });
-      }
-      
-      // Șterge tratamentele pentru dinții care nu mai sunt în plan
-      for (const toothNumber of existingToothNumbers) {
-        if (!usedToothNumbers.has(toothNumber)) {
-          console.log(`Clearing treatments for tooth ${toothNumber} (no longer in plan)`);
-          allUpdates.push({
-            toothNumber: toothNumber,
-            condition: "sound",
-            treatments: [], // Listă goală = șterge tratamentele
-          });
-        }
-      }
-      
-      // Salvează toate actualizările într-o singură operație
-      if (allUpdates.length > 0) {
-        console.log("Saving all updates:", allUpdates);
-        await service.bulkPatchDentalHistory(patientId, allUpdates);
-      }
+      // Update the hasExistingPlan state
+      setHasExistingPlan(true);
       
       console.log("Plan saved successfully");
     } catch (e) {
       console.error("Error saving plan:", e);
-      setError("Eroare la salvarea tratamentelor.");
+      setError("Eroare la salvarea planului de tratament.");
     } finally {
       setIsSaving(false);
     }
@@ -457,6 +373,24 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
 
   const handlePreviewPdf = async () => {
     try {
+      // Try to use server-side PDF generation first
+      try {
+        const result = await planService.generatePdf(patientId, items);
+        if (result.pdfUrl) {
+          window.open(result.pdfUrl, '_blank');
+          return;
+        } else if (result.dataUrl) {
+          const link = document.createElement('a');
+          link.href = result.dataUrl;
+          link.download = 'plan-tratament.pdf';
+          link.click();
+          return;
+        }
+      } catch (serverError) {
+        console.log("Server PDF generation failed, falling back to client-side:", serverError);
+      }
+      
+      // Fallback to client-side PDF generation
       const { default: jsPDF } = (await import("jspdf")) as any;
       await import("jspdf-autotable");
       const doc = new jsPDF();
@@ -483,6 +417,7 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
       
       doc.save("plan-tratament.pdf");
     } catch (e) {
+      console.error("Error generating PDF:", e);
       setError("Nu s-a putut genera PDF-ul.");
     }
   };
@@ -490,10 +425,16 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
   const handleSendToPatient = async () => {
     try {
       await savePlan();
-      // Pentru moment, doar salvăm - în viitor putem adăuga funcționalitatea de trimitere
-      alert("Planul a fost salvat și va fi atașat la pacient.");
+      // Send plan to patient using plan service
+      const result = await planService.sendToPatient(patientId, items);
+      if (result.success) {
+        alert("Planul a fost salvat și trimis pacientului.");
+      } else {
+        alert("Planul a fost salvat, dar trimiterea a eșuat.");
+      }
     } catch (e) {
-      setError("Salvarea planului a eșuat.");
+      console.error("Error sending plan to patient:", e);
+      setError("Trimiterea planului a eșuat.");
     }
   };
 
@@ -510,8 +451,45 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
             {error && <div className="text-sm text-red-600">{error}</div>}
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-900">Ordinea tratamentelor</h3>
+              {/* Plan Management Section */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-900">
+                    {hasExistingPlan ? "Plan de tratament existent" : "Plan nou"}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {hasExistingPlan && (
+                      <button
+                        className="inline-flex items-center rounded-md bg-orange-600 px-3 py-1.5 text-white text-sm hover:bg-orange-700"
+                        onClick={handleCreateNewPlan}
+                      >
+                        Plan nou
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Chart Import/Export Controls */}
+                {chartItems.length > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <button
+                      className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-white text-sm hover:bg-blue-700"
+                      onClick={handleImportFromChart}
+                    >
+                      Importă din chart ({chartItems.length})
+                    </button>
+                    {items.some(item => item.isFromChart) && (
+                      <button
+                        className="inline-flex items-center rounded-md bg-gray-600 px-3 py-1.5 text-white text-sm hover:bg-gray-700"
+                        onClick={handleRemoveFromChart}
+                      >
+                        Elimină din chart din plan
+                      </button>
+                    )}
+                  </div>
+                )}
+                
+                {/* Plan Actions */}
                 <div className="flex items-center gap-2">
                   {items.length > 0 && (
                     <button
@@ -529,35 +507,96 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
                     className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-1.5 text-white text-sm hover:bg-emerald-700"
                     onClick={handleAddExtra}
                   >
-                    + Adaugă tratament
+                    + Adaugă tratament manual
                   </button>
                 </div>
               </div>
 
-              {items.length === 0 && (
-                <div className="text-center py-8 text-sm text-gray-500">
-                  Nu există tratamente în plan. Adaugă tratamente din chart sau manual.
+              {/* Treatment List Section */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Ordinea tratamentelor</h3>
+
+                {items.length === 0 && (
+                  <div className="text-center py-8 text-sm text-gray-500">
+                    {chartItems.length > 0 
+                      ? `Nu există tratamente în plan. Adaugă tratamente manual sau importă din chart (${chartItems.length} disponibile).`
+                      : "Nu există tratamente în plan. Adaugă tratamente manual."
+                    }
+                  </div>
+                )}
+
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext items={items.map(item => item.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {items.map((item, index) => (
+                        <SortableItem
+                          key={item.id}
+                          item={item}
+                          index={index}
+                          onRemove={removeItem}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
+              
+              {/* Available Chart Treatments Section */}
+              {chartItems.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">
+                    Tratamente disponibile din chart ({chartItems.filter(chartItem => 
+                      !items.some(planItem => planItem.treatmentId === chartItem.treatmentId)
+                    ).length} neimportate)
+                  </h4>
+                  <div className="space-y-2">
+                    {chartItems
+                      .filter(chartItem => 
+                        !items.some(planItem => planItem.treatmentId === chartItem.treatmentId)
+                      )
+                      .map((chartItem, index) => (
+                        <div 
+                          key={chartItem.id}
+                          className="flex items-center gap-3 p-3 rounded-lg border bg-blue-50 border-blue-200"
+                        >
+                          <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-gray-900">
+                                Dinte {chartItem.toothNumber}
+                              </span>
+                              <span className="text-sm text-gray-700 truncate">
+                                {chartItem.title}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
+                              {chartItem.durationMinutes && (
+                                <span>{chartItem.durationMinutes} min</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0">
+                            <button
+                              type="button"
+                              className="inline-flex items-center rounded-md bg-blue-600 px-2 py-1 text-white text-xs hover:bg-blue-700"
+                              onClick={() => {
+                                setItems(prev => [...prev, chartItem]);
+                              }}
+                            >
+                              Importă
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               )}
-
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext items={items.map(item => item.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-2">
-                    {items.map((item, index) => (
-                      <SortableItem
-                        key={item.id}
-                        item={item}
-                        index={index}
-                        onRemove={removeItem}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
             </div>
           </div>
         )}

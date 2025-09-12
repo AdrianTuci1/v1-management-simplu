@@ -86,6 +86,36 @@ declare module "../../services/dentalPlanService" {
   export default DentalPlanService;
 }
 
+declare module "@/services/planService" {
+  export type PlanItem = {
+    id: string;
+    toothNumber?: number | null;
+    title: string;
+    durationMinutes?: number | null;
+    price?: number | null;
+    notes?: string;
+    isFromChart?: boolean;
+    treatmentId?: string | null;
+  };
+  export type PlanData = { 
+    patientId: string;
+    plan: PlanItem[];
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  class PlanService {
+    constructor();
+    getPlan(patientId: string): Promise<PlanItem[]>;
+    upsertPlan(patientId: string, items: PlanItem[]): Promise<any>;
+    deletePlan(patientId: string): Promise<{ success: boolean; message?: string; error?: any }>;
+    generatePdf(patientId: string, items: PlanItem[]): Promise<{ pdfUrl?: string; dataUrl?: string }>;
+    sendToPatient(patientId: string, items: PlanItem[]): Promise<{ success: boolean; error?: any }>;
+  }
+
+  export default PlanService;
+}
+
 declare module "@/components/combobox/TreatmentCombobox.jsx" {
   interface TreatmentValue { id: string; name: string; duration?: number }
   interface TreatmentComboboxProps {
