@@ -156,7 +156,8 @@ export const useTreatments = () => {
           sharedTreatments = testData
           setTreatments(testData)
           setTreatmentCount(testData.length)
-          setError('Conectare la server eșuată. Se afișează datele de test din cache local.')
+          // Nu setează eroarea când avem date din cache
+          setError(null)
           notifySubscribers()
           return testData
         }
@@ -164,11 +165,13 @@ export const useTreatments = () => {
         sharedTreatments = cachedData
         setTreatments(cachedData)
         setTreatmentCount(cachedData.length)
-        setError('Conectare la server eșuată. Se afișează datele din cache local.')
+        // Nu setează eroarea când avem date din cache
+        setError(null)
         notifySubscribers()
         return cachedData
       } catch (cacheErr) {
-        setError(err.message)
+        // Setează eroarea doar dacă nu reușim să încărcăm din cache
+        setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
         console.error('Error loading treatments:', err)
         return []
       }
@@ -350,8 +353,27 @@ export const useTreatments = () => {
       setTreatmentCount(treatmentsData.length)
       notifySubscribers()
     } catch (err) {
-      setError(err.message)
-      console.error('Error searching treatments:', err)
+      // Încearcă să caute în cache local
+      try {
+        console.warn('Search API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('treatments')
+        
+        // Filtrează local după termenul de căutare
+        const filteredData = cachedData.filter(treatment => 
+          treatment.treatmentType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          treatment.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          treatment.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        ).slice(0, limit)
+        
+        sharedTreatments = filteredData
+        setTreatments(filteredData)
+        setTreatmentCount(filteredData.length)
+        setError(null) // Nu setează eroarea când căutarea funcționează local
+        notifySubscribers()
+      } catch (cacheErr) {
+        setError('Nu s-au putut căuta datele. Verifică conexiunea la internet.')
+        console.error('Error searching treatments:', err)
+      }
     } finally {
       setLoading(false)
     }
@@ -371,8 +393,26 @@ export const useTreatments = () => {
       setTreatmentCount(sortedTreatments.length)
       notifySubscribers()
     } catch (err) {
-      setError(err.message)
-      console.error('Error loading treatments by category:', err)
+      // Încearcă să filtreze din cache local
+      try {
+        console.warn('Category API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('treatments')
+        
+        // Filtrează local după categorie
+        const filteredData = cachedData.filter(treatment => 
+          treatment.category === category
+        )
+        const sortedTreatments = treatmentManager.sortTreatments(filteredData, sortBy, sortOrder)
+        
+        sharedTreatments = sortedTreatments
+        setTreatments(sortedTreatments)
+        setTreatmentCount(sortedTreatments.length)
+        setError(null) // Nu setează eroarea când filtrarea funcționează local
+        notifySubscribers()
+      } catch (cacheErr) {
+        setError('Nu s-au putut filtra datele. Verifică conexiunea la internet.')
+        console.error('Error loading treatments by category:', err)
+      }
     } finally {
       setLoading(false)
     }
@@ -392,8 +432,26 @@ export const useTreatments = () => {
       setTreatmentCount(sortedTreatments.length)
       notifySubscribers()
     } catch (err) {
-      setError(err.message)
-      console.error('Error loading treatments by type:', err)
+      // Încearcă să filtreze din cache local
+      try {
+        console.warn('Type API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('treatments')
+        
+        // Filtrează local după tip
+        const filteredData = cachedData.filter(treatment => 
+          treatment.treatmentType === treatmentType
+        )
+        const sortedTreatments = treatmentManager.sortTreatments(filteredData, sortBy, sortOrder)
+        
+        sharedTreatments = sortedTreatments
+        setTreatments(sortedTreatments)
+        setTreatmentCount(sortedTreatments.length)
+        setError(null) // Nu setează eroarea când filtrarea funcționează local
+        notifySubscribers()
+      } catch (cacheErr) {
+        setError('Nu s-au putut filtra datele. Verifică conexiunea la internet.')
+        console.error('Error loading treatments by type:', err)
+      }
     } finally {
       setLoading(false)
     }

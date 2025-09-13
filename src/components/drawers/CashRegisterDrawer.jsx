@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Receipt, Printer, Save, Plus, Trash2 } from 'lucide-react'
+import { Receipt, Printer, Save } from 'lucide-react'
 import { 
   Drawer, 
   DrawerHeader, 

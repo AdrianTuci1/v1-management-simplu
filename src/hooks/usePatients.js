@@ -40,8 +40,23 @@ export const usePatients = () => {
       setPatients([...data])
       notifySubscribers()
     } catch (err) {
-      setError(err.message)
-      console.error('Error loading patients:', err)
+      // Încearcă să încarce din cache local
+      try {
+        console.warn('Patients API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('patients')
+        
+        if (cachedData.length > 0) {
+          sharedPatients = cachedData
+          setPatients([...cachedData])
+          setError(null) // Nu setează eroarea când avem date din cache
+          notifySubscribers()
+        } else {
+          setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
+        }
+      } catch (cacheErr) {
+        setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
+        console.error('Error loading patients:', err)
+      }
     } finally {
       setLoading(false)
     }
@@ -57,8 +72,38 @@ export const usePatients = () => {
       setPatients([...data])
       notifySubscribers()
     } catch (err) {
-      setError(err.message)
-      console.error('Error loading patients by page:', err)
+      // Încearcă să încarce din cache local cu filtrare
+      try {
+        console.warn('Patients by page API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('patients')
+        
+        // Aplică filtrele local
+        let filteredData = cachedData
+        if (filters.name) {
+          filteredData = filteredData.filter(patient => 
+            patient.name?.toLowerCase().includes(filters.name.toLowerCase())
+          )
+        }
+        if (filters.status) {
+          filteredData = filteredData.filter(patient => patient.status === filters.status)
+        }
+        
+        // Aplică paginarea
+        const startIndex = (page - 1) * limit
+        const paginatedData = filteredData.slice(startIndex, startIndex + limit)
+        
+        if (cachedData.length > 0) {
+          sharedPatients = paginatedData
+          setPatients([...paginatedData])
+          setError(null) // Nu setează eroarea când avem date din cache
+          notifySubscribers()
+        } else {
+          setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
+        }
+      } catch (cacheErr) {
+        setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
+        console.error('Error loading patients by page:', err)
+      }
     } finally {
       setLoading(false)
     }
@@ -74,8 +119,30 @@ export const usePatients = () => {
       setPatients([...data])
       notifySubscribers()
     } catch (err) {
-      setError(err.message)
-      console.error('Error searching patients:', err)
+      // Căutare în cache local când API-ul eșuează
+      try {
+        console.warn('Search patients API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('patients')
+        
+        // Căutare locală în mai multe câmpuri
+        const searchResults = cachedData.filter(patient => 
+          patient.name?.toLowerCase().includes(query.toLowerCase()) ||
+          patient.email?.toLowerCase().includes(query.toLowerCase()) ||
+          patient.phone?.includes(query)
+        )
+        
+        if (cachedData.length > 0) {
+          sharedPatients = searchResults
+          setPatients([...searchResults])
+          setError(null) // Căutarea offline funcționează
+          notifySubscribers()
+        } else {
+          setError('Nu s-au putut căuta datele. Verifică conexiunea la internet.')
+        }
+      } catch (cacheErr) {
+        setError('Nu s-au putut căuta datele. Verifică conexiunea la internet.')
+        console.error('Error searching patients:', err)
+      }
     } finally {
       setLoading(false)
     }

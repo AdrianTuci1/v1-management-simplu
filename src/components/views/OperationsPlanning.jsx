@@ -364,17 +364,15 @@ const OperationsPlanning = () => {
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
               <span>Se încarcă programările...</span>
             </div>
-          ) : error ? (
+          ) : error && filteredAppointments.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-red-600 mb-4">Eroare la încărcarea programărilor: {error}</p>
-                          {error.includes('Conectare la server eșuată') && (
               <button
                 onClick={populateWithTestData}
                 className="btn btn-primary btn-sm"
               >
                 Încarcă date de test
               </button>
-            )}
             </div>
           ) : (
             <div className="space-y-3">

@@ -13,6 +13,7 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
+import CategoryCombobox from '../combobox/CategoryCombobox.jsx'
 
 const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null }) => {
   const [loading, setLoading] = useState(false)
@@ -40,19 +41,15 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
     }
   })
 
-  // Categorii predefinite pentru tratamente stomatologice
-  const categories = [
-    'Consultații',
-    'Igienă orală',
-    'Tratamente conservatoare',
-    'Chirurgie orală',
-    'Imagini diagnostice',
-    'Endodonție',
-    'Protezare',
-    'Implantologie',
-    'Estetică',
-    'Ortodonție'
-  ]
+  // Funcție pentru adăugarea unei categorii noi
+  const handleAddNewCategory = (newCategory) => {
+    // Pentru moment, doar setăm categoria nouă în formular
+    // În viitor, aceasta ar putea fi salvată în backend
+    setFormData(prev => ({
+      ...prev,
+      category: newCategory
+    }))
+  }
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -136,18 +133,12 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
           {/* Category */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Categorie</label>
-            <select
+            <CategoryCombobox
               value={formData.category}
-              onChange={(e) => handleInputChange('category', e.target.value)}
-              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Selectează categoria</option>
-              {categories.map(category => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
+              onValueChange={(category) => handleInputChange('category', category)}
+              onAddNewCategory={handleAddNewCategory}
+              placeholder="Selectează categoria"
+            />
           </div>
 
           {/* Duration */}

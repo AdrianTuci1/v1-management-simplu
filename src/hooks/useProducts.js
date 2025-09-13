@@ -260,7 +260,12 @@ export const useProducts = () => {
       }
       
     } catch (err) {
-      setError(err.message);
+      // Doar setează eroarea dacă nu avem produse în cache
+      if (sharedProducts.length === 0) {
+        setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.');
+      } else {
+        setError(null); // Nu afișa eroarea dacă avem date în cache
+      }
       console.error('Error loading products:', err);
     } finally {
       setLoading(false);
@@ -301,7 +306,12 @@ export const useProducts = () => {
       console.log('LoadProductsByCategory - optimistic count:', optimisticProducts.length, 'filtered result count:', filteredResult.length, 'total:', sharedProducts.length)
       notifySubscribers()
     } catch (err) {
-      setError(err.message);
+      // Doar setează eroarea dacă nu avem produse în cache
+      if (sharedProducts.length === 0) {
+        setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.');
+      } else {
+        setError(null); // Nu afișa eroarea dacă avem date în cache
+      }
       console.error('Error loading products by category:', err);
     } finally {
       setLoading(false);
@@ -342,7 +352,12 @@ export const useProducts = () => {
       console.log('LoadLowStockProducts - optimistic count:', optimisticProducts.length, 'filtered result count:', filteredResult.length, 'total:', sharedProducts.length)
       notifySubscribers()
     } catch (err) {
-      setError(err.message);
+      // Doar setează eroarea dacă nu avem produse în cache
+      if (sharedProducts.length === 0) {
+        setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.');
+      } else {
+        setError(null); // Nu afișa eroarea dacă avem date în cache
+      }
       console.error('Error loading low stock products:', err);
     } finally {
       setLoading(false);
@@ -385,7 +400,12 @@ export const useProducts = () => {
         console.log('SearchProducts (empty) - optimistic count:', optimisticProducts.length, 'filtered result count:', filteredResult.length, 'total:', sharedProducts.length)
         notifySubscribers()
       } catch (err) {
-        setError(err.message);
+        // Doar setează eroarea dacă nu avem produse în cache
+        if (sharedProducts.length === 0) {
+          setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.');
+        } else {
+          setError(null); // Nu afișa eroarea dacă avem date în cache
+        }
         console.error('Error loading products:', err);
       } finally {
         setLoading(false);
@@ -425,7 +445,12 @@ export const useProducts = () => {
       console.log('SearchProducts (with term) - optimistic count:', optimisticProducts.length, 'filtered result count:', filteredResult.length, 'total:', sharedProducts.length)
       notifySubscribers()
     } catch (err) {
-      setError(err.message);
+      // Doar setează eroarea dacă nu avem produse în cache
+      if (sharedProducts.length === 0) {
+        setError('Nu s-au putut căuta datele. Verifică conexiunea la internet.');
+      } else {
+        setError(null); // Nu afișa eroarea dacă avem date în cache
+      }
       console.error('Error searching products:', err);
     } finally {
       setLoading(false);
