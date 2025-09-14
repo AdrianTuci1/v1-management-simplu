@@ -85,10 +85,10 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         ...uiData,
         // Păstrăm ID-ul original pentru actualizare
         id: appointmentId,
-        // Extragem ID-urile pentru combobox-uri
-        patient: uiData.patient?.id || uiData.patient || '',
-        doctor: uiData.doctor?.id || uiData.doctor || '',
-        service: uiData.service?.id || uiData.service || '',
+        // Extragem obiectele complete pentru combobox-uri
+        patient: uiData.patient || '',
+        doctor: uiData.doctor || '',
+        service: uiData.service || '',
         serviceDuration: uiData.service?.duration || '',
         images: appointmentData.images || []
       }
@@ -223,7 +223,13 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
           <div className="flex-1">
             <PatientCombobox
               value={formData.patient}
-              onValueChange={(value) => handleInputChange('patient', value)}
+              onValueChange={(value) => {
+                if (typeof value === 'object' && value.id) {
+                  handleInputChange('patient', value);
+                } else {
+                  handleInputChange('patient', value);
+                }
+              }}
               placeholder="Selectează pacient"
             />
           </div>
@@ -238,7 +244,13 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         <label className="text-sm font-medium">Doctor</label>
         <DoctorCombobox
           value={formData.doctor}
-          onValueChange={(value) => handleInputChange('doctor', value)}
+          onValueChange={(value) => {
+            if (typeof value === 'object' && value.id) {
+              handleInputChange('doctor', value);
+            } else {
+              handleInputChange('doctor', value);
+            }
+          }}
           placeholder="Selectează doctor"
         />
       </div>

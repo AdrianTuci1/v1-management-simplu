@@ -25,7 +25,7 @@ const PatientCombobox = ({
   const [searchTerm, setSearchTerm] = React.useState('');
   const { patients, loading, error, searchPatients } = usePatients();
 
-  const selectedPatient = patients.find((patient) => (patient.resourceId || patient.id).toString() === value);
+  const selectedPatient = patients.find((patient) => (patient.resourceId || patient.id).toString() === (typeof value === 'string' ? value : value?.id));
 
   // Căutare când se deschide combobox-ul sau când se schimbă termenul de căutare
   React.useEffect(() => {
@@ -48,7 +48,7 @@ const PatientCombobox = ({
           disabled={loading}
         >
           <span className={cn('truncate')}>
-            {selectedPatient ? selectedPatient.name : placeholder}
+            {selectedPatient ? selectedPatient.name : (typeof value === 'object' && value?.name ? value.name : placeholder)}
           </span>
           <ButtonArrow />
         </Button>
@@ -70,12 +70,16 @@ const PatientCombobox = ({
                   key={patient.resourceId || patient.id}
                   value={patient.name}
                   onSelect={() => {
-                    onValueChange((patient.resourceId || patient.id).toString());
+                    const patientData = {
+                      id: (patient.resourceId || patient.id).toString(),
+                      name: patient.name
+                    };
+                    onValueChange(patientData);
                     setOpen(false);
                   }}
                 >
                   <span className="truncate">{patient.name}</span>
-                  {value === (patient.resourceId || patient.id).toString() && <CommandCheck />}
+                  {(typeof value === 'string' ? value : value?.id) === (patient.resourceId || patient.id).toString() && <CommandCheck />}
                 </CommandItem>
               ))}
             </CommandGroup>

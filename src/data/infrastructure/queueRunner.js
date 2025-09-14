@@ -1,23 +1,35 @@
 import { processQueue } from "../queue/offlineQueue";
 import { registerNetHandlers, startQueueProcessor } from "./netStatus";
-import { apiRequest, buildResourcesEndpoint } from "./apiClient";
+import { ResourceRepository } from "../repositories/ResourceRepository";
+
+// Cache pentru repository-urile existente
+const repositoryCache = new Map();
+
+function getRepository(resourceType) {
+  if (!repositoryCache.has(resourceType)) {
+    repositoryCache.set(resourceType, new ResourceRepository(resourceType, resourceType));
+  }
+  return repositoryCache.get(resourceType);
+}
 
 async function queueApiRequest(resourceType, action, payload, targetId) {
-  let method = "POST";
-  let path = "";
-  if (action === "update") {
-    method = "PUT";
-    path = `/${targetId}`;
-  } else if (action === "delete") {
-    method = "DELETE";
-    path = `/${targetId}`;
+  const repository = getRepository(resourceType);
+  
+  try {
+    switch (action) {
+      case "create":
+        return await repository.add(payload);
+      case "update":
+        return await repository.update(targetId, payload);
+      case "delete":
+        return await repository.remove(targetId);
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+  } catch (error) {
+    // Re-throw error to be handled by processQueue
+    throw error;
   }
-  const endpoint = buildResourcesEndpoint(path);
-  const options = {
-    method,
-    ...(method !== "DELETE" && { body: JSON.stringify(payload) })
-  };
-  return apiRequest(resourceType, endpoint, options);
 }
 
 export function initOfflineQueueProcessing() {
