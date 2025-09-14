@@ -1,4 +1,5 @@
 import { db } from "../infrastructure/db";
+import { apiRequest, buildResourcesEndpoint } from "../infrastructure/apiClient.js";
 
 export class StatisticsDataRepository {
   constructor() {
@@ -7,40 +8,21 @@ export class StatisticsDataRepository {
 
   async query(params = {}) {
     try {
-      // Build the endpoint with businessId-locationId
-      const businessId = localStorage.getItem("businessId") || 'B0100001';
-      const locationId = localStorage.getItem("locationId") || 'L0100001';
-      const authToken = localStorage.getItem('auth-token');
-      
-      const baseUrl = import.meta.env.VITE_API_URL || "";
-      const url = `${baseUrl}/api/resources/statistics/${businessId}-${locationId}`;
-      
       // Determine statistics type from params
       const statisticsType = params.type || 'business-statistics';
       
-      const headers = {
-        "Content-Type": "application/json",
-        "X-Resource-Type": statisticsType, // This will be either 'business-statistics' or 'recent-activities'
-        "Authorization": `Bearer ${authToken}`,
-      };
+      // Build the endpoint with businessId-locationId
+      const businessId = localStorage.getItem("businessId") || 'B0100001';
+      const locationId = localStorage.getItem("locationId") || 'L0100001';
+      const endpoint = `/api/resources/statistics/${businessId}-${locationId}`;
       
       console.log('Making statistics API request:', {
-        url: url,
+        endpoint: endpoint,
         method: 'GET',
-        statisticsType: statisticsType,
-        headers: headers
+        statisticsType: statisticsType
       });
       
-      const res = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
-      }
-
-      const response = await res.json();
+      const response = await apiRequest(statisticsType, endpoint, { method: 'GET' });
       
       // Handle the response based on statistics type
       if (statisticsType === 'business-statistics') {

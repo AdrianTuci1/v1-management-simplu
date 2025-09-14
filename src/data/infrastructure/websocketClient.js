@@ -81,6 +81,12 @@ function createWorker() {
           if (normalizedData.resourceType && resourceListeners.has(normalizedData.resourceType)) {
             resourceListeners.get(normalizedData.resourceType).forEach(cb => cb(normalizedData));
           }
+          
+          // Centralized handler: persist + retention
+          try {
+            // Lazy import to avoid circular deps at module load
+            import('./websocketResourceHandler').then(m => m.handleResourceEvent(normalizedData)).catch(() => {});
+          } catch (_) {}
           break;
           
         case 'log':

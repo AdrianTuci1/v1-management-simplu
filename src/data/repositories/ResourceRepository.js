@@ -1,6 +1,8 @@
 import { db, indexedDb } from "../infrastructure/db";
-import { buildResourcesEndpoint } from "../infrastructure/apiClient.js";
-import { generateTempId } from "../../lib/utils";
+import { buildResourcesEndpoint, apiRequest } from "../infrastructure/apiClient.js";
+import { enqueue } from "../queue/offlineQueue";
+import { applyOptimistic, makeTempId } from "../store/optimistic";
+import { mapTempToPermId } from "../store/idMap";
 
 export class ResourceRepository {
   constructor(resourceType, store = "resources") {
@@ -12,7 +14,7 @@ export class ResourceRepository {
   async clearOptimisticEntries() {
     try {
       const table = db.table(this.store)
-      const optimistics = await table.filter(item => item && item._isOptimistic === true).toArray()
+      const optimistics = await table.filter(item => item && (item._isOptimistic === true || item._optimistic === true)).toArray()
       if (optimistics.length > 0) {
         const keys = optimistics
           .map(item => item.resourceId || item.id)
@@ -28,53 +30,8 @@ export class ResourceRepository {
 
   async request(path = "", options = {}) {
     try {
-      // Folosește buildResourcesEndpoint pentru a construi URL-ul corect
-      const baseUrl = import.meta.env.VITE_API_URL || "";
       const resourcesEndpoint = buildResourcesEndpoint(path);
-      const endpoint = baseUrl ? `${baseUrl}${resourcesEndpoint}` : resourcesEndpoint;
-
-      const authToken = localStorage.getItem('auth-token');
-
-      const headers = {
-        "X-Resource-Type": this.resourceType,
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${authToken}`,
-        ...(options.headers || {}),
-      };
-      
-      console.log('Making API request:', {
-        url: endpoint,
-        method: options.method || 'GET',
-        resourceType: this.resourceType,
-        headers: headers,
-        body: options.body
-      });
-      
-      const res = await fetch(endpoint, {
-        ...options,
-        headers,
-      });
-
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
-      }
-
-      // Încercăm să detectăm conținutul răspunsului
-      const contentType = res.headers.get('content-type') || '';
-      const contentLength = res.headers.get('content-length');
-
-      // Dacă răspunsul nu este JSON sau body-ul e gol, întoarcem un obiect cu accepted
-      if (!contentType.includes('application/json') || contentLength === '0' || res.status === 201 || res.status === 202) {
-        try {
-          // Unele servere trimit JSON chiar și pe 201/202
-          const maybeJson = await res.json();
-          return maybeJson;
-        } catch (_) {
-          return { accepted: res.status === 201 || res.status === 202, status: res.status };
-        }
-      }
-
-      return res.json();
+      return await apiRequest(this.resourceType, resourcesEndpoint, options);
     } catch (error) {
       console.error('API request failed:', error);
       throw error;
@@ -202,16 +159,8 @@ export class ResourceRepository {
       
       // Dacă serverul a acceptat procesarea asincronă fără body util
       if (response && response.accepted === true) {
-        const tempId = generateTempId(this.store)
-        const nowIso = new Date().toISOString()
-        const optimisticEntry = {
-          ...resource,
-          id: tempId,
-          resourceId: tempId,
-          _isOptimistic: true,
-          _tempId: tempId,
-          _createdAt: nowIso
-        }
+        const tempId = makeTempId(`${this.store}_`)
+        const optimisticEntry = applyOptimistic({ ...resource, id: tempId, resourceId: tempId }, "create", tempId)
         await db.table(this.store).put(optimisticEntry)
         await indexedDb.outboxAdd({
           tempId,
@@ -221,6 +170,7 @@ export class ResourceRepository {
           createdAt: Date.now(),
           status: 'pending'
         })
+        await enqueue({ resourceType: this.store, action: "create", payload: resource, tempId })
         return optimisticEntry
       }
 
@@ -234,16 +184,8 @@ export class ResourceRepository {
       
       // If server responded without a concrete payload/id, fallback to optimistic entry
       if (!data || (typeof data === 'object' && !data.id && !data.resourceId && !data.data)) {
-        const tempId = generateTempId(this.store)
-        const nowIso = new Date().toISOString()
-        const optimisticEntry = {
-          ...resource,
-          id: tempId,
-          resourceId: tempId,
-          _isOptimistic: true,
-          _tempId: tempId,
-          _createdAt: nowIso
-        }
+        const tempId = makeTempId(`${this.store}_`)
+        const optimisticEntry = applyOptimistic({ ...resource, id: tempId, resourceId: tempId }, "create", tempId)
         // Best-effort local cache; if it fails, just return optimistic entry
         try { await db.table(this.store).put(optimisticEntry) } catch (_) {}
         return optimisticEntry
@@ -276,16 +218,8 @@ export class ResourceRepository {
       return normalized;
     } catch (error) {
       // Dacă serverul a răspuns fără body util sau cererea e acceptată async, generăm un ID temporar
-      const tempId = generateTempId(this.store)
-      const nowIso = new Date().toISOString()
-      const optimisticEntry = {
-        ...resource,
-        id: tempId,
-        resourceId: tempId,
-        _isOptimistic: true,
-        _tempId: tempId,
-        _createdAt: nowIso
-      }
+      const tempId = makeTempId(`${this.store}_`)
+      const optimisticEntry = applyOptimistic({ ...resource, id: tempId, resourceId: tempId }, "create", tempId)
       // Salvează în store local
       await db.table(this.store).put(optimisticEntry)
       // Pune în outbox pentru reconciliere când vine evenimentul de pe websocket
@@ -297,6 +231,7 @@ export class ResourceRepository {
         createdAt: Date.now(),
         status: 'pending'
       })
+      await enqueue({ resourceType: this.store, action: "create", payload: resource, tempId })
       return optimisticEntry
     }
   }
@@ -309,16 +244,8 @@ export class ResourceRepository {
       });
       
       if (response && response.accepted === true) {
-        const tempId = generateTempId(this.store)
-        const nowIso = new Date().toISOString()
-        const optimisticEntry = {
-          ...resource,
-          id,
-          resourceId: id,
-          _isOptimistic: true,
-          _tempId: tempId,
-          _updatedAt: nowIso
-        }
+        const tempId = makeTempId(`${this.store}_`)
+        const optimisticEntry = applyOptimistic({ ...resource, id, resourceId: id }, "update", tempId)
         await db.table(this.store).put(optimisticEntry)
         await indexedDb.outboxAdd({
           tempId,
@@ -329,6 +256,7 @@ export class ResourceRepository {
           createdAt: Date.now(),
           status: 'pending'
         })
+        await enqueue({ resourceType: this.store, action: "update", payload: resource, targetId: id, tempId })
         return optimisticEntry
       }
 
@@ -342,16 +270,8 @@ export class ResourceRepository {
       
       // If server responded without a concrete payload/id, fallback to optimistic update
       if (!data || (typeof data === 'object' && !data.id && !data.resourceId && !data.data)) {
-        const tempId = generateTempId(this.store)
-        const nowIso = new Date().toISOString()
-        const optimisticEntry = {
-          ...resource,
-          id,
-          resourceId: id,
-          _isOptimistic: true,
-          _tempId: tempId,
-          _updatedAt: nowIso
-        }
+        const tempId = makeTempId(`${this.store}_`)
+        const optimisticEntry = applyOptimistic({ ...resource, id, resourceId: id }, "update", tempId)
         try { await db.table(this.store).put(optimisticEntry) } catch (_) {}
         return optimisticEntry
       }
@@ -382,16 +302,8 @@ export class ResourceRepository {
       return normalized;
     } catch (error) {
       // Optimistic local update with temp operation
-      const tempId = generateTempId(this.store)
-      const nowIso = new Date().toISOString()
-      const optimisticEntry = {
-        ...resource,
-        id,
-        resourceId: id,
-        _isOptimistic: true,
-        _tempId: tempId,
-        _updatedAt: nowIso
-      }
+      const tempId = makeTempId(`${this.store}_`)
+      const optimisticEntry = applyOptimistic({ ...resource, id, resourceId: id }, "update", tempId)
       await db.table(this.store).put(optimisticEntry)
       await indexedDb.outboxAdd({
         tempId,
@@ -402,6 +314,7 @@ export class ResourceRepository {
         createdAt: Date.now(),
         status: 'pending'
       })
+      await enqueue({ resourceType: this.store, action: "update", payload: resource, targetId: id, tempId })
       return optimisticEntry
     }
   }
@@ -410,7 +323,7 @@ export class ResourceRepository {
     try {
       const response = await this.request(`/${id}`, { method: "DELETE" });
       if (response && response.accepted === true) {
-        const tempId = generateTempId(this.store)
+        const tempId = makeTempId(`${this.store}_`)
         await db.table(this.store).put({ id, resourceId: id, _deleted: true, _isOptimistic: true, _tempId: tempId })
         await indexedDb.outboxAdd({
           tempId,
@@ -420,11 +333,12 @@ export class ResourceRepository {
           createdAt: Date.now(),
           status: 'pending'
         })
+        await enqueue({ resourceType: this.store, action: "delete", targetId: id, tempId })
         return true
       }
       await db.table(this.store).delete(id);
     } catch (error) {
-      const tempId = generateTempId(this.store)
+      const tempId = makeTempId(`${this.store}_`)
       await db.table(this.store).put({ id, resourceId: id, _deleted: true, _isOptimistic: true, _tempId: tempId })
       await indexedDb.outboxAdd({
         tempId,
@@ -434,6 +348,7 @@ export class ResourceRepository {
         createdAt: Date.now(),
         status: 'pending'
       })
+      await enqueue({ resourceType: this.store, action: "delete", targetId: id, tempId })
       return true
     }
   }

@@ -15,10 +15,7 @@ const notifySubscribers = () => {
   subscribers.forEach(callback => callback(sharedUsers, sharedStats, sharedUserCount))
 }
 
-// Generare ID temporar pentru optimistic updates
-const generateTempId = () => {
-  return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-}
+// Optimismul este gestionat în Repository
 
 export const useUsers = () => {
   const [users, setUsers] = useState(sharedUsers)
@@ -42,69 +39,32 @@ export const useUsers = () => {
     return () => subscribers.delete(handleStateChange)
   }, [])
 
-  // WebSocket handling pentru utilizatori
+  // WebSocket handling pentru utilizatori (reflectă starea finală)
   useEffect(() => {
     const handler = async (message) => {
       const { type, data, resourceType } = message
-      
-      // Verifică dacă este un mesaj pentru utilizatori
       if (resourceType !== 'users' && resourceType !== 'user') return
-      
-      const operation = type?.replace('resource_', '') || 'unknown'
+      const operation = type?.replace('resource_', '') || type
       const userId = data?.id || data?.resourceId
-      
       if (!userId) return
-      
-      try {
-        if (operation === 'created') {
-          // Înlocuiește utilizatorul optimist cu datele reale
+      if (operation === 'created' || operation === 'create') {
+        const ui = userManager.transformUserForUI({ ...data, id: userId, resourceId: userId })
+        const idx = sharedUsers.findIndex(u => u.id === userId || u.resourceId === userId)
+        if (idx >= 0) sharedUsers[idx] = { ...ui, _isOptimistic: false }
+        else sharedUsers = [{ ...ui, _isOptimistic: false }, ...sharedUsers]
+        sharedUserCount = sharedUsers.length
+        notifySubscribers()
+      } else if (operation === 'updated' || operation === 'update') {
+        const idx = sharedUsers.findIndex(u => u.id === userId || u.resourceId === userId)
+        if (idx >= 0) {
           const ui = userManager.transformUserForUI({ ...data, id: userId, resourceId: userId })
-          
-          // Caută în outbox pentru a găsi operația optimistă
-          const outboxEntry = await indexedDb.outboxFindByTempId?.(userId)
-          
-          if (outboxEntry) {
-            const optimisticIndex = sharedUsers.findIndex(u => u._tempId === outboxEntry.tempId)
-            if (optimisticIndex >= 0) {
-              sharedUsers[optimisticIndex] = { ...ui, _isOptimistic: false }
-              notifySubscribers()
-            }
-            await indexedDb.outboxDelete?.(outboxEntry.id)
-          } else {
-            // Euristică: caută după email sau nume
-            const optimisticIndex = sharedUsers.findIndex(u => 
-              u._isOptimistic && (
-                u.email === data.email ||
-                u.medicName === data.medicName ||
-                u.fullName === data.fullName
-              )
-            )
-            if (optimisticIndex >= 0) {
-              sharedUsers[optimisticIndex] = { ...ui, _isOptimistic: false }
-              notifySubscribers()
-            }
-          }
-        } else if (operation === 'updated') {
-          // Dezactivează flag-ul optimistic
-          const existingIndex = sharedUsers.findIndex(u => 
-            u.id === userId || u.resourceId === userId
-          )
-          if (existingIndex >= 0) {
-            const ui = userManager.transformUserForUI({ ...data, id: userId, resourceId: userId })
-            sharedUsers[existingIndex] = { ...ui, _isOptimistic: false }
-            notifySubscribers()
-          }
-        } else if (operation === 'deleted') {
-          // Elimină utilizatorul din lista locală
-          sharedUsers = sharedUsers.filter(u => {
-            const matches = u.id === userId || u.resourceId === userId
-            return !matches
-          })
-          sharedUserCount = sharedUsers.length
+          sharedUsers[idx] = { ...ui, _isOptimistic: false }
           notifySubscribers()
         }
-      } catch (err) {
-        console.error('Error handling WebSocket message for users:', err)
+      } else if (operation === 'deleted' || operation === 'delete') {
+        sharedUsers = sharedUsers.filter(u => (u.id !== userId && u.resourceId !== userId))
+        sharedUserCount = sharedUsers.length
+        notifySubscribers()
       }
     }
 
@@ -176,33 +136,21 @@ export const useUsers = () => {
     return users.find(user => user.id === id || user.resourceId === id) || null
   }, [users])
 
-  // Adaugă un utilizator nou cu optimistic update
+  // Adaugă un utilizator nou (optimism gestionat în Repository)
   const addUser = useCallback(async (userData) => {
     setLoading(true)
     setError(null)
     
-    const tempId = generateTempId()
-    const optimisticUser = {
-      ...userManager.transformUserForUI(userData),
-      _tempId: tempId,
-      _isOptimistic: true,
-      id: tempId,
-      resourceId: tempId
-    }
-    
-    // Adaugă optimist în starea partajată
-    sharedUsers = [optimisticUser, ...sharedUsers]
-    sharedUserCount = sharedUsers.length
-    notifySubscribers()
-    
     try {
       const newUser = await userService.addUser(userData)
-      return newUser
-    } catch (err) {
-      // Rollback în caz de eroare
-      sharedUsers = sharedUsers.filter(user => user._tempId !== tempId)
+      const ui = userManager.transformUserForUI(newUser)
+      const idx = sharedUsers.findIndex(u => u.id === ui.id || u.resourceId === ui.resourceId)
+      if (idx >= 0) sharedUsers[idx] = { ...ui, _isOptimistic: false }
+      else sharedUsers = [ui, ...sharedUsers]
       sharedUserCount = sharedUsers.length
       notifySubscribers()
+      return ui
+    } catch (err) {
       setError(err.message)
       console.error('Error adding user:', err)
       throw err
@@ -211,39 +159,19 @@ export const useUsers = () => {
     }
   }, [])
 
-  // Actualizează un utilizator cu optimistic update
+  // Actualizează un utilizator (optimism gestionat în Repository)
   const updateUser = useCallback(async (id, userData) => {
     setLoading(true)
     setError(null)
     
-    // Găsește utilizatorul existent
-    const existingIndex = sharedUsers.findIndex(user => 
-      user.id === id || user.resourceId === id
-    )
-    
-    if (existingIndex >= 0) {
-      // Marchează ca optimist
-      sharedUsers[existingIndex] = {
-        ...sharedUsers[existingIndex],
-        ...userManager.transformUserForUI(userData),
-        _isOptimistic: true
-      }
-      notifySubscribers()
-    }
-    
     try {
       const updatedUser = await userService.updateUser(id, userData)
-      return updatedUser
+      const ui = userManager.transformUserForUI(updatedUser)
+      const existingIndex = sharedUsers.findIndex(user => user.id === id || user.resourceId === id)
+      if (existingIndex >= 0) sharedUsers[existingIndex] = { ...ui, _isOptimistic: false }
+      notifySubscribers()
+      return ui
     } catch (err) {
-      // Rollback în caz de eroare
-      if (existingIndex >= 0) {
-        // Restaurează starea anterioară
-        sharedUsers[existingIndex] = {
-          ...sharedUsers[existingIndex],
-          _isOptimistic: false
-        }
-        notifySubscribers()
-      }
       setError(err.message)
       console.error('Error updating user:', err)
       throw err
@@ -252,38 +180,18 @@ export const useUsers = () => {
     }
   }, [])
 
-  // Șterge un utilizator cu optimistic update
+  // Șterge un utilizator (optimism gestionat în Repository)
   const deleteUser = useCallback(async (id) => {
     setLoading(true)
     setError(null)
     
-    // Marchează pentru ștergere optimistă
-    const existingIndex = sharedUsers.findIndex(user => 
-      user.id === id || user.resourceId === id
-    )
-    
-    if (existingIndex >= 0) {
-      sharedUsers[existingIndex] = {
-        ...sharedUsers[existingIndex],
-        _isOptimistic: true,
-        _isDeleting: true
-      }
-      notifySubscribers()
-    }
-    
     try {
       await userService.deleteUser(id)
+      sharedUsers = sharedUsers.filter(u => (u.id !== id && u.resourceId !== id))
+      sharedUserCount = sharedUsers.length
+      notifySubscribers()
       return true
     } catch (err) {
-      // Rollback în caz de eroare
-      if (existingIndex >= 0) {
-        sharedUsers[existingIndex] = {
-          ...sharedUsers[existingIndex],
-          _isOptimistic: false,
-          _isDeleting: false
-        }
-        notifySubscribers()
-      }
       setError(err.message)
       console.error('Error deleting user:', err)
       throw err

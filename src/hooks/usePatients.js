@@ -19,10 +19,7 @@ function notifySubscribers() {
   subscribers.forEach(cb => cb([...sharedPatients]))
 }
 
-// Funcție pentru generarea unui ID temporar
-function generateTempId() {
-  return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-}
+// Nu mai generăm tempId în hook; Repository gestionează optimismul
 
 export const usePatients = () => {
   const [patients, setPatients] = useState(sharedPatients)
@@ -159,114 +156,59 @@ export const usePatients = () => {
     }
   }, [])
 
-  // Funcție pentru adăugarea unui pacient
+  // Funcție pentru adăugarea unui pacient (optimism gestionat în Repository)
   const addPatient = useCallback(async (patientData) => {
     setError(null)
     
-    // Generează ID temporar pentru optimistic update
-    const tempId = generateTempId()
-    const optimisticPatient = {
-      ...patientManager.transformPatientForUI(patientData),
-      _tempId: tempId,
-      _isOptimistic: true,
-      id: tempId // Folosim tempId ca ID pentru optimistic update
-    }
-    
-    // Adaugă pacientul optimist în shared state
-    sharedPatients = [optimisticPatient, ...sharedPatients]
-    setPatients([...sharedPatients])
-    notifySubscribers()
-    
     try {
-      const newPatient = await patientService.addPatient(patientData)
-      return newPatient
-    } catch (err) {
-      // În caz de eroare, elimină pacientul optimist
-      sharedPatients = sharedPatients.filter(p => p._tempId !== tempId)
+      const created = await patientService.addPatient(patientData)
+      const ui = patientManager.transformPatientForUI(created)
+      const idx = sharedPatients.findIndex(p => p.id === ui.id || p.resourceId === ui.resourceId)
+      if (idx >= 0) {
+        sharedPatients[idx] = { ...ui, _isOptimistic: false }
+      } else {
+        sharedPatients = [{ ...ui, _isOptimistic: !!ui._isOptimistic }, ...sharedPatients]
+      }
       setPatients([...sharedPatients])
       notifySubscribers()
-      
+      return ui
+    } catch (err) {
       setError(err.message)
       console.error('Error adding patient:', err)
       throw err
     }
   }, [])
 
-  // Funcție pentru actualizarea unui pacient
+  // Funcție pentru actualizarea unui pacient (optimism gestionat în Repository)
   const updatePatient = useCallback(async (id, patientData) => {
     setError(null)
     
-    // Găsește pacientul existent
-    const existingPatient = sharedPatients.find(p => p.id === id || p.resourceId === id)
-    if (!existingPatient) {
-      throw new Error('Patient not found')
-    }
-    
-    // Creează versiunea optimistă
-    const optimisticPatient = {
-      ...existingPatient,
-      ...patientManager.transformPatientForUI(patientData),
-      _isOptimistic: true
-    }
-    
-    // Actualizează pacientul optimist în shared state
-    sharedPatients = sharedPatients.map(p => 
-      (p.id === id || p.resourceId === id) ? optimisticPatient : p
-    )
-    setPatients([...sharedPatients])
-    notifySubscribers()
-    
     try {
-      const updatedPatient = await patientService.updatePatient(id, patientData)
-      return updatedPatient
-    } catch (err) {
-      // În caz de eroare, restaurează pacientul original
-      sharedPatients = sharedPatients.map(p => 
-        (p.id === id || p.resourceId === id) ? existingPatient : p
-      )
+      const updated = await patientService.updatePatient(id, patientData)
+      const ui = patientManager.transformPatientForUI(updated)
+      const idx = sharedPatients.findIndex(p => p.id === id || p.resourceId === id)
+      if (idx >= 0) sharedPatients[idx] = { ...ui, _isOptimistic: false }
       setPatients([...sharedPatients])
       notifySubscribers()
-      
+      return ui
+    } catch (err) {
       setError(err.message)
       console.error('Error updating patient:', err)
       throw err
     }
   }, [])
 
-  // Funcție pentru ștergerea unui pacient
+  // Funcție pentru ștergerea unui pacient (optimism gestionat în Repository)
   const deletePatient = useCallback(async (id) => {
     setError(null)
     
-    // Găsește pacientul existent
-    const existingPatient = sharedPatients.find(p => p.id === id || p.resourceId === id)
-    if (!existingPatient) {
-      throw new Error('Patient not found')
-    }
-    
-    // Marchează pacientul ca fiind șters optimist
-    const optimisticPatient = {
-      ...existingPatient,
-      _isOptimistic: true,
-      _isDeleting: true
-    }
-    
-    // Actualizează pacientul optimist în shared state
-    sharedPatients = sharedPatients.map(p => 
-      (p.id === id || p.resourceId === id) ? optimisticPatient : p
-    )
-    setPatients([...sharedPatients])
-    notifySubscribers()
-    
     try {
       await patientService.deletePatient(id)
-    } catch (err) {
-      // În caz de eroare, restaurează pacientul original
-      sharedPatients = sharedPatients.map(p => 
-        (p.id === id || p.resourceId === id) ? existingPatient : p
-      )
+      sharedPatients = sharedPatients.filter(p => (p.id !== id && p.resourceId !== id))
       setPatients([...sharedPatients])
       notifySubscribers()
-      
+      return true
+    } catch (err) {
       setError(err.message)
       console.error('Error deleting patient:', err)
       throw err
@@ -323,98 +265,26 @@ export const usePatients = () => {
     // Subscribe la actualizări prin websocket
     const handler = async (message) => {
       const { type, data, resourceType } = message
-      
-      console.log('WebSocket message received:', { type, resourceType, data })
-      
-      // Verifică dacă este pentru pacienți
       if (resourceType !== 'patient') return
-      
-      // Extrage operația din tipul mesajului
-      const operation = type?.replace('resource_', '') || 'unknown'
-      const patientId = data?.id
-      
-      console.log('Processing patient operation:', { operation, patientId })
-      
-      if (!patientId) return
-      
-      // Procesează operația
-      if (operation === 'created') {
-        const ui = patientManager.transformPatientForUI({ ...data, id: patientId, resourceId: patientId })
-        
-        // Actualizează IndexedDB cu datele reale
-        await indexedDb.put('patients', { ...ui, _isOptimistic: false })
-        
-        // Caută în outbox pentru a găsi operația optimistă
-        const outboxEntry = await indexedDb.outboxFindByResourceId(patientId, 'patients')
-        
-        if (outboxEntry) {
-          // Găsește pacientul optimist în shared state prin tempId
-          const optimisticIndex = sharedPatients.findIndex(p => p._tempId === outboxEntry.tempId)
-          
-          if (optimisticIndex >= 0) {
-            // Înlocuiește pacientul optimist cu datele reale
-            sharedPatients[optimisticIndex] = { ...ui, _isOptimistic: false }
-            console.log('Replaced optimistic patient with real data from outbox')
-          }
-          
-          // Șterge din outbox
-          await indexedDb.outboxDelete(outboxEntry.id)
-        } else {
-          // Dacă nu găsește în outbox, caută prin ID normal
-          const existingIndex = sharedPatients.findIndex(p => p.id === patientId || p.resourceId === patientId)
-          
-          if (existingIndex >= 0) {
-            // Actualizează pacientul existent
-            sharedPatients[existingIndex] = { ...ui, _isOptimistic: false }
-          } else {
-            // Adaugă pacientul nou
-            sharedPatients = [{ ...ui, _isOptimistic: false }, ...sharedPatients]
-          }
-        }
-        
-        // Actualizează starea locală și notifică toți subscriberii
-        console.log('Updating patients state after CREATED operation. Current count:', sharedPatients.length)
+      const operation = type?.replace('resource_', '') || type
+      const id = data?.id || data?.resourceId
+      if (!id) return
+      if (operation === 'created' || operation === 'create') {
+        const ui = patientManager.transformPatientForUI({ ...data, id, resourceId: id })
+        const idx = sharedPatients.findIndex(p => p.id === id || p.resourceId === id)
+        if (idx >= 0) sharedPatients[idx] = { ...ui, _isOptimistic: false }
+        else sharedPatients = [{ ...ui, _isOptimistic: false }, ...sharedPatients]
         setPatients([...sharedPatients])
         notifySubscribers()
-        
-      } else if (operation === 'updated') {
-        const ui = patientManager.transformPatientForUI({ ...data, id: patientId, resourceId: patientId })
-        
-        // Actualizează IndexedDB cu datele reale
-        await indexedDb.put('patients', { ...ui, _isOptimistic: false })
-        
-        // Caută pacientul în shared state și dezactivează _isOptimistic
-        const existingIndex = sharedPatients.findIndex(p => p.id === patientId || p.resourceId === patientId)
-        
-        if (existingIndex >= 0) {
-          // Actualizează pacientul existent și dezactivează optimistic flag
-          sharedPatients[existingIndex] = { ...ui, _isOptimistic: false }
-          console.log('Updated patient and disabled optimistic flag')
-        } else {
-          // Adaugă pacientul nou dacă nu există
-          sharedPatients = [{ ...ui, _isOptimistic: false }, ...sharedPatients]
-        }
-        
-        // Actualizează starea locală și notifică toți subscriberii
-        console.log('Updating patients state after UPDATED operation. Current count:', sharedPatients.length)
+      } else if (operation === 'updated' || operation === 'update') {
+        const ui = patientManager.transformPatientForUI({ ...data, id, resourceId: id })
+        const idx = sharedPatients.findIndex(p => p.id === id || p.resourceId === id)
+        if (idx >= 0) sharedPatients[idx] = { ...ui, _isOptimistic: false }
+        else sharedPatients = [{ ...ui, _isOptimistic: false }, ...sharedPatients]
         setPatients([...sharedPatients])
         notifySubscribers()
-        
-      } else if (operation === 'deleted') {
-        // Șterge din IndexedDB
-        await indexedDb.delete('patients', patientId)
-        
-        // Șterge din shared state și dezactivează _isOptimistic
-        sharedPatients = sharedPatients.filter(p => {
-          const matches = p.id === patientId || p.resourceId === patientId
-          if (matches && p._isOptimistic) {
-            console.log('Removed optimistic patient after deletion confirmation')
-          }
-          return !matches
-        })
-        
-        // Actualizează starea locală și notifică toți subscriberii
-        console.log('Updating patients state after DELETED operation. Current count:', sharedPatients.length)
+      } else if (operation === 'deleted' || operation === 'delete') {
+        sharedPatients = sharedPatients.filter(p => (p.id !== id && p.resourceId !== id))
         setPatients([...sharedPatients])
         notifySubscribers()
       }

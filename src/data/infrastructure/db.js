@@ -18,7 +18,11 @@ class AppDatabase extends Dexie {
       permissions: 'resourceId, resource, action, description', // Store pentru permisiuni
       treatments: 'resourceId, treatmentType, category, duration, price', // Store pentru tratamente
       statistics: 'id, timestamp', // Store pentru statistici și activități recente
-      outbox: '++id, tempId, resourceType, operation, createdAt, status' // Outbox pentru operații trimise spre procesare
+      outbox: '++id, tempId, resourceType, operation, createdAt, status', // Outbox pentru operații trimise spre procesare
+      // noi store-uri pentru migrarea arhitecturii (idMap, queue, meta)
+      idMap: 'tempId, permId, resourceType',
+      queue: '++seq, createdAt, status, resourceType, action, tempId',
+      meta: 'key'
     });
   }
 }

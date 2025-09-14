@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { indexedDb } from '../data/infrastructure/db.js'
 import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
-import { generateTempId } from '../lib/utils.js'
 import { ResourceRepository } from '../data/repositories/ResourceRepository.js'
 import { ResourceInvoker } from '../data/invoker/ResourceInvoker.js'
 import { GetCommand } from '../data/commands/GetCommand.js'
@@ -51,12 +50,8 @@ export const useSales = () => {
       setSales(prev => [...prev, created])
       return created
     } catch (err) {
-      // optimistic fallback if request was accepted
-      const tempId = generateTempId('sales')
-      const optimistic = { ...saleData, id: tempId, resourceId: tempId, _tempId: tempId, _isOptimistic: true }
-      await indexedDb.put('sales', optimistic)
-      setSales(prev => [...prev, optimistic])
-      return optimistic
+      setError(err.message)
+      throw err
     } finally {
       setLoading(false)
     }
@@ -71,11 +66,8 @@ export const useSales = () => {
       setSales(prev => prev.map(s => s.id === id ? updated : s))
       return updated
     } catch (err) {
-      const tempId = generateTempId('sales')
-      const optimistic = { ...saleData, id, resourceId: id, _tempId: tempId, _isOptimistic: true }
-      await indexedDb.put('sales', optimistic)
-      setSales(prev => prev.map(s => s.id === id ? optimistic : s))
-      return optimistic
+      setError(err.message)
+      throw err
     } finally {
       setLoading(false)
     }
@@ -90,9 +82,8 @@ export const useSales = () => {
       setSales(prev => prev.filter(s => s.id !== id))
       return true
     } catch (err) {
-      await indexedDb.put('sales', { id, resourceId: id, _deleted: true, _isOptimistic: true })
-      setSales(prev => prev.filter(s => s.id !== id))
-      return true
+      setError(err.message)
+      throw err
     } finally {
       setLoading(false)
     }
@@ -100,24 +91,20 @@ export const useSales = () => {
 
   useEffect(() => {
     const handler = async (message) => {
-      const { type, data, tempId, realId, operation } = message
-      if ((type && type.endsWith('_resolved')) || ['create','update','delete'].includes(operation)) {
-        if (operation === 'create' || type === 'create_resolved') {
-          if (tempId && realId) {
-            await indexedDb.put('sales', { ...data, id: realId, resourceId: realId, _isOptimistic: false })
-            setSales(prev => prev.map(s => (s._tempId === tempId ? { ...data, id: realId, resourceId: realId } : s)))
-          }
-        } else if (operation === 'update' || type === 'update_resolved') {
-          if (realId) {
-            await indexedDb.put('sales', { ...data, id: realId, resourceId: realId, _isOptimistic: false })
-            setSales(prev => prev.map(s => (s.id === realId ? { ...s, ...data, resourceId: realId } : s)))
-          }
-        } else if (operation === 'delete' || type === 'delete_resolved') {
-          if (realId) {
-            await indexedDb.delete('sales', realId)
-            setSales(prev => prev.filter(s => s.id !== realId))
-          }
-        }
+      const { type, data, resourceType } = message
+      if (resourceType !== 'sales' && resourceType !== 'sale') return
+      const operation = type?.replace('resource_', '') || type
+      const id = data?.id || data?.resourceId
+      if (!id) return
+      if (operation === 'created' || operation === 'create') {
+        setSales(prev => {
+          const exists = prev.findIndex(s => s.id === id) >= 0
+          return exists ? prev : [...prev, data]
+        })
+      } else if (operation === 'updated' || operation === 'update') {
+        setSales(prev => prev.map(s => (s.id === id ? { ...s, ...data } : s)))
+      } else if (operation === 'deleted' || operation === 'delete') {
+        setSales(prev => prev.filter(s => s.id !== id))
       }
     }
     const unsubPlural = onResourceMessage('sales', handler)

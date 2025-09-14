@@ -1,4 +1,5 @@
 import { getConfig } from '../config/aiAssistantConfig';
+import { aiApiRequest } from '../data/infrastructure/apiClient.js';
 
 // Logger utility
 class Logger {
@@ -85,24 +86,17 @@ export class AIAssistantService {
   // Load message history for a session
   async loadMessageHistory(sessionId, limit = null, before = null) {
     try {
-      const url = new URL(`${getConfig('API_ENDPOINTS.SESSIONS')}/${sessionId}/messages`);
+      let endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/${sessionId}/messages`;
       
-      if (limit) url.searchParams.append('limit', limit);
-      if (before) url.searchParams.append('before', before);
+      const params = new URLSearchParams();
+      if (limit) params.append('limit', limit);
+      if (before) params.append('before', before);
       
-      const response = await fetch(url.toString());
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Endpoint not implemented yet, start with empty history
-          Logger.log('warn', 'Sessions endpoint not implemented, starting with empty history');
-          this.messageHistory = [];
-          return this.messageHistory;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (params.toString()) {
+        endpoint += `?${params.toString()}`;
       }
       
-      const data = await response.json();
+      const data = await aiApiRequest(endpoint);
       this.messageHistory = data.messages || [];
       
       Logger.log('info', 'Message history loaded', { 
@@ -148,50 +142,10 @@ export class AIAssistantService {
 
       Logger.log('debug', 'Sending message', messageData);
 
-      const response = await fetch(getConfig('API_ENDPOINTS.MESSAGES'), {
+      const result = await aiApiRequest(getConfig('API_ENDPOINTS.MESSAGES'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(messageData),
       });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Endpoint not implemented yet, simulate success
-          Logger.log('warn', 'Messages endpoint not implemented, simulating success');
-          const simulatedResult = {
-            status: 'success',
-            messageId: `sim_${Date.now()}`,
-            message: {
-              messageId: `sim_${Date.now()}`,
-              content: 'Message endpoint not implemented yet'
-            }
-          };
-          
-          // Add user message to history
-          const userMessage = {
-            messageId: simulatedResult.messageId,
-            sessionId: this.currentSessionId,
-            businessId: this.businessId,
-            userId: this.userId,
-            content: content.trim(),
-            type: 'user',
-            timestamp: new Date().toISOString(),
-            metadata: { source: 'api', simulated: true }
-          };
-          
-          this.messageHistory.push(userMessage);
-          this.onMessageReceived?.([userMessage]);
-          
-          return simulatedResult;
-        }
-        
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       
       if (result.status === 'success') {
         Logger.log('info', 'Message sent successfully', result);
@@ -225,19 +179,8 @@ export class AIAssistantService {
   // Get active sessions for business
   async getActiveSessions() {
     try {
-      const url = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/active`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Endpoint not implemented yet, return empty array
-          Logger.log('warn', 'Active sessions endpoint not implemented, returning empty array');
-          return [];
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
+      const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/active`;
+      const data = await aiApiRequest(endpoint);
       Logger.log('info', 'Active sessions retrieved', { 
         businessId: this.businessId, 
         sessionCount: data.activeSessions?.length || 0 
@@ -260,24 +203,12 @@ export class AIAssistantService {
 
     try {
       const url = `${getConfig('API_ENDPOINTS.SESSIONS')}/${this.currentSessionId}`;
-      const response = await fetch(url, {
+      const result = await aiApiRequest(url, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ status }),
       });
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Endpoint not implemented yet, just clear local session
-          Logger.log('warn', 'Close session endpoint not implemented, clearing local session');
-          this.currentSessionId = null;
-          this.onSessionChange?.(null);
-          return true;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      // aiApiRequest already handles errors
 
       Logger.log('info', 'Session closed', { 
         sessionId: this.currentSessionId, 
@@ -299,14 +230,8 @@ export class AIAssistantService {
   // Get session statistics
   async getSessionStats() {
     try {
-      const url = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/stats`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
+      const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/stats`;
+      const data = await aiApiRequest(endpoint);
       Logger.log('info', 'Session statistics retrieved', data);
       
       return data;
@@ -328,13 +253,7 @@ export class AIAssistantService {
       url.searchParams.append('q', query);
       url.searchParams.append('limit', limit);
       
-      const response = await fetch(url.toString());
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
+      const data = await aiApiRequest(url.toString());
       Logger.log('info', 'Message search completed', { 
         query, 
         resultCount: data.messages?.length || 0 
@@ -358,18 +277,13 @@ export class AIAssistantService {
       const url = new URL(`${getConfig('API_ENDPOINTS.SESSIONS')}/${this.currentSessionId}/export`);
       url.searchParams.append('format', format);
       
-      const response = await fetch(url.toString());
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      const data = await aiApiRequest(url.toString());
       
       if (format === 'json') {
-        const data = await response.json();
         return data;
       } else {
-        const blob = await response.blob();
-        return blob;
+        // For non-JSON formats, return the data as is
+        return data;
       }
     } catch (error) {
       Logger.log('error', 'Failed to export session', error);

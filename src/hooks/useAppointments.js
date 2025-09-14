@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import appointmentService from '../services/appointmentService.js'
 import { indexedDb } from '../data/infrastructure/db.js'
 import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
-import { populateTestData, checkCacheStatus, updateLookupCache } from '../utils/appointmentUtils.js'
+import { populateTestData, updateLookupCache } from '../utils/appointmentUtils.js'
 import appointmentManager from '../business/appointmentManager.js'
 
 // Shared state pentru toate instanțele
@@ -176,136 +176,62 @@ export const useAppointments = () => {
     }
   }, [])
 
-  // Funcție pentru adăugarea unei programări cu optimistic update
+  // Funcție pentru adăugarea unei programări (optimism gestionat de Repository)
   const addAppointment = useCallback(async (appointmentData) => {
     setError(null)
-    
-    // Validare
     appointmentManager.validateAppointment(appointmentData)
-    
-    // Transformare pentru API
     const apiData = appointmentManager.transformAppointmentForAPI(appointmentData)
-    
-    // Generare ID temporar pentru optimistic update
-    const tempId = generateTempId()
-    const optimisticAppointment = {
-      ...appointmentManager.transformAppointmentForUI(apiData),
-      _tempId: tempId,
-      _isOptimistic: true,
-      id: tempId // Folosim tempId ca ID pentru optimistic update
-    }
-    
-    // Adaugă programarea optimistă în shared state
-    sharedAppointments = [optimisticAppointment, ...sharedAppointments]
-    setAppointments([...sharedAppointments])
-    notifySubscribers()
-    
     try {
-      const newAppointment = await appointmentService.addAppointment(apiData)
-      return newAppointment
-    } catch (err) {
-      // În caz de eroare, elimină programarea optimistă
-      sharedAppointments = sharedAppointments.filter(a => a._tempId !== tempId)
+      const created = await appointmentService.addAppointment(apiData)
+      const ui = appointmentManager.transformAppointmentForUI(created)
+      const idx = sharedAppointments.findIndex(a => a.id === ui.id || a.resourceId === ui.resourceId)
+      if (idx >= 0) {
+        sharedAppointments[idx] = { ...ui, _isOptimistic: false }
+      } else {
+        sharedAppointments = [{ ...ui, _isOptimistic: !!ui._isOptimistic }, ...sharedAppointments]
+      }
       setAppointments([...sharedAppointments])
       notifySubscribers()
-      
+      return ui
+    } catch (err) {
       setError(err.message)
       console.error('Error adding appointment:', err)
       throw err
     }
   }, [])
 
-  // Funcție pentru actualizarea unei programări cu optimistic update
+  // Funcție pentru actualizarea unei programări (optimism gestionat de Repository)
   const updateAppointment = useCallback(async (id, appointmentData) => {
     setError(null)
-    
-    // Verifică dacă ID-ul este valid
-    if (!id) {
-      throw new Error('Appointment ID is required for update')
-    }
-    
-    // Validare
+    if (!id) throw new Error('Appointment ID is required for update')
     appointmentManager.validateAppointment(appointmentData)
-    
-    // Transformare pentru API
     const apiData = appointmentManager.transformAppointmentForAPI(appointmentData)
-    
-    // Găsește programarea existentă
-    const existingAppointment = sharedAppointments.find(a => a.id === id || a.resourceId === id)
-    if (!existingAppointment) {
-      throw new Error('Appointment not found')
-    }
-    
-    // Creează versiunea optimistă
-    const optimisticAppointment = {
-      ...existingAppointment,
-      ...appointmentManager.transformAppointmentForUI(apiData),
-      _isOptimistic: true
-    }
-    
-    // Actualizează programarea optimistă în shared state
-    sharedAppointments = sharedAppointments.map(a => 
-      (a.id === id || a.resourceId === id) ? optimisticAppointment : a
-    )
-    setAppointments([...sharedAppointments])
-    notifySubscribers()
-    
     try {
-      const updatedAppointment = await appointmentService.updateAppointment(id, apiData)
-      return updatedAppointment
-    } catch (err) {
-      // În caz de eroare, restaurează programarea originală
-      sharedAppointments = sharedAppointments.map(a => 
-        (a.id === id || a.resourceId === id) ? existingAppointment : a
-      )
+      const updated = await appointmentService.updateAppointment(id, apiData)
+      const ui = appointmentManager.transformAppointmentForUI(updated)
+      const idx = sharedAppointments.findIndex(a => a.id === id || a.resourceId === id)
+      if (idx >= 0) sharedAppointments[idx] = { ...ui, _isOptimistic: false }
       setAppointments([...sharedAppointments])
       notifySubscribers()
-      
+      return ui
+    } catch (err) {
       setError(err.message)
       console.error('Error updating appointment:', err)
       throw err
     }
   }, [])
 
-  // Funcție pentru ștergerea unei programări cu optimistic update
+  // Funcție pentru ștergerea unei programări (optimism gestionat de Repository)
   const deleteAppointment = useCallback(async (id) => {
     setError(null)
-    
-    // Verifică dacă ID-ul este valid
-    if (!id) {
-      throw new Error('Appointment ID is required for deletion')
-    }
-    
-    // Găsește programarea existentă
-    const existingAppointment = sharedAppointments.find(a => a.id === id || a.resourceId === id)
-    if (!existingAppointment) {
-      throw new Error('Appointment not found')
-    }
-    
-    // Marchează programarea ca fiind ștearsă optimist
-    const optimisticAppointment = {
-      ...existingAppointment,
-      _isOptimistic: true,
-      _isDeleting: true
-    }
-    
-    // Actualizează programarea optimistă în shared state
-    sharedAppointments = sharedAppointments.map(a => 
-      (a.id === id || a.resourceId === id) ? optimisticAppointment : a
-    )
-    setAppointments([...sharedAppointments])
-    notifySubscribers()
-    
+    if (!id) throw new Error('Appointment ID is required for deletion')
     try {
       await appointmentService.deleteAppointment(id)
-    } catch (err) {
-      // În caz de eroare, restaurează programarea originală
-      sharedAppointments = sharedAppointments.map(a => 
-        (a.id === id || a.resourceId === id) ? existingAppointment : a
-      )
+      sharedAppointments = sharedAppointments.filter(a => (a.id !== id && a.resourceId !== id))
       setAppointments([...sharedAppointments])
       notifySubscribers()
-      
+      return true
+    } catch (err) {
       setError(err.message)
       console.error('Error deleting appointment:', err)
       throw err
@@ -464,121 +390,26 @@ export const useAppointments = () => {
     // Subscribe la actualizări prin websocket
     const handler = async (message) => {
       const { type, data, resourceType } = message
-      
-      console.log('WebSocket message received:', { type, resourceType, data })
-      
-      // Verifică dacă este pentru programări
       if (resourceType !== 'appointment') return
-      
-      // Extrage operația din tipul mesajului
-      const operation = type?.replace('resource_', '') || 'unknown'
-      const appointmentId = data?.id
-      
-      console.log('Processing appointment operation:', { operation, appointmentId })
-      
-      if (!appointmentId) return
-      
-      // Procesează operația
-      if (operation === 'created') {
-        console.log('Before transformAppointmentForUI - data:', { ...data, id: appointmentId, resourceId: appointmentId })
-        const ui = appointmentManager.transformAppointmentForUI({ ...data, id: appointmentId, resourceId: appointmentId })
-        console.log('After transformAppointmentForUI - ui:', ui)
-        
-        // Actualizează IndexedDB cu datele reale - asigură-te că resourceId este setat
-        const dataForIndexedDB = { 
-          ...data, 
-          id: appointmentId, 
-          resourceId: appointmentId, 
-          _isOptimistic: false 
-        }
-        await indexedDb.put('appointments', dataForIndexedDB)
-        
-        // Caută în outbox pentru a găsi operația optimistă
-        const outboxEntry = await indexedDb.outboxFindByResourceId(appointmentId, 'appointments')
-        
-        if (outboxEntry) {
-          console.log('Found outbox entry:', outboxEntry)
-          // Găsește programarea optimistă în shared state prin tempId
-          const optimisticIndex = sharedAppointments.findIndex(a => a._tempId === outboxEntry.tempId)
-          console.log('Looking for tempId:', outboxEntry.tempId, 'Found at index:', optimisticIndex)
-          
-          if (optimisticIndex >= 0) {
-            console.log('Before replacement - appointment:', sharedAppointments[optimisticIndex])
-            // Înlocuiește programarea optimistă cu datele reale
-            sharedAppointments[optimisticIndex] = { ...ui, _isOptimistic: false }
-            console.log('After replacement - appointment:', sharedAppointments[optimisticIndex])
-            console.log('Replaced optimistic appointment with real data from outbox')
-          }
-          
-          // Șterge din outbox
-          await indexedDb.outboxDelete(outboxEntry.id)
-        } else {
-          // Dacă nu găsește în outbox, caută prin ID normal
-          const existingIndex = sharedAppointments.findIndex(a => a.id === appointmentId || a.resourceId === appointmentId)
-          
-          if (existingIndex >= 0) {
-            // Actualizează programarea existentă
-            sharedAppointments[existingIndex] = { ...ui, _isOptimistic: false }
-          } else {
-            // Adaugă programarea nouă
-            sharedAppointments = [{ ...ui, _isOptimistic: false }, ...sharedAppointments]
-          }
-        }
-        
-        // Actualizează starea locală și notifică toți subscriberii
-        console.log('Updating appointments state after CREATED operation. Current count:', sharedAppointments.length)
+      const operation = type?.replace('resource_', '') || type
+      const id = data?.id || data?.resourceId
+      if (!id) return
+      if (operation === 'created' || operation === 'create') {
+        const ui = appointmentManager.transformAppointmentForUI({ ...data, id, resourceId: id })
+        const idx = sharedAppointments.findIndex(a => a.id === id || a.resourceId === id)
+        if (idx >= 0) sharedAppointments[idx] = { ...ui, _isOptimistic: false }
+        else sharedAppointments = [{ ...ui, _isOptimistic: false }, ...sharedAppointments]
         setAppointments([...sharedAppointments])
         notifySubscribers()
-        
-      } else if (operation === 'updated') {
-        console.log('Before transformAppointmentForUI (updated) - data:', { ...data, id: appointmentId, resourceId: appointmentId })
-        const ui = appointmentManager.transformAppointmentForUI({ ...data, id: appointmentId, resourceId: appointmentId })
-        console.log('After transformAppointmentForUI (updated) - ui:', ui)
-        
-        // Actualizează IndexedDB cu datele reale - asigură-te că resourceId este setat
-        const dataForIndexedDB = { 
-          ...data, 
-          id: appointmentId, 
-          resourceId: appointmentId, 
-          _isOptimistic: false 
-        }
-        await indexedDb.put('appointments', dataForIndexedDB)
-        
-        // Caută programarea în shared state și dezactivează _isOptimistic
-        const existingIndex = sharedAppointments.findIndex(a => a.id === appointmentId || a.resourceId === appointmentId)
-        console.log('Looking for appointment with id/resourceId:', appointmentId, 'Found at index:', existingIndex)
-        
-        if (existingIndex >= 0) {
-          console.log('Before update - appointment:', sharedAppointments[existingIndex])
-          // Actualizează programarea existentă și dezactivează optimistic flag
-          sharedAppointments[existingIndex] = { ...ui, _isOptimistic: false }
-          console.log('After update - appointment:', sharedAppointments[existingIndex])
-          console.log('Updated appointment and disabled optimistic flag')
-        } else {
-          // Adaugă programarea nouă dacă nu există
-          sharedAppointments = [{ ...ui, _isOptimistic: false }, ...sharedAppointments]
-        }
-        
-        // Actualizează starea locală și notifică toți subscriberii
-        console.log('Updating appointments state after UPDATED operation. Current count:', sharedAppointments.length)
+      } else if (operation === 'updated' || operation === 'update') {
+        const ui = appointmentManager.transformAppointmentForUI({ ...data, id, resourceId: id })
+        const idx = sharedAppointments.findIndex(a => a.id === id || a.resourceId === id)
+        if (idx >= 0) sharedAppointments[idx] = { ...ui, _isOptimistic: false }
+        else sharedAppointments = [{ ...ui, _isOptimistic: false }, ...sharedAppointments]
         setAppointments([...sharedAppointments])
         notifySubscribers()
-        
-      } else if (operation === 'deleted') {
-        // Șterge din IndexedDB
-        await indexedDb.delete('appointments', appointmentId)
-        
-        // Șterge din shared state și dezactivează _isOptimistic
-        sharedAppointments = sharedAppointments.filter(a => {
-          const matches = a.id === appointmentId || a.resourceId === appointmentId
-          if (matches && a._isOptimistic) {
-            console.log('Removed optimistic appointment after deletion confirmation')
-          }
-          return !matches
-        })
-        
-        // Actualizează starea locală și notifică toți subscriberii
-        console.log('Updating appointments state after DELETED operation. Current count:', sharedAppointments.length)
+      } else if (operation === 'deleted' || operation === 'delete') {
+        sharedAppointments = sharedAppointments.filter(a => (a.id !== id && a.resourceId !== id))
         setAppointments([...sharedAppointments])
         notifySubscribers()
       }

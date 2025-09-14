@@ -3,7 +3,6 @@ import treatmentService from '../services/treatmentService.js'
 import treatmentManager from '../business/treatmentManager.js'
 import { indexedDb } from '../data/infrastructure/db.js'
 import { populateTestData, checkCacheStatus } from '../utils/treatmentUtils.js'
-import { generateTempId } from '../lib/utils.js'
 import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
 
 // Stare partajată la nivel de modul pentru sincronizare între instanțe
@@ -185,51 +184,27 @@ export const useTreatments = () => {
     return treatments.find(treatment => treatment.id === id) || null
   }, [treatments])
 
-  // Adaugă un tratament nou cu optimistic update
+  // Adaugă un tratament nou (optimism gestionat de Repository)
   const addTreatment = useCallback(async (treatmentData) => {
     setLoading(true)
     setError(null)
     
-    // Generează ID temporar pentru optimistic update
-    const tempId = generateTempId('treatment')
-    
     try {
-      const optimisticTreatment = {
-        ...treatmentManager.transformTreatmentForUI(treatmentData),
-        _tempId: tempId,
-        _isOptimistic: true,
-        id: tempId,
-        resourceId: tempId
-      }
-      
-      // Adaugă în shared state optimist
-      sharedTreatments = [optimisticTreatment, ...sharedTreatments]
-      setTreatments(sharedTreatments)
-      setTreatmentCount(sharedTreatments.length)
-      notifySubscribers()
-      
       // Trimitere la server
       const newTreatment = await treatmentService.addTreatment(treatmentData)
       
-      // Dacă API-ul a returnat date reale, înlocuiește optimistul
       if (newTreatment && newTreatment.id) {
         const realTreatment = treatmentManager.transformTreatmentForUI(newTreatment)
-        const optimisticIndex = sharedTreatments.findIndex(t => t._tempId === tempId)
-        if (optimisticIndex >= 0) {
-          sharedTreatments[optimisticIndex] = { ...realTreatment, _isOptimistic: false }
-          setTreatments(sharedTreatments)
-          notifySubscribers()
-        }
+        const idx = sharedTreatments.findIndex(t => t.id === realTreatment.id || t.resourceId === realTreatment.resourceId)
+        if (idx >= 0) sharedTreatments[idx] = { ...realTreatment, _isOptimistic: false }
+        else sharedTreatments = [realTreatment, ...sharedTreatments]
+        setTreatments(sharedTreatments)
+        setTreatmentCount(sharedTreatments.length)
+        notifySubscribers()
       }
       
       return newTreatment
     } catch (err) {
-      // Rollback în caz de eroare
-      sharedTreatments = sharedTreatments.filter(t => t._tempId !== tempId)
-      setTreatments(sharedTreatments)
-      setTreatmentCount(sharedTreatments.length)
-      notifySubscribers()
-      
       setError(err.message)
       console.error('Error adding treatment:', err)
       throw err
@@ -238,40 +213,19 @@ export const useTreatments = () => {
     }
   }, [])
 
-  // Actualizează un tratament cu optimistic update
+  // Actualizează un tratament (optimism gestionat de Repository)
   const updateTreatment = useCallback(async (id, treatmentData) => {
     setLoading(true)
     setError(null)
     
     try {
-      // Găsește tratamentul existent
-      const existingIndex = sharedTreatments.findIndex(t => t.id === id || t.resourceId === id)
-      if (existingIndex === -1) {
-        throw new Error('Tratamentul nu a fost găsit')
-      }
-      
-      const existingTreatment = sharedTreatments[existingIndex]
-      
-      // Creează versiunea optimistă
-      const optimisticTreatment = {
-        ...treatmentManager.transformTreatmentForUI(treatmentData),
-        _isOptimistic: true,
-        id: existingTreatment.id,
-        resourceId: existingTreatment.resourceId
-      }
-      
-      // Actualizează în shared state optimist
-      sharedTreatments[existingIndex] = optimisticTreatment
-      setTreatments(sharedTreatments)
-      notifySubscribers()
-      
       // Trimitere la server
       const updatedTreatment = await treatmentService.updateTreatment(id, treatmentData)
       
-      // Dacă API-ul a returnat date reale, dezactivează optimistic
       if (updatedTreatment) {
         const realTreatment = treatmentManager.transformTreatmentForUI(updatedTreatment)
-        sharedTreatments[existingIndex] = { ...realTreatment, _isOptimistic: false }
+        const existingIndex = sharedTreatments.findIndex(t => t.id === id || t.resourceId === id)
+        if (existingIndex >= 0) sharedTreatments[existingIndex] = { ...realTreatment, _isOptimistic: false }
         setTreatments(sharedTreatments)
         notifySubscribers()
       }
@@ -286,32 +240,12 @@ export const useTreatments = () => {
     }
   }, [])
 
-  // Șterge un tratament cu optimistic update
+  // Șterge un tratament (optimism gestionat de Repository)
   const deleteTreatment = useCallback(async (id) => {
     setLoading(true)
     setError(null)
     
     try {
-      // Găsește tratamentul existent
-      const existingIndex = sharedTreatments.findIndex(t => t.id === id || t.resourceId === id)
-      if (existingIndex === -1) {
-        throw new Error('Tratamentul nu a fost găsit')
-      }
-      
-      const existingTreatment = sharedTreatments[existingIndex]
-      
-      // Marchează pentru ștergere optimistă
-      const deletingTreatment = {
-        ...existingTreatment,
-        _isOptimistic: true,
-        _isDeleting: true
-      }
-      
-      // Actualizează în shared state
-      sharedTreatments[existingIndex] = deletingTreatment
-      setTreatments(sharedTreatments)
-      notifySubscribers()
-      
       // Trimitere la server
       await treatmentService.deleteTreatment(id)
       
@@ -321,17 +255,6 @@ export const useTreatments = () => {
       setTreatmentCount(sharedTreatments.length)
       notifySubscribers()
     } catch (err) {
-      // Rollback în caz de eroare
-      const existingIndex = sharedTreatments.findIndex(t => t.id === id || t.resourceId === id)
-      if (existingIndex >= 0) {
-        sharedTreatments[existingIndex] = {
-          ...sharedTreatments[existingIndex],
-          _isOptimistic: false,
-          _isDeleting: false
-        }
-        setTreatments(sharedTreatments)
-        notifySubscribers()
-      }
       
       setError(err.message)
       console.error('Error deleting treatment:', err)
