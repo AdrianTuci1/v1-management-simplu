@@ -2,7 +2,6 @@ import {
   Users, 
   Plus, 
   Search, 
-  Filter, 
   Edit,
   Trash2,
   Download,
@@ -35,19 +34,16 @@ const OperationsPeople = () => {
   } = usePatients()
   
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [sortBy, setSortBy] = useState('name')
   const [sortOrder, setSortOrder] = useState('asc')
-  const [showFilters, setShowFilters] = useState(false)
 
   // Încarcă pacienții la montarea componentei
   useEffect(() => {
     loadPatientsByPage(currentPage, 20, {
-      name: searchTerm,
-      status: statusFilter
+      name: searchTerm
     })
-  }, [currentPage, searchTerm, statusFilter, loadPatientsByPage])
+  }, [currentPage, searchTerm, loadPatientsByPage])
 
   // Funcție pentru căutare
   const handleSearch = async (term) => {
@@ -56,7 +52,7 @@ const OperationsPeople = () => {
     if (term.trim()) {
       await searchPatients(term)
     } else {
-      await loadPatientsByPage(1, 20, { status: statusFilter })
+      await loadPatientsByPage(1, 20, {})
     }
   }
 
@@ -166,9 +162,9 @@ const OperationsPeople = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Persoane</h1>
+          <h1 className="text-3xl font-bold">Pacienti</h1>
           <p className="text-muted-foreground">
-            Gestionează clienții și personalul
+            Gestionează clienții
           </p>
         </div>
         <div className="flex gap-2">
@@ -256,26 +252,6 @@ const OperationsPeople = () => {
               />
             </div>
             
-            <div className="flex gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Toate statusurile</option>
-                <option value="active">Activ</option>
-                <option value="inactive">Inactiv</option>
-                <option value="archived">Arhivat</option>
-              </select>
-              
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className="btn btn-outline"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filtrează
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -317,12 +293,12 @@ const OperationsPeople = () => {
               <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Nu există pacienți</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || statusFilter 
+                {searchTerm 
                   ? 'Nu s-au găsit pacienți cu criteriile specificate.'
                   : 'Aici vei putea gestiona clienții și personalul companiei.'
                 }
               </p>
-              {!searchTerm && !statusFilter && (
+              {!searchTerm && (
                 <button 
                   onClick={() => openDrawer({ type: 'new-person' })}
                   className="btn btn-primary"
@@ -383,7 +359,7 @@ const OperationsPeople = () => {
                 </thead>
                 <tbody>
                   {sortedPatients.map((patient) => (
-                    <tr key={patient.id} className="border-b hover:bg-muted/50">
+                    <tr key={patient.resourceId || patient.id} className="border-b hover:bg-muted/50">
                       <td className="p-3">
                         <div>
                           <div className="font-medium flex items-center gap-2">
@@ -478,7 +454,7 @@ const OperationsPeople = () => {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDeletePatient(patient.id)}
+                            onClick={() => handleDeletePatient(patient.resourceId || patient.id)}
                             className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Șterge"
                             disabled={patient._isOptimistic || patient._isDeleting}

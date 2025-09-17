@@ -111,19 +111,59 @@ class TreatmentService {
     return treatmentManager.exportTreatments(treatments, format)
   }
 
-  // Căutare tratamente
+  // Căutare tratamente folosind resource queries
   async searchTreatments(query, limit = 50) {
     try {
-      const searchFilters = {
-        search: query,
-        limit
+      const businessId = localStorage.getItem("businessId") || 'B0100001';
+      const locationId = localStorage.getItem("locationId") || 'L0100001';
+      
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.treatmentName=${encodeURIComponent(query)}&page=1&limit=${limit}`;
+      console.log('Treatment search endpoint:', endpoint);
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Resource-Type": "treatment",
+          ...(localStorage.getItem('cognito-data') && {
+            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
+          })
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error ${response.status}`);
       }
-      const command = new GetCommand(this.repository, searchFilters)
-      const treatments = await this.invoker.run(command)
-      return Array.isArray(treatments) ? treatments : []
+      
+      const data = await response.json();
+      
+      // Extract data from API response structure
+      let treatments = [];
+      if (data && data.data) {
+        treatments = Array.isArray(data.data) ? data.data : [];
+      } else if (Array.isArray(data)) {
+        treatments = data;
+      }
+      
+      // Transformăm fiecare tratament pentru UI
+      return treatments.map(treatment => 
+        treatmentManager.transformTreatmentForUI(treatment)
+      );
     } catch (error) {
-      console.error('Error searching treatments:', error)
-      return []
+      console.error('Error searching treatments by name:', error);
+      // Fallback to old method if resource query fails
+      try {
+        const searchFilters = {
+          search: query,
+          limit
+        }
+        const command = new GetCommand(this.repository, searchFilters)
+        const treatments = await this.invoker.run(command)
+        return Array.isArray(treatments) ? treatments : []
+      } catch (fallbackError) {
+        console.error('Fallback search also failed:', fallbackError)
+        return []
+      }
     }
   }
 }

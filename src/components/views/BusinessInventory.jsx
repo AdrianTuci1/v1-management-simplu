@@ -3,7 +3,6 @@ import {
   Package, 
   Plus, 
   Search, 
-  Download, 
   AlertTriangle,
   Edit,
   TrendingUp,
@@ -61,10 +60,10 @@ const BusinessInventory = () => {
   })()
 
   // Gestionează căutarea
-  const handleSearch = (e) => {
+  const handleSearch = async (e) => {
     const term = e.target.value
     setSearchTerm(term)
-    searchProducts(term)
+    await searchProducts(term)
   }
 
   // Gestionează filtrarea după categorie
@@ -97,23 +96,6 @@ const BusinessInventory = () => {
     }
   }
 
-  // Gestionează exportul
-  const handleExport = async (format) => {
-    try {
-      const data = await exportProducts(format)
-      const blob = new Blob([data], { 
-        type: format === 'csv' ? 'text/csv' : 'application/json' 
-      })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `inventar_${new Date().toISOString().split('T')[0]}.${format}`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Error exporting products:', err)
-    }
-  }
 
   // Obține categoriile disponibile
   const categories = productManager.getCategories()
@@ -210,7 +192,7 @@ const BusinessInventory = () => {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Caută produse după nume, categorie..."
+                placeholder="Caută produse după nume..."
                 value={searchTerm}
                 onChange={handleSearch}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -243,14 +225,6 @@ const BusinessInventory = () => {
                 Stoc scăzut
               </button>
               
-              <button
-                onClick={() => handleExport('csv')}
-                className="btn btn-outline flex items-center gap-2"
-                disabled={loading}
-              >
-                <Download className="h-4 w-4" />
-                Export CSV
-              </button>
             </div>
           </div>
         </div>
@@ -372,7 +346,7 @@ const BusinessInventory = () => {
                 </thead>
                 <tbody>
                   {sortedProducts.map((product) => (
-                    <tr key={product.id} className={`border-b hover:bg-muted/50 ${
+                    <tr key={product.resourceId || product.id} className={`border-b hover:bg-muted/50 ${
                       product._isDeleting ? 'opacity-50' : ''
                     }`}>
                       <td className="p-3">

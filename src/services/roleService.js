@@ -24,8 +24,19 @@ class RoleService {
                   // Transformă datele pentru UI
       return rolesArray.map(role => roleManager.transformRoleForUI(role));
     } catch (error) {
-      console.error('Error getting roles:', error)
-      throw error
+      console.error('Error getting roles from API, trying IndexedDB:', error)
+      
+      // Fallback la IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js');
+        const cachedRoles = await indexedDb.getAll('role');
+        console.log(`Loaded ${cachedRoles.length} roles from IndexedDB cache`);
+        
+        return cachedRoles.map(role => roleManager.transformRoleForUI(role));
+      } catch (cacheError) {
+        console.error('Error loading roles from IndexedDB:', cacheError);
+        return [];
+      }
     }
   }
 
@@ -96,8 +107,19 @@ class RoleService {
       const roles = await this.invoker.run(command)
       return roles.map(role => roleManager.transformRoleForUI(role))
     } catch (error) {
-      console.error('Error searching roles:', error)
-      throw error
+      console.error('Error searching roles from API, trying IndexedDB:', error)
+      
+      // Fallback la IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js');
+        const cachedRoles = await indexedDb.searchRoles(query);
+        console.log(`Found ${cachedRoles.length} roles matching "${query}" from IndexedDB cache`);
+        
+        return cachedRoles.map(role => roleManager.transformRoleForUI(role));
+      } catch (cacheError) {
+        console.error('Error searching roles from IndexedDB:', cacheError);
+        return [];
+      }
     }
   }
 
@@ -145,8 +167,19 @@ class RoleService {
       const roles = await this.invoker.run(command)
       return roles.map(role => roleManager.transformRoleForUI(role))
     } catch (error) {
-      console.error('Error getting roles by status:', error)
-      throw error
+      console.error('Error getting roles by status from API, trying IndexedDB:', error)
+      
+      // Fallback la IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js');
+        const cachedRoles = await indexedDb.getRolesByStatus(status);
+        console.log(`Found ${cachedRoles.length} roles with status "${status}" from IndexedDB cache`);
+        
+        return cachedRoles.map(role => roleManager.transformRoleForUI(role));
+      } catch (cacheError) {
+        console.error('Error getting roles by status from IndexedDB:', cacheError);
+        return [];
+      }
     }
   }
 }

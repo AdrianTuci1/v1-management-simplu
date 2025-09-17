@@ -80,11 +80,11 @@ const OperationsTreatments = () => {
   }, [treatments, sortBy, sortOrder])
 
   // Gestionează căutarea
-  const handleSearch = (e) => {
+  const handleSearch = async (e) => {
     const term = e.target.value
     setSearchTerm(term)
     if (term.trim()) {
-      searchTreatments(term)
+      await searchTreatments(term)
     }
   }
 
@@ -201,7 +201,7 @@ const OperationsTreatments = () => {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Caută tratamente după tip sau categorie..."
+                placeholder="Caută tratamente după nume..."
                 value={searchTerm}
                 onChange={handleSearch}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -364,7 +364,7 @@ const OperationsTreatments = () => {
                     const TypeIcon = getTreatmentTypeIcon(treatment.treatmentType)
                     
                     return (
-                      <tr key={treatment.id} className={`border-b hover:bg-muted/50 ${
+                      <tr key={treatment.resourceId} className={`border-b hover:bg-muted/50 ${
                         treatment._isDeleting ? 'opacity-50' : ''
                       }`}>
                         <td className="p-3">
@@ -425,7 +425,7 @@ const OperationsTreatments = () => {
                               <Edit className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteTreatment(treatment.id)}
+                              onClick={() => handleDeleteTreatment(treatment.resourceId || treatment.id)}
                               className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Șterge"
                               disabled={treatment._isOptimistic || treatment._isDeleting}

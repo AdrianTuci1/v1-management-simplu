@@ -13,8 +13,9 @@ import {
   Clock,
   X
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
+import appointmentService from '../../services/appointmentService.js'
 import { 
   Drawer, 
   DrawerHeader, 
@@ -29,6 +30,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [newTag, setNewTag] = useState('')
+  const [appointments, setAppointments] = useState([])
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false)
   
   // Hook pentru gestionarea pacienților
   const { addPatient, updatePatient, deletePatient } = usePatients()
@@ -59,6 +62,29 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
       status: 'active'
     }
   })
+
+  // Load appointments when patient data changes
+  useEffect(() => {
+    const loadAppointments = async () => {
+      if (patientData?.id || patientData?.resourceId) {
+        setAppointmentsLoading(true)
+        try {
+          const patientId = patientData.resourceId || patientData.id
+          const patientAppointments = await appointmentService.getAppointmentsByPatientId(patientId)
+          setAppointments(patientAppointments)
+        } catch (error) {
+          console.error('Error loading appointments:', error)
+          setAppointments([])
+        } finally {
+          setAppointmentsLoading(false)
+        }
+      } else {
+        setAppointments([])
+      }
+    }
+
+    loadAppointments()
+  }, [patientData?.id, patientData?.resourceId])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -122,33 +148,6 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
     }
   }
 
-  // Mock appointments data - in real app this would come from appointments service
-  const mockAppointments = [
-    {
-      id: 1,
-      date: '2024-01-15',
-      time: '10:00',
-      type: 'Consultare',
-      status: 'completed',
-      notes: 'Control rutină'
-    },
-    {
-      id: 2,
-      date: '2024-02-20',
-      time: '14:30',
-      type: 'Tratament',
-      status: 'scheduled',
-      notes: 'Plombare'
-    },
-    {
-      id: 3,
-      date: '2024-03-10',
-      time: '09:00',
-      type: 'Consultare',
-      status: 'scheduled',
-      notes: 'Control post-tratament'
-    }
-  ]
 
   const renderPatientDetails = () => (
     <div className="space-y-4">
@@ -342,46 +341,53 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
         Programări
       </div>
       
-      <div className="space-y-3">
-        {mockAppointments.map((appointment) => (
-          <div
-            key={appointment.id}
-            className={`p-4 rounded-lg border ${
-              appointment.status === 'completed' 
-                ? 'bg-green-50 border-green-200' 
-                : 'bg-blue-50 border-blue-200'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">
-                  {new Date(appointment.date).toLocaleDateString('ro-RO')} - {appointment.time}
+      {appointmentsLoading ? (
+        <div className="text-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+          <p className="text-slate-500">Se încarcă programările...</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {appointments.map((appointment) => (
+            <div
+              key={appointment.id}
+              className={`p-4 rounded-lg border ${
+                appointment.status === 'completed' 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-blue-50 border-blue-200'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">
+                    {appointment.appointmentDate ? new Date(appointment.appointmentDate).toLocaleDateString('ro-RO') : 'Data necunoscută'} - {appointment.startTime || 'Ora necunoscută'}
+                  </span>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  appointment.status === 'completed' 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {appointment.status === 'completed' ? 'Finalizată' : 'Programată'}
                 </span>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                appointment.status === 'completed' 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-blue-100 text-blue-800'
-              }`}>
-                {appointment.status === 'completed' ? 'Finalizată' : 'Programată'}
-              </span>
+              <div className="text-sm text-slate-600">
+                <div className="font-medium">{appointment.treatmentType || appointment.type || 'Consultare'}</div>
+                {appointment.notes && (
+                  <div className="mt-1">{appointment.notes}</div>
+                )}
+              </div>
             </div>
-            <div className="text-sm text-slate-600">
-              <div className="font-medium">{appointment.type}</div>
-              {appointment.notes && (
-                <div className="mt-1">{appointment.notes}</div>
-              )}
+          ))}
+          
+          {appointments.length === 0 && (
+            <div className="text-center py-8 text-slate-500">
+              Nu există programări pentru acest pacient
             </div>
-          </div>
-        ))}
-        
-        {mockAppointments.length === 0 && (
-          <div className="text-center py-8 text-slate-500">
-            Nu există programări pentru acest pacient
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 

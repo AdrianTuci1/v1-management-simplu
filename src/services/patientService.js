@@ -45,16 +45,55 @@ class PatientService {
     return Array.isArray(result) ? result : []
   }
 
-  // Obține pacienții după nume (căutare)
+  // Obține pacienții după nume (căutare) folosind resource queries
   async searchPatients(searchTerm, limit = 50) {
-    const params = {
-      search: searchTerm,
-      limit,
-      sortBy: 'name',
-      sortOrder: 'asc'
+    try {
+      const businessId = localStorage.getItem("businessId") || 'B0100001';
+      const locationId = localStorage.getItem("locationId") || 'L0100001';
+      
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.patientName=${encodeURIComponent(searchTerm)}&page=1&limit=${limit}`;
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Resource-Type": "patient",
+          ...(localStorage.getItem('cognito-data') && {
+            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
+          })
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract data from API response structure
+      let patients = [];
+      if (data && data.data) {
+        patients = Array.isArray(data.data) ? data.data : [];
+      } else if (Array.isArray(data)) {
+        patients = data;
+      }
+      
+      // Transformăm fiecare pacient pentru UI
+      return patients.map(patient => 
+        patientManager.transformPatientForUI(patient)
+      );
+    } catch (error) {
+      console.error('Error searching patients by name:', error);
+      // Fallback to old method if resource query fails
+      const params = {
+        search: searchTerm,
+        limit,
+        sortBy: 'name',
+        sortOrder: 'asc'
+      }
+      const result = await this.getPatients(params)
+      return Array.isArray(result) ? result : []
     }
-    const result = await this.getPatients(params)
-    return Array.isArray(result) ? result : []
   }
 
   // Obține un pacient după ID

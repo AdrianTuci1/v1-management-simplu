@@ -26,8 +26,20 @@ class ProductService {
       // Transformă datele pentru UI
       return productsArray.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading products:', error);
-      return [];
+      console.error('Error loading products from API, trying IndexedDB:', error);
+      
+      // Fallback la IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js');
+        const cachedProducts = await indexedDb.getAll('products');
+        console.log(`Loaded ${cachedProducts.length} products from IndexedDB cache`);
+        
+        // Transformă datele pentru UI
+        return cachedProducts.map(product => productManager.transformForUI(product));
+      } catch (cacheError) {
+        console.error('Error loading products from IndexedDB:', cacheError);
+        return [];
+      }
     }
   }
 
@@ -42,8 +54,19 @@ class ProductService {
       
       return productsArray.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading products by category:', error);
-      return [];
+      console.error('Error loading products by category from API, trying IndexedDB:', error);
+      
+      // Fallback la IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js');
+        const cachedProducts = await indexedDb.getProductsByCategory(category);
+        console.log(`Loaded ${cachedProducts.length} products for category "${category}" from IndexedDB cache`);
+        
+        return cachedProducts.map(product => productManager.transformForUI(product));
+      } catch (cacheError) {
+        console.error('Error loading products by category from IndexedDB:', cacheError);
+        return [];
+      }
     }
   }
 
@@ -58,24 +81,74 @@ class ProductService {
       
       return productsArray.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading low stock products:', error);
-      return [];
+      console.error('Error loading low stock products from API, trying IndexedDB:', error);
+      
+      // Fallback la IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js');
+        const cachedProducts = await indexedDb.getLowStockProducts();
+        console.log(`Loaded ${cachedProducts.length} low stock products from IndexedDB cache`);
+        
+        return cachedProducts.map(product => productManager.transformForUI(product));
+      } catch (cacheError) {
+        console.error('Error loading low stock products from IndexedDB:', cacheError);
+        return [];
+      }
     }
   }
 
-  // Caută produse
+  // Caută produse folosind resource queries
   async searchProducts(searchTerm) {
     try {
-      const command = new GetCommand(this.repository, { search: searchTerm });
-      const products = await command.execute();
+      const businessId = localStorage.getItem("businessId") || 'B0100001';
+      const locationId = localStorage.getItem("locationId") || 'L0100001';
       
-      // Asigură-te că rezultatul este întotdeauna un array
-      const productsArray = Array.isArray(products) ? products : [];
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.name=${encodeURIComponent(searchTerm)}&page=1&limit=50`;
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Resource-Type": "product",
+          ...(localStorage.getItem('cognito-data') && {
+            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
+          })
+        }
+      });
       
-      return productsArray.map(product => productManager.transformForUI(product));
+      if (!response.ok) {
+        throw new Error(`API error ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract data from API response structure
+      let products = [];
+      if (data && data.data) {
+        products = Array.isArray(data.data) ? data.data : [];
+      } else if (Array.isArray(data)) {
+        products = data;
+      }
+      
+      // Transformăm fiecare produs pentru UI
+      return products.map(product => 
+        productManager.transformForUI(product)
+      );
     } catch (error) {
-      console.error('Error searching products:', error);
-      return [];
+      console.error('Error searching products by name:', error);
+      // Fallback to old method if resource query fails
+      try {
+        const command = new GetCommand(this.repository, { search: searchTerm });
+        const products = await command.execute();
+        
+        // Asigură-te că rezultatul este întotdeauna un array
+        const productsArray = Array.isArray(products) ? products : [];
+        
+        return productsArray.map(product => productManager.transformForUI(product));
+      } catch (fallbackError) {
+        console.error('Fallback search also failed:', fallbackError);
+        return [];
+      }
     }
   }
 

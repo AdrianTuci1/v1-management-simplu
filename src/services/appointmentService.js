@@ -189,6 +189,92 @@ class AppointmentService {
   async exportAppointments(appointments, format = 'json') {
     return appointmentManager.exportAppointments(appointments, format)
   }
+
+  // Obține programările unui pacient specific folosind resource queries
+  async getAppointmentsByPatientId(patientId) {
+    try {
+      const businessId = localStorage.getItem("businessId") || 'B0100001';
+      const locationId = localStorage.getItem("locationId") || 'L0100001';
+      
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.patient.id=${encodeURIComponent(patientId)}&page=1&limit=50`;
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Resource-Type": "appointment",
+          ...(localStorage.getItem('cognito-data') && {
+            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
+          })
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract data from API response structure
+      let appointments = [];
+      if (data && data.data) {
+        appointments = Array.isArray(data.data) ? data.data : [];
+      } else if (Array.isArray(data)) {
+        appointments = data;
+      }
+      
+      // Transformăm fiecare programare pentru UI
+      return appointments.map(appointment => 
+        appointmentManager.transformAppointmentForUI(appointment)
+      );
+    } catch (error) {
+      console.error('Error fetching appointments by patient ID:', error);
+      return [];
+    }
+  }
+
+  // Obține programările unui medic specific folosind resource queries
+  async getAppointmentsByMedicId(medicId) {
+    try {
+      const businessId = localStorage.getItem("businessId") || 'B0100001';
+      const locationId = localStorage.getItem("locationId") || 'L0100001';
+      
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.doctor.id=${encodeURIComponent(medicId)}&page=1&limit=50`;
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Resource-Type": "appointment",
+          ...(localStorage.getItem('cognito-data') && {
+            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
+          })
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract data from API response structure
+      let appointments = [];
+      if (data && data.data) {
+        appointments = Array.isArray(data.data) ? data.data : [];
+      } else if (Array.isArray(data)) {
+        appointments = data;
+      }
+      
+      // Transformăm fiecare programare pentru UI
+      return appointments.map(appointment => 
+        appointmentManager.transformAppointmentForUI(appointment)
+      );
+    } catch (error) {
+      console.error('Error fetching appointments by medic ID:', error);
+      return [];
+    }
+  }
 }
 
 export default new AppointmentService()

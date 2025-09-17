@@ -28,8 +28,19 @@ class UserService {
       
       return userManager.transformUsersForUI(users)
     } catch (error) {
-      console.error('Error getting users:', error)
-      return []
+      console.error('Error getting users from API, trying IndexedDB:', error)
+      
+      // Fallback la IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js');
+        const cachedUsers = await indexedDb.getAll('users');
+        console.log(`Loaded ${cachedUsers.length} users from IndexedDB cache`);
+        
+        return userManager.transformUsersForUI(cachedUsers);
+      } catch (cacheError) {
+        console.error('Error loading users from IndexedDB:', cacheError);
+        return [];
+      }
     }
   }
 
@@ -105,8 +116,19 @@ class UserService {
       const usersArray = Array.isArray(users) ? users : []
       return userManager.transformUsersForUI(usersArray)
     } catch (error) {
-      console.error('Error searching users:', error)
-      return []
+      console.error('Error searching users from API, trying IndexedDB:', error)
+      
+      // Fallback la IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js');
+        const cachedUsers = await indexedDb.searchUsers(query);
+        console.log(`Found ${cachedUsers.length} users matching "${query}" from IndexedDB cache`);
+        
+        return userManager.transformUsersForUI(cachedUsers);
+      } catch (cacheError) {
+        console.error('Error searching users from IndexedDB:', cacheError);
+        return [];
+      }
     }
   }
 
