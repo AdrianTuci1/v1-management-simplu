@@ -165,19 +165,11 @@ const OperationsPeople = () => {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={handleExport}
-            className="btn btn-outline"
-            disabled={loading}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </button>
-          <button
             onClick={() => openDrawer({ type: 'new-person' })}
             className="btn btn-primary"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Persoană nouă
+            Pacient nou
           </button>
         </div>
       </div>
@@ -350,12 +342,18 @@ const OperationsPeople = () => {
                         )}
                       </button>
                     </th>
-                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedPatients.map((patient) => (
-                    <tr key={patient.resourceId || patient.id} className="border-b hover:bg-muted/50">
+                    <tr 
+                      key={patient.resourceId || patient.id} 
+                      className="border-b hover:bg-muted/50 cursor-pointer"
+                      onClick={() => openDrawer({ 
+                        type: 'edit-person', 
+                        data: patient 
+                      })}
+                    >
                       <td className="p-3">
                         <div>
                           <div className="font-medium flex items-center gap-2">
@@ -435,29 +433,6 @@ const OperationsPeople = () => {
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(patient.status)}`}>
                           {getStatusLabel(patient.status)}
                         </span>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openDrawer({ 
-                              type: 'edit-person', 
-                              data: patient 
-                            })}
-                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Editează"
-                            disabled={patient._isOptimistic || patient._isDeleting}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeletePatient(patient.resourceId || patient.id)}
-                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Șterge"
-                            disabled={patient._isOptimistic || patient._isDeleting}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))}

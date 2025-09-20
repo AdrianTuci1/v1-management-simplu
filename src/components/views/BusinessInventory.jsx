@@ -341,14 +341,17 @@ const BusinessInventory = () => {
                     </th>
                     <th className="text-left p-3 font-medium">Nivel Reîncărcare</th>
                     <th className="text-left p-3 font-medium">Status</th>
-                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedProducts.map((product) => (
-                    <tr key={product.resourceId || product.id} className={`border-b hover:bg-muted/50 ${
-                      product._isDeleting ? 'opacity-50' : ''
-                    }`}>
+                    <tr 
+                      key={product.resourceId || product.id} 
+                      className={`border-b hover:bg-muted/50 cursor-pointer ${
+                        product._isDeleting ? 'opacity-50' : ''
+                      }`}
+                      onClick={() => openDrawer({ type: 'product', data: product })}
+                    >
                       <td className="p-3">
                         <div>
                           <div className="font-medium flex items-center gap-2">
@@ -402,18 +405,6 @@ const BusinessInventory = () => {
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(product)}`}>
                           {getStatusLabel(product)}
                         </span>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openDrawer({ type: 'product', data: product })}
-                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Editează"
-                            disabled={product._isOptimistic || product._isDeleting}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))}

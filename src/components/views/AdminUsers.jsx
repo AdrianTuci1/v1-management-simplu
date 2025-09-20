@@ -352,14 +352,6 @@ const AdminUsers = () => {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-3 font-medium">
-                      <input
-                        type="checkbox"
-                        checked={selectedUsers.length === sortedUsers.length}
-                        onChange={handleSelectAll}
-                        className="rounded"
-                      />
-                    </th>
-                    <th className="text-left p-3 font-medium">
                       <button 
                         onClick={() => handleSort('medicName')}
                         className="flex items-center gap-1 hover:text-primary"
@@ -387,23 +379,18 @@ const AdminUsers = () => {
                       </button>
                     </th>
                     <th className="text-left p-3 font-medium">Zile Serviciu</th>
-                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedUsers.map((user) => (
-                    <tr key={user.id} className={`border-b hover:bg-muted/50 ${
-                      user._isDeleting ? 'opacity-50' : ''
-                    }`}>
-                      <td className="p-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.includes(user.id)}
-                          onChange={() => handleUserSelect(user.id)}
-                          className="rounded"
-                          disabled={user._isDeleting}
-                        />
-                      </td>
+                    <tr 
+                      key={user.id} 
+                      className={`border-b hover:bg-muted/50 cursor-pointer ${
+                        user._isDeleting ? 'opacity-50' : ''
+                      }`}
+                      onClick={() => openDrawer({ type: 'medic', data: user })}
+                    >
+ 
                       <td className="p-3">
                         <div>
                           <div className="font-medium flex items-center gap-2">
@@ -461,26 +448,6 @@ const AdminUsers = () => {
                           {(!user.dutyDays || user.dutyDays.length === 0) && (
                             <span className="text-xs text-gray-500">Fără zile setate</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openDrawer({ type: 'medic', data: user })}
-                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Editează"
-                            disabled={user._isOptimistic || user._isDeleting}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => openDrawer({ type: 'medic', data: user })}
-                            className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Vezi detalii"
-                            disabled={user._isOptimistic || user._isDeleting}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
                         </div>
                       </td>
                     </tr>

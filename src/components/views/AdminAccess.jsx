@@ -258,14 +258,15 @@ const AdminAccess = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleSort('status')}>
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acțiuni
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {roles.map((role) => (
-                    <tr key={role.id} className="hover:bg-gray-50">
+                    <tr 
+                      key={role.id} 
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => openDrawer({ type: 'role', data: role })}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <Shield className="h-5 w-5 text-primary mr-3" />
@@ -290,22 +291,6 @@ const AdminAccess = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(role.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleEditRole(role)}
-                            className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRole(role.id)}
-                            className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))}

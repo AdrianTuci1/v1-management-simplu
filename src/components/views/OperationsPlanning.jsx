@@ -6,7 +6,7 @@ import { useDrawer } from '../../contexts/DrawerContext'
 
 const OperationsPlanning = () => {
   const { openDrawer } = useDrawer();
-  
+
   // State management
   const [viewType, setViewType] = useState('week') // 'day', 'week', 'month'
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -55,6 +55,14 @@ const OperationsPlanning = () => {
     }
   }
 
+  // Cycle through view types
+  const cycleViewType = () => {
+    const viewTypes = ['day', 'week', 'month']
+    const currentIndex = viewTypes.indexOf(viewType)
+    const nextIndex = (currentIndex + 1) % viewTypes.length
+    setViewType(viewTypes[nextIndex])
+  }
+
   // Calendar navigation functions
   const goToPrevious = () => {
     const newDate = new Date(currentViewDate)
@@ -98,7 +106,7 @@ const OperationsPlanning = () => {
   const getCalendarDates = () => {
     const dates = []
     const startDate = new Date(currentViewDate)
-    
+
     switch (viewType) {
       case 'day':
         dates.push(new Date(startDate))
@@ -108,7 +116,7 @@ const OperationsPlanning = () => {
         const dayOfWeek = startDate.getDay()
         const diff = startDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
         const monday = new Date(startDate.setDate(diff))
-        
+
         for (let i = 0; i < 7; i++) {
           const date = new Date(monday)
           date.setDate(monday.getDate() + i)
@@ -119,12 +127,12 @@ const OperationsPlanning = () => {
         // Get start of month
         const firstDay = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
         const lastDay = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0)
-        
+
         // Get start of week for first day
         const firstDayOfWeek = firstDay.getDay()
         const startOfCalendar = new Date(firstDay)
         startOfCalendar.setDate(firstDay.getDate() - (firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1))
-        
+
         // Generate all dates for the month view
         for (let i = 0; i < 42; i++) {
           const date = new Date(startOfCalendar)
@@ -133,14 +141,14 @@ const OperationsPlanning = () => {
         }
         break
     }
-    
+
     return dates
   }
 
   // Get view title
   const getViewTitle = () => {
-    const options = { 
-      year: 'numeric', 
+    const options = {
+      year: 'numeric',
       month: 'long',
       ...(viewType === 'day' && { day: 'numeric' })
     }
@@ -152,14 +160,14 @@ const OperationsPlanning = () => {
     const loadData = async () => {
       // Obținem toate datele din calendar pentru a calcula perioada totală
       const calendarDates = getCalendarDates()
-      
+
       if (calendarDates.length === 0) return
-      
+
       // Calculăm perioada totală (startDate și endDate)
       const sortedDates = [...calendarDates].sort((a, b) => a - b)
       const startDate = sortedDates[0]
       const endDate = sortedDates[sortedDates.length - 1]
-      
+
       // Formatăm datele în format yyyy-mm-dd
       const formatDate = (date) => {
         const year = date.getFullYear()
@@ -167,7 +175,7 @@ const OperationsPlanning = () => {
         const day = String(date.getDate()).padStart(2, '0')
         return `${year}-${month}-${day}`
       }
-      
+
       // Facem o singură cerere pentru întreaga perioadă vizibilă
       const loadedAppointments = await loadAppointments({
         startDate: formatDate(startDate),
@@ -175,7 +183,7 @@ const OperationsPlanning = () => {
         sortBy: 'date',
         sortOrder: 'asc'
       })
-      
+
       // Calculăm numărul de programări pentru fiecare zi din rezultatul obținut
       await loadAppointmentsCount(calendarDates, loadedAppointments)
     }
@@ -188,7 +196,7 @@ const OperationsPlanning = () => {
   // Filtrează programările pentru afișare cu sortare optimistă
   const filteredAppointments = useMemo(() => {
     if (!appointments || appointments.length === 0) return []
-    
+
     // Aplică sortarea optimistă pentru a prioritiza elementele în proces
     const sortedAppointments = getSortedAppointments('time', 'asc')
     return sortedAppointments.slice(0, appointmentsLimit)
@@ -197,16 +205,16 @@ const OperationsPlanning = () => {
   // Check if date is current date
   const isCurrentDate = (date) => {
     const today = new Date()
-    return date.getDate() === today.getDate() && 
-           date.getMonth() === today.getMonth() && 
-           date.getFullYear() === today.getFullYear()
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
   }
 
   // Check if date is selected date
   const isSelectedDate = (date) => {
-    return date.getDate() === selectedDate.getDate() && 
-           date.getMonth() === selectedDate.getMonth() && 
-           date.getFullYear() === selectedDate.getFullYear()
+    return date.getDate() === selectedDate.getDate() &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear()
   }
 
   // Funcție pentru formatarea datelor în format yyyy-mm-dd
@@ -236,54 +244,36 @@ const OperationsPlanning = () => {
         <div>
           <h1 className="text-3xl font-bold">Planificare</h1>
           <p className="text-muted-foreground">
-            Gestionează programările și calendarul
+            Gestionează programările
           </p>
         </div>
-        <button
-          onClick={() => openDrawer({ type: 'appointment', isNew: true })}
-          className="btn btn-primary"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Programare nouă
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={cycleViewType}
+            className="btn btn-primary btn-sm"
+          >
+            {viewType === 'day' && 'Zi'}
+            {viewType === 'week' && 'Săptămână'}
+            {viewType === 'month' && 'Lună'}
+          </button>
+          <button
+            onClick={goToCurrent}
+            className="btn btn-outline btn-sm"
+          >
+            Astăzi
+          </button>
+          <button
+            onClick={() => openDrawer({ type: 'appointment', isNew: true })}
+            className="btn btn-primary"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Programare nouă
+          </button>
+        </div>
       </div>
 
       {/* Calendar View */}
       <div className="card">
-        <div className="card-header">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              <h3 className="card-title">Calendar - {getViewTitle()}</h3>
-            </div>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setViewType('day')}
-                className={`btn btn-sm ${viewType === 'day' ? 'btn-primary' : 'btn-outline'}`}
-              >
-                Zi
-              </button>
-              <button 
-                onClick={() => setViewType('week')}
-                className={`btn btn-sm ${viewType === 'week' ? 'btn-primary' : 'btn-outline'}`}
-              >
-                Săptămână
-              </button>
-              <button 
-                onClick={() => setViewType('month')}
-                className={`btn btn-sm ${viewType === 'month' ? 'btn-primary' : 'btn-outline'}`}
-              >
-                Lună
-              </button>
-              <button 
-                onClick={goToCurrent}
-                className="btn btn-outline btn-sm"
-              >
-                Astăzi
-              </button>
-            </div>
-          </div>
-        </div>
         <div className="card-content">
           {/* Navigation arrows */}
           <div className="flex items-center justify-between mb-4">
@@ -310,20 +300,19 @@ const OperationsPlanning = () => {
               ))}
             </div>
           )}
-          
-          <div className={`grid gap-1 ${
-            viewType === 'day' ? 'grid-cols-1' : 
-            viewType === 'week' ? 'grid-cols-7' : 
-            'grid-cols-7'
-          }`}>
+
+          <div className={`grid gap-1 ${viewType === 'day' ? 'grid-cols-1' :
+              viewType === 'week' ? 'grid-cols-7' :
+                'grid-cols-7'
+            }`}>
             {calendarDates.map((date, index) => {
               const isCurrent = isCurrentDate(date)
               const isSelected = isSelectedDate(date)
               const appointmentsCount = getAppointmentsCount(date)
               const isCurrentMonth = date.getMonth() === currentViewDate.getMonth()
-              
+
               return (
-                <div 
+                <div
                   key={index}
                   onClick={() => setSelectedDate(date)}
                   className={`
@@ -378,19 +367,19 @@ const OperationsPlanning = () => {
             <div className="space-y-3">
               {filteredAppointments.length > 0 ? (
                 filteredAppointments.map((appointment, index) => (
-                  <div 
-                    key={appointment.id || appointment._tempId || index} 
-                    className={`flex items-center justify-between p-3 border rounded-lg ${
-                      appointment._isDeleting ? 'opacity-50' : ''
-                    }`}
+                  <div
+                    key={appointment.id || appointment._tempId || index}
+                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 ${appointment._isDeleting ? 'opacity-50' : ''
+                      }`}
+                    onClick={() => openDrawer({ type: 'appointment', data: appointment })}
                   >
                     <div className="flex items-center gap-4">
                       <div className="flex flex-col">
-                      <div className="text-sm font-medium w-16">{appointment.time}</div>
-                      <div className="text-xs text-muted-foreground">
+                        <div className="text-sm font-medium w-16">{appointment.time}</div>
+                        <div className="text-xs text-muted-foreground">
                           {appointment.date ? new Date(appointment.date).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' }) : ''}
                         </div>
-                        </div>
+                      </div>
                       <div>
                         <div className={`font-medium ${appointment._isDeleting ? 'line-through' : ''}`}>
                           {appointment.patient?.name || appointment.patient || 'Pacient necunoscut'}
@@ -408,7 +397,7 @@ const OperationsPlanning = () => {
                       <span className={`badge ${getStatusColor(appointment.status)}`}>
                         {getStatusText(appointment.status)}
                       </span>
-                      
+
                       {/* Indicator pentru optimistic updates */}
                       {appointment._isOptimistic && !appointment._isDeleting && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
@@ -416,16 +405,19 @@ const OperationsPlanning = () => {
                           Salvare...
                         </span>
                       )}
-                      
+
                       {appointment._isDeleting && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
                           <Trash2 className="h-3 w-3 mr-1" />
                           Ștergere...
                         </span>
                       )}
-                      
-                      <button 
-                        onClick={() => openDrawer({ type: 'appointment', data: appointment })}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openDrawer({ type: 'appointment', data: appointment })
+                        }}
                         className="btn btn-ghost btn-sm"
                         disabled={appointment._isOptimistic}
                       >
@@ -444,7 +436,7 @@ const OperationsPlanning = () => {
         </div>
         {filteredAppointments.length >= appointmentsLimit && (
           <div className="card-footer">
-            <button 
+            <button
               onClick={loadMoreAppointments}
               className="btn btn-outline btn-sm"
             >

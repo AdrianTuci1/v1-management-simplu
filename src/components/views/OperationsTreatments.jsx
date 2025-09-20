@@ -356,7 +356,6 @@ const OperationsTreatments = () => {
                         )}
                       </button>
                     </th>
-                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -364,9 +363,13 @@ const OperationsTreatments = () => {
                     const TypeIcon = getTreatmentTypeIcon(treatment.treatmentType)
                     
                     return (
-                      <tr key={treatment.resourceId} className={`border-b hover:bg-muted/50 ${
-                        treatment._isDeleting ? 'opacity-50' : ''
-                      }`}>
+                      <tr 
+                        key={treatment.resourceId} 
+                        className={`border-b hover:bg-muted/50 cursor-pointer ${
+                          treatment._isDeleting ? 'opacity-50' : ''
+                        }`}
+                        onClick={() => openDrawer({ type: 'treatment', isNew: false, data: treatment })}
+                      >
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <TypeIcon className="h-4 w-4 text-primary" />
@@ -412,26 +415,6 @@ const OperationsTreatments = () => {
                             }`}>
                               {treatment.price} RON
                             </span>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => openDrawer({ type: 'treatment', isNew: false, data: treatment })}
-                              className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Editează"
-                              disabled={treatment._isOptimistic || treatment._isDeleting}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTreatment(treatment.resourceId || treatment.id)}
-                              className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Șterge"
-                              disabled={treatment._isOptimistic || treatment._isDeleting}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
                           </div>
                         </td>
                       </tr>
