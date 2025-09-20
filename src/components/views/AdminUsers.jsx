@@ -163,22 +163,6 @@ const AdminUsers = () => {
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={handlePopulateTestData}
-            className="btn btn-outline flex items-center gap-2"
-            disabled={loading}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Date Test
-          </button>
-          <button
-            onClick={handleExport}
-            className="btn btn-outline"
-            disabled={loading}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </button>
-          <button 
             onClick={() => openDrawer({ type: 'medic' })} 
             className="btn btn-primary flex items-center gap-2"
           >
@@ -188,68 +172,16 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="card">
-            <div className="card-content p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total medici</p>
-                  <p className="text-2xl font-bold">{stats.total || users.length}</p>
-                </div>
-                <User className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="card">
-            <div className="card-content p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Activi</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.active || users.filter(u => u.status === 'active').length}</p>
-                </div>
-                <User className="h-8 w-8 text-green-600" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="card">
-            <div className="card-content p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Inactivi</p>
-                  <p className="text-2xl font-bold text-yellow-600">{stats.inactive || users.filter(u => u.status === 'inactive').length}</p>
-                </div>
-                <User className="h-8 w-8 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="card">
-            <div className="card-content p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Suspendati</p>
-                  <p className="text-2xl font-bold text-red-600">{stats.suspended || users.filter(u => u.status === 'suspended').length}</p>
-                </div>
-                <User className="h-8 w-8 text-red-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Filters and Search */}
-      <div className="card">
-        <div className="card-content">
+      <div className="card flex">
+        <div className="card-conten p-2">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Caută medici după nume, email, telefon..."
+                placeholder="Caută medic"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -257,30 +189,6 @@ const AdminUsers = () => {
             </div>
             
             <div className="flex gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Toate statusurile</option>
-                <option value="active">Activ</option>
-                <option value="inactive">Inactiv</option>
-                <option value="suspended">Suspendat</option>
-                <option value="retired">Pensionat</option>
-              </select>
-              
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Toate rolurile</option>
-                <option value="doctor">Medic</option>
-                <option value="nurse">Asistent</option>
-                <option value="specialist">Specialist</option>
-                <option value="resident">Rezident</option>
-                <option value="admin">Admin</option>
-              </select>
               
               <button 
                 onClick={() => setShowFilters(!showFilters)}

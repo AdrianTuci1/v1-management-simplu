@@ -201,40 +201,14 @@ const OperationsTreatments = () => {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Caută tratamente după nume..."
+                placeholder="Caută tratamente"
                 value={searchTerm}
                 onChange={handleSearch}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
             </div>
             
-            <div className="flex gap-2">
-              <select
-                value={categoryFilter}
-                onChange={(e) => handleCategoryFilter(e.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Toate categoriile</option>
-                {uniqueCategories.map(category => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              
-              <select
-                value={typeFilter}
-                onChange={(e) => handleTypeFilter(e.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Toate tipurile</option>
-                {uniqueTreatmentTypes.map(type => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-              
+            <div className="flex gap-2">          
               <button 
                 onClick={() => setShowFilters(!showFilters)}
                 className="btn btn-outline"

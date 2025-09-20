@@ -1,10 +1,8 @@
-import { RefreshCw, Plus, Power, PowerOff, Mail, MessageSquare, Mic, Facebook, CheckCircle, XCircle, AlertCircle, ExternalLink, Loader2 } from 'lucide-react'
-import { useDrawer } from '../../contexts/DrawerContext'
+import { Power, Mail, MessageSquare, Mic, Facebook, CheckCircle, XCircle, AlertCircle, ExternalLink, Loader2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import externalApiService from '../../services/externalApiService'
 
 const BusinessProcesses = () => {
-  const { openDrawer } = useDrawer();
   
   // State for service status
   const [services, setServices] = useState({
@@ -188,42 +186,22 @@ const BusinessProcesses = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Procese</h1>
-          <p className="text-muted-foreground">Gestionează serviciile și integrarea cu platforme externe</p>
-        </div>
-        <div className="flex space-x-3">
-          <button 
-            onClick={checkAllServicesStatus} 
-            disabled={checkingStatus}
-            className="btn btn-outline"
-          >
-            {checkingStatus ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            {checkingStatus ? 'Se verifică...' : 'Verifică Status'}
-          </button>
-          <button onClick={() => openDrawer({ type: 'new-process' })} className="btn btn-primary">
-            <Plus className="h-4 w-4 mr-2" />
-            Proces nou
-          </button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold">Servicii</h1>
+        <p className="text-muted-foreground">Gestionează serviciile și integrarea cu platforme externe</p>
       </div>
 
-      {/* Services Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Services List */}
+      <div className="space-y-4">
         {Object.entries(services).map(([key, service]) => {
           const StatusIcon = getStatusInfo(service).icon;
           const ServiceIcon = getServiceIcon(key);
           
           return (
             <div key={key} className="card">
-              <div className="card-content p-6">
-                {/* Service Header */}
-                <div className="flex items-center justify-between mb-4">
+              <div className="card-content p-4">
+                <div className="flex items-center justify-between">
+                  {/* Service Info */}
                   <div className="flex items-center space-x-3">
                     <div className={`p-2 rounded-lg ${service.active ? 'bg-green-100' : 'bg-gray-100'}`}>
                       <ServiceIcon className={`h-5 w-5 ${service.active ? 'text-green-600' : 'text-gray-600'}`} />
@@ -238,25 +216,10 @@ const BusinessProcesses = () => {
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Service Description */}
-                <p className="text-sm text-muted-foreground mb-4">
-                  {service.description}
-                </p>
-
-                {/* Error Message */}
-                {service.error && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600">{service.error}</p>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="space-y-3">
-                  {/* Toggle Switch */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Status</span>
+                  {/* Actions */}
+                  <div className="flex items-center space-x-3">
+                    {/* Toggle Switch */}
                     <button
                       onClick={() => toggleService(key)}
                       disabled={!service.authorized}
@@ -270,47 +233,47 @@ const BusinessProcesses = () => {
                         }`}
                       />
                     </button>
-                  </div>
 
-                  {/* Authorization Button (for Gmail, Meta, and Voice Agent) */}
-                  {((key === 'gmail' || key === 'meta') && !service.authorized) || (key === 'voiceAgent' && !service.authorized) ? (
-                    <button
-                      onClick={() => handleAuthorization(key)}
-                      disabled={service.loading}
-                      className="w-full btn btn-outline btn-sm flex items-center justify-center space-x-2 disabled:opacity-50"
-                    >
-                      {service.loading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
+                    {/* Authorization Button */}
+                    {((key === 'gmail' || key === 'meta') && !service.authorized) || (key === 'voiceAgent' && !service.authorized) ? (
+                      <button
+                        onClick={() => handleAuthorization(key)}
+                        disabled={service.loading}
+                        className="btn btn-outline btn-sm flex items-center space-x-2 disabled:opacity-50"
+                      >
+                        {service.loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ExternalLink className="h-4 w-4" />
+                        )}
+                        <span>
+                          {service.loading ? 'Se conectează...' : `Autorizează`}
+                        </span>
+                      </button>
+                    ) : null}
+
+                    {/* Re-authorize Button */}
+                    {(key === 'gmail' || key === 'meta') && service.authorized && !service.active && !service.loading && (
+                      <button
+                        onClick={() => handleAuthorization(key)}
+                        className="btn btn-outline btn-sm flex items-center space-x-2"
+                      >
                         <ExternalLink className="h-4 w-4" />
-                      )}
-                      <span>
-                        {service.loading ? 'Se conectează...' : `Autorizează ${service.name}`}
-                      </span>
-                    </button>
-                  ) : null}
+                        <span>Re-autorizează</span>
+                      </button>
+                    )}
 
-                  {/* Re-authorize Button (for authorized but inactive services) */}
-                  {(key === 'gmail' || key === 'meta') && service.authorized && !service.active && !service.loading && (
-                    <button
-                      onClick={() => handleAuthorization(key)}
-                      className="w-full btn btn-outline btn-sm flex items-center justify-center space-x-2"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      <span>Re-autorizează</span>
-                    </button>
-                  )}
-
-                  {/* Voice Agent Session Button */}
-                  {key === 'voiceAgent' && service.authorized && !service.loading && (
-                    <button
-                      onClick={() => handleAuthorization(key)}
-                      className="w-full btn btn-outline btn-sm flex items-center justify-center space-x-2"
-                    >
-                      <Mic className="h-4 w-4" />
-                      <span>Creează Sesiune Voice</span>
-                    </button>
-                  )}
+                    {/* Voice Agent Session Button */}
+                    {key === 'voiceAgent' && service.authorized && !service.loading && (
+                      <button
+                        onClick={() => handleAuthorization(key)}
+                        className="btn btn-outline btn-sm flex items-center space-x-2"
+                      >
+                        <Mic className="h-4 w-4" />
+                        <span>Sesiune Voice</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -318,22 +281,6 @@ const BusinessProcesses = () => {
         })}
       </div>
 
-      {/* Additional Process Management */}
-      <div className="card">
-        <div className="card-content">
-          <div className="text-center py-8">
-            <RefreshCw className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Workflow-uri și Procese</h3>
-            <p className="text-muted-foreground mb-4">
-              Gestionează workflow-urile și procesele automate pentru serviciile activate.
-            </p>
-            <button onClick={() => openDrawer({ type: 'new-process' })} className="btn btn-primary">
-              <Plus className="h-4 w-4 mr-2" />
-              Creează Workflow
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

@@ -135,7 +135,7 @@ const BusinessInventory = () => {
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="card">
-            <div className="card-content p-4">
+            <div className="card-content">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Produse</p>
@@ -147,7 +147,7 @@ const BusinessInventory = () => {
           </div>
           
           <div className="card">
-            <div className="card-content p-4">
+            <div className="card-content">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Valoare Totală</p>
@@ -159,7 +159,7 @@ const BusinessInventory = () => {
           </div>
           
           <div className="card">
-            <div className="card-content p-4">
+            <div className="card-content">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Stoc Scăzut</p>
@@ -171,7 +171,7 @@ const BusinessInventory = () => {
           </div>
           
           <div className="card">
-            <div className="card-content p-4">
+            <div className="card-content">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Fără Stoc</p>
@@ -243,18 +243,6 @@ const BusinessInventory = () => {
 
       {/* Lista Produse */}
       <div className="card">
-        <div className="card-header">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              <h3 className="card-title">Lista Produse</h3>
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {sortedProducts.length} produse afișate
-            </p>
-          </div>
-        </div>
         
         <div className="card-content">
           {loading && sortedProducts.length === 0 ? (

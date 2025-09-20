@@ -44,7 +44,7 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocati
         },
         {
           id: 'operations-people',
-          label: 'Persoane',
+          label: 'Pacienți',
           icon: Users,
           view: 'operations-people'
         },
@@ -145,7 +145,7 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocati
         },
         {
           id: 'admin-users',
-          label: 'Utilizatori',
+          label: 'Medici',
           icon: User,
           view: 'admin-users'
         },
