@@ -168,10 +168,23 @@ class AuthService {
     // Try to get data from new auth repository first
     const authUserData = authRepository.getStoredUserData()
     if (authUserData?.user?.locations) {
-      const accessibleLocations = authUserData.user.locations.filter(location => 
-        location.role && location.role !== 'user'
-      )
-      console.log('Getting accessible locations from auth repository:', accessibleLocations)
+      // Merge names/addresses from business-info
+      const businessInfo = businessInfoRepository.getStoredBusinessInfo()
+      const businessLocations = businessInfo?.locations || []
+
+      const accessibleLocations = authUserData.user.locations
+        .filter(location => location.role && location.role !== 'user')
+        .map(location => {
+          const match = businessLocations.find(loc => loc.id === location.locationId)
+          return {
+            id: location.locationId,
+            name: match?.name || location.locationName || location.locationId,
+            address: match?.address || `Locația ${location.locationId}`,
+            role: location.role,
+            businessId: authUserData.user.businessId
+          }
+        })
+      console.log('Getting accessible locations from auth repository (merged with business-info):', accessibleLocations)
       return accessibleLocations
     }
     

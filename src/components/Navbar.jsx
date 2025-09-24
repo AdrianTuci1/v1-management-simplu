@@ -72,7 +72,7 @@ const Navbar = ({ currentView, currentLocation }) => {
         {/* Right side - Robot, Notifications and user */}
         <div className="flex items-center gap-2">
           {/* Robot AI Assistant - Hidden in demo mode */}
-          {!isDemoMode && (
+          {/* {!isDemoMode && (
             <button
               onClick={toggleAIAssistant}
               className="btn btn-ghost btn-sm"
@@ -80,7 +80,7 @@ const Navbar = ({ currentView, currentLocation }) => {
             >
               <Bot className="h-5 w-5" />
             </button>
-          )}
+          )} */}
 
           <button
             onClick={toggleQuickActions}
@@ -99,9 +99,6 @@ const Navbar = ({ currentView, currentLocation }) => {
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
               <User className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="hidden sm:block text-sm font-medium">
-              {userEmail}
-            </span>
           </button>
 
           {/* Sign Out Button */}

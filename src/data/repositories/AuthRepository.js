@@ -7,10 +7,15 @@ class AuthRepository {
 
   async getCurrentUser() {
     try {
+
       const userData = await authInvoker.getCurrentUser()
+      
       
       // Store user data in localStorage
       this.storeUserData(userData)
+      
+      // Verify data was stored correctly
+      const storedData = this.getStoredUserData()
       
       return userData
     } catch (error) {
@@ -19,7 +24,6 @@ class AuthRepository {
       // Return cached data if available
       const cachedData = this.getStoredUserData()
       if (cachedData) {
-        console.log('Using cached auth user data')
         return cachedData
       }
       

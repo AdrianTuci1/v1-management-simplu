@@ -96,7 +96,7 @@ export class AIAssistantService {
         endpoint += `?${params.toString()}`;
       }
       
-      const data = await aiApiRequest(endpoint);
+      const data = await fetch(endpoint);
       this.messageHistory = data.messages || [];
       
       Logger.log('info', 'Message history loaded', { 

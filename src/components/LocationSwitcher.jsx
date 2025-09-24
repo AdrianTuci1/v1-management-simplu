@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { MapPin, ChevronDown, Building, Check } from 'lucide-react'
+import authRepository from '../data/repositories/AuthRepository.js'
 import businessInfoRepository from '../data/repositories/BusinessInfoRepository.js'
 
 const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
@@ -9,29 +10,41 @@ const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
   useEffect(() => {
     const loadLocations = () => {
       try {
-        // Get business info locations
+        console.log('LocationSwitcher: Loading locations...')
+        
+        // Get user's accessible locations from the new API format
+        const userData = authRepository.getStoredUserData()
+        console.log('LocationSwitcher: User data from localStorage:', userData)
+
+        // Get business info locations for names/addresses
         const businessInfo = businessInfoRepository.getStoredBusinessInfo()
         const businessLocations = businessInfo?.locations || []
-        
-        // Get user data for roles
-        const savedCognitoData = localStorage.getItem('auth-user-data')
-        if (savedCognitoData) {
-          const userData = JSON.parse(savedCognitoData)
-          const userRoles = userData.locations || {}
-          
-          // Filter accessible locations based on user roles
-          const accessibleLocations = businessLocations.filter(location => {
-            const userRoleForLocation = userRoles[location.role]
-            return userRoleForLocation && userRoleForLocation !== 'user'
-          })
-          
+
+        if (userData?.user?.locations) {
+          console.log('LocationSwitcher: Raw locations from API:', userData.user.locations)
+
+          // Filter by role and merge with business-info by id
+          const accessibleLocations = userData.user.locations
+            .filter(location => location.role && location.role !== 'user')
+            .map(location => {
+              const match = businessLocations.find(loc => loc.id === location.locationId)
+              return {
+                id: location.locationId,
+                name: match?.name || location.locationName || location.locationId,
+                address: match?.address || `Locația ${location.locationId}`,
+                role: location.role,
+                businessId: userData.user.businessId
+              }
+            })
+
+          console.log('LocationSwitcher: Transformed locations (merged with business-info):', accessibleLocations)
           setLocations(accessibleLocations)
         } else {
-          // If no user data, show all business locations
-          setLocations(businessLocations)
+          console.log('LocationSwitcher: No user locations found in API response')
+          setLocations([])
         }
       } catch (error) {
-        console.error('Error loading locations:', error)
+        console.error('LocationSwitcher: Error loading locations:', error)
         setLocations([])
       }
     }

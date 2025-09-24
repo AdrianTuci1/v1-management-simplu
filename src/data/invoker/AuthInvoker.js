@@ -8,7 +8,10 @@ class AuthInvoker {
   async getCurrentUser() {
     try {
       const businessId = this.getBusinessIdFromStorage()
+      
       const response = await apiRequest('auth', `${this.basePath}/${businessId}`)
+
+      
       return response
     } catch (error) {
       console.error('Error fetching current user data:', error)
