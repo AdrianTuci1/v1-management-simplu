@@ -43,8 +43,12 @@ export const usePatients = () => {
         const cachedData = await indexedDb.getAll('patients')
         
         if (cachedData.length > 0) {
-          sharedPatients = cachedData
-          setPatients([...cachedData])
+          // Transformăm datele din cache pentru UI
+          const transformedData = cachedData.map(patient => 
+            patientManager.transformPatientForUI(patient)
+          )
+          sharedPatients = transformedData
+          setPatients([...transformedData])
           setError(null) // Nu setează eroarea când avem date din cache
           notifySubscribers()
         } else {
@@ -78,7 +82,8 @@ export const usePatients = () => {
         let filteredData = cachedData
         if (filters.name) {
           filteredData = filteredData.filter(patient => 
-            patient.name?.toLowerCase().includes(filters.name.toLowerCase())
+            (patient.name?.toLowerCase().includes(filters.name.toLowerCase())) ||
+            (patient.patientName?.toLowerCase().includes(filters.name.toLowerCase()))
           )
         }
         if (filters.status) {
@@ -90,8 +95,12 @@ export const usePatients = () => {
         const paginatedData = filteredData.slice(startIndex, startIndex + limit)
         
         if (cachedData.length > 0) {
-          sharedPatients = paginatedData
-          setPatients([...paginatedData])
+          // Transformăm datele din cache pentru UI
+          const transformedData = paginatedData.map(patient => 
+            patientManager.transformPatientForUI(patient)
+          )
+          sharedPatients = transformedData
+          setPatients([...transformedData])
           setError(null) // Nu setează eroarea când avem date din cache
           notifySubscribers()
         } else {
@@ -110,6 +119,42 @@ export const usePatients = () => {
   const searchPatients = useCallback(async (query) => {
     setLoading(true)
     setError(null)
+    
+    // Dacă query-ul este gol, încarcă toți pacienții
+    if (!query || query.trim().length === 0) {
+      try {
+        const data = await patientService.getPatients({ limit })
+        sharedPatients = data
+        setPatients([...data])
+        notifySubscribers()
+      } catch (err) {
+        // Încearcă să încarce din cache local
+        try {
+          console.warn('Load patients API failed, trying local cache:', err.message)
+          const cachedData = await indexedDb.getAll('patients')
+          
+          if (cachedData.length > 0) {
+            // Transformăm datele din cache pentru UI
+            const transformedData = cachedData.slice(0, limit).map(patient => 
+              patientManager.transformPatientForUI(patient)
+            )
+            sharedPatients = transformedData
+            setPatients([...transformedData])
+            setError(null)
+            notifySubscribers()
+          } else {
+            setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
+          }
+        } catch (cacheErr) {
+          setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
+          console.error('Error loading patients from cache:', err)
+        }
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+    
     try {
       const data = await patientService.searchPatients(query)
       sharedPatients = data
@@ -123,14 +168,19 @@ export const usePatients = () => {
         
         // Căutare locală în mai multe câmpuri
         const searchResults = cachedData.filter(patient => 
-          patient.name?.toLowerCase().includes(query.toLowerCase()) ||
+          (patient.name?.toLowerCase().includes(query.toLowerCase())) ||
+          (patient.patientName?.toLowerCase().includes(query.toLowerCase())) ||
           patient.email?.toLowerCase().includes(query.toLowerCase()) ||
           patient.phone?.includes(query)
         )
         
         if (cachedData.length > 0) {
-          sharedPatients = searchResults
-          setPatients([...searchResults])
+          // Transformăm datele din cache pentru UI
+          const transformedResults = searchResults.map(patient => 
+            patientManager.transformPatientForUI(patient)
+          )
+          sharedPatients = transformedResults
+          setPatients([...transformedResults])
           setError(null) // Căutarea offline funcționează
           notifySubscribers()
         } else {

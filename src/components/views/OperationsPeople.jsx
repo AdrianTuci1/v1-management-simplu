@@ -2,15 +2,11 @@ import {
   Users, 
   Plus, 
   Search, 
-  Edit,
-  Trash2,
-  Download,
   User,
   Mail,
   Phone,
   MapPin,
   Calendar,
-  Shield,
   Loader2,
   RotateCw
 } from 'lucide-react'
@@ -364,7 +360,7 @@ const OperationsPeople = () => {
                         <div>
                           <div className="font-medium flex items-center gap-2">
                             <span className={patient._isDeleting ? 'line-through opacity-50' : ''}>
-                              {patient.name}
+                              {patient.name || patient.patientName}
                             </span>
                             {patient._isOptimistic && !patient._isDeleting && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">

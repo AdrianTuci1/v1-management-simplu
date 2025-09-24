@@ -139,72 +139,69 @@ const AIAssistantComponent = () => {
 
   return (
     <AIAssistant
-      position="top-right"
+      position="side"
       size="md"
       state={isOpen ? "open" : "closed"}
       className="flex flex-col rounded-lg"
     >
       <AIAssistantHeader>
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
-            <Bot className="h-5 w-5 text-primary-foreground" />
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center">
+              <Bot className="h-4 w-4 text-primary" />
+            </div>
+            <span className="text-sm font-medium text-foreground">AI Assistant</span>
+            <div className="flex items-center gap-1">
+              {isConnected ? (
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+              ) : (
+                <div className="h-2 w-2 rounded-full bg-red-500" />
+              )}
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-lg">AI Assistant</h3>
-            <p className="text-sm text-muted-foreground">
-              Asistent pentru dashboard business
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Connection Status Indicator */}
+          
           <div className="flex items-center gap-1">
-            {isConnected ? (
-              <Wifi className="h-4 w-4 text-green-500" />
-            ) : (
-              <WifiOff className="h-4 w-4 text-red-500" />
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSettings(!showSettings)}
+              className="h-6 w-6 p-0"
+            >
+              <Settings className="h-3 w-3" />
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={closeAIAssistant}
+              className="h-6 w-6 p-0"
+            >
+              <X className="h-3 w-3" />
+            </Button>
           </div>
-          
-          {/* Settings Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowSettings(!showSettings)}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={closeAIAssistant}
-          >
-            <X className="h-5 w-5" />
-          </Button>
         </div>
       </AIAssistantHeader>
 
       {/* Session Info */}
-      <div className="px-4 py-2 bg-muted/50 border-b">
-        <p className="text-xs text-muted-foreground text-center">
+      <div className="px-3 py-1 bg-muted/30 border-b">
+        <p className="text-xs text-muted-foreground">
           {getSessionInfo()}
         </p>
       </div>
 
       {/* Search Bar */}
       {showSearch && (
-        <div className="px-4 py-2 bg-muted/30 border-b">
-          <div className="flex gap-2">
+        <div className="px-3 py-1 bg-muted/20 border-b">
+          <div className="flex gap-1">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Căutare în conversație..."
-              className="flex-1 text-xs px-2 py-1 rounded border"
+              placeholder="Căutare..."
+              className="flex-1 text-xs px-2 py-1 rounded border bg-background"
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
             />
-            <Button size="sm" variant="outline" onClick={handleSearch}>
+            <Button size="sm" variant="ghost" onClick={handleSearch} className="h-6 w-6 p-0">
               <Search className="h-3 w-3" />
             </Button>
           </div>
@@ -213,72 +210,73 @@ const AIAssistantComponent = () => {
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="px-4 py-2 bg-muted/30 border-b">
-          <div className="flex gap-2">
+        <div className="px-3 py-1 bg-muted/20 border-b">
+          <div className="flex gap-1">
             <Button 
               size="sm" 
-              variant="outline" 
+              variant="ghost" 
               onClick={() => setShowSearch(!showSearch)}
+              className="h-6 text-xs"
             >
               {showSearch ? 'Ascunde' : 'Căutare'}
             </Button>
-            <Button size="sm" variant="outline" onClick={handleExport}>
+            <Button size="sm" variant="ghost" onClick={handleExport} className="h-6 text-xs">
               <Download className="h-3 w-3 mr-1" />
               Export
             </Button>
-            <Button size="sm" variant="outline" onClick={handleCloseSession}>
-              Închide Sesiunea
+            <Button size="sm" variant="ghost" onClick={handleCloseSession} className="h-6 text-xs">
+              Închide
             </Button>
           </div>
         </div>
       )}
 
       <AIAssistantBody>
-        <div className="space-y-4">
+        <div className="space-y-2">
           {messages.map((message) => (
             <div
               key={message.messageId}
-              className={`flex gap-3 ${
+              className={`flex gap-2 ${
                 message.type === 'user' ? 'justify-end' : 'justify-start'
               }`}
             >
               {message.type === 'agent' && (
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                  <Bot className="h-4 w-4 text-primary-foreground" />
+                <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                  <Bot className="h-3 w-3 text-primary" />
                 </div>
               )}
               
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                className={`max-w-[85%] rounded px-3 py-2 ${
                   message.type === 'user'
                     ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
+                    : 'bg-muted/50'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <p className="text-xs opacity-70 mt-1">
+                <p className="text-xs whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                <p className="text-xs opacity-60 mt-1">
                   {formatTimestamp(message.timestamp)}
                 </p>
               </div>
               
               {message.type === 'user' && (
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                  <User className="h-4 w-4 text-primary-foreground" />
+                <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                  <User className="h-3 w-3 text-primary" />
                 </div>
               )}
             </div>
           ))}
           
           {isLoading && (
-            <div className="flex gap-3 justify-start">
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                <Bot className="h-4 w-4 text-primary-foreground" />
+            <div className="flex gap-2 justify-start">
+              <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                <Bot className="h-3 w-3 text-primary" />
               </div>
-              <div className="bg-muted rounded-lg px-4 py-2">
+              <div className="bg-muted/50 rounded px-3 py-2">
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
               </div>
             </div>
@@ -295,8 +293,8 @@ const AIAssistantComponent = () => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Scrieți mesajul dvs..."
-            className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            placeholder="Mesaj..."
+            className="flex-1 resize-none rounded border border-input bg-background px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             rows={1}
             disabled={isLoading || !isConnected}
             maxLength={getConfig('MESSAGE.MAX_LENGTH')}
@@ -306,9 +304,9 @@ const AIAssistantComponent = () => {
             size="sm"
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading || !isConnected}
-            className="flex items-center gap-2"
+            className="h-6 w-6 p-0"
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-3 w-3" />
           </Button>
         </div>
       </AIAssistantFooter>

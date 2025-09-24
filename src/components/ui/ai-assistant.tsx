@@ -3,24 +3,25 @@ import { cva } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
 const aiAssistantVariants = cva(
-  "fixed z-50 bg-white border shadow-lg transition-all duration-300 ease-in-out m-2",
+  "bg-white border shadow-lg transition-all duration-300 ease-in-out",
   {
     variants: {
       position: {
-        "top-right": "top-16 right-4",
-        "top-left": "top-16 left-4",
-        "bottom-right": "bottom-4 right-4",
-        "bottom-left": "bottom-4 left-4",
+        "top-right": "fixed z-50 top-16 right-4 m-2",
+        "top-left": "fixed z-50 top-16 left-4 m-2",
+        "bottom-right": "fixed z-50 bottom-4 right-4 m-2",
+        "bottom-left": "fixed z-50 bottom-4 left-4 m-2",
+        "side": "flex-shrink-0 h-full",
       },
       size: {
-        sm: "w-42 h-96",
-        md: "w-96 h-[500px]",
-        lg: "w-[500px] h-[600px]",
-        xl: "w-[600px] h-[700px]",
+        sm: "w-64 h-full",
+        md: "w-80 h-full",
+        lg: "w-96 h-full",
+        xl: "w-[500px] h-full",
       },
       state: {
         open: "opacity-100 visible scale-100 translate-y-0",
-        closed: "opacity-0 invisible scale-95 translate-y-2",
+        closed: "opacity-0 invisible scale-95 translate-y-2 w-0",
       },
     },
     defaultVariants: {
@@ -33,7 +34,7 @@ const aiAssistantVariants = cva(
 
 export interface AIAssistantProps
   extends React.HTMLAttributes<HTMLDivElement> {
-  position?: "top-right" | "top-left" | "bottom-right" | "bottom-left"
+  position?: "top-right" | "top-left" | "bottom-right" | "bottom-left" | "side"
   size?: "sm" | "md" | "lg" | "xl"
   state?: "open" | "closed"
 }
@@ -55,7 +56,7 @@ const AIAssistantHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex items-center justify-between p-4 border-b bg-white", className)}
+    className={cn("flex items-center justify-between px-3 py-2 border-b bg-muted/20", className)}
     {...props}
   />
 ))
@@ -67,7 +68,7 @@ const AIAssistantBody = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex-1 overflow-y-auto p-4", className)}
+    className={cn("flex-1 overflow-y-auto p-3", className)}
     {...props}
   />
 ))
@@ -79,7 +80,7 @@ const AIAssistantFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("border-t p-4 bg-white", className)}
+    className={cn("border-t p-3 bg-muted/10", className)}
     {...props}
   />
 ))

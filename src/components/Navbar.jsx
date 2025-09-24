@@ -12,6 +12,9 @@ const Navbar = ({ currentView, currentLocation }) => {
   const { toggleQuickActions } = useQuickActionsStore()
   const { businessName, BusinessIcon } = useBusinessConfig()
   
+  // Check if we're in demo mode
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
+  
   const getViewTitle = (view) => {
     const titles = {
       dashboard: 'Dashboard',
@@ -68,14 +71,16 @@ const Navbar = ({ currentView, currentLocation }) => {
 
         {/* Right side - Robot, Notifications and user */}
         <div className="flex items-center gap-2">
-          {/* Robot AI Assistant */}
-          <button
-            onClick={toggleAIAssistant}
-            className="btn btn-ghost btn-sm"
-            title="Deschide AI Assistant"
-          >
-            <Bot className="h-5 w-5" />
-          </button>
+          {/* Robot AI Assistant - Hidden in demo mode */}
+          {!isDemoMode && (
+            <button
+              onClick={toggleAIAssistant}
+              className="btn btn-ghost btn-sm"
+              title="Deschide AI Assistant"
+            >
+              <Bot className="h-5 w-5" />
+            </button>
+          )}
 
           <button
             onClick={toggleQuickActions}

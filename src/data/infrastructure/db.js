@@ -156,7 +156,8 @@ export const indexedDb = {
     const term = searchTerm.toLowerCase();
     return db.patients
       .filter(patient => 
-        patient.name.toLowerCase().includes(term) ||
+        (patient.name && patient.name.toLowerCase().includes(term)) ||
+        (patient.patientName && patient.patientName.toLowerCase().includes(term)) ||
         patient.email.toLowerCase().includes(term) ||
         (patient.phone && patient.phone.includes(term)) ||
         (patient.cnp && patient.cnp.includes(term))

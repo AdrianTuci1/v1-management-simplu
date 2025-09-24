@@ -220,11 +220,16 @@ function AppContent() {
 
         
         {/* Content Area */}
-        <main className="flex-1 overflow-auto p-6">
-          <Dashboard 
-            currentView={currentView}
-            currentLocation={selectedLocation}
-          />
+        <main className="flex-1 flex overflow-hidden">
+          <div className="flex-1 overflow-auto p-6">
+            <Dashboard 
+              currentView={currentView}
+              currentLocation={selectedLocation}
+            />
+          </div>
+          
+          {/* AI Assistant Side Panel */}
+          <AIAssistantComponent />
         </main>
 
         {/* Drawer */}
@@ -234,9 +239,6 @@ function AppContent() {
           onClose={closeDrawer}
         />
       </div>
-      
-      {/* AI Assistant */}
-      <AIAssistantComponent />
       
       {/* Quick Actions Drawer */}
       <QuickActionsDrawer />
