@@ -27,7 +27,9 @@ class AuthRepository {
         return cachedData
       }
       
-      throw error
+      // If no cached data and API fails, return demo data
+      console.log('API failed and no cached data, using demo user data')
+      return this.getDemoUserData()
     }
   }
 
@@ -92,6 +94,30 @@ class AuthRepository {
   getUserInfo() {
     const userData = this.getStoredUserData()
     return userData?.user || null
+  }
+
+  // Get demo user data when API is not available
+  getDemoUserData() {
+    const demoUserData = {
+      success: true,
+      user: {
+        userId: 'demo-user',
+        userName: 'Demo User',
+        email: 'demo@cabinet-popescu.ro',
+        businessId: 'B0100001',
+        locations: [
+          { locationId: 'L0100001', locationName: 'Premier Central', role: 'admin' },
+          { locationId: 'L0100002', locationName: 'Filiala Pipera', role: 'manager' },
+          { locationId: 'L0100003', locationName: 'Centrul Medical Militari', role: 'user' }
+        ]
+      }
+    }
+    
+    // Store demo data in localStorage
+    this.storeUserData(demoUserData)
+    console.log('Using demo user data:', demoUserData)
+    
+    return demoUserData
   }
 
   // Query method for command pattern

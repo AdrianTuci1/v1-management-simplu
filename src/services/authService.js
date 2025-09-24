@@ -2,6 +2,7 @@ import businessInfoRepository from '../data/repositories/BusinessInfoRepository.
 import userRolesRepository from '../data/repositories/UserRolesRepository.js'
 import authRepository from '../data/repositories/AuthRepository.js'
 import { GetCommand } from '../data/commands/GetCommand.js'
+import { demoDataSeeder } from '../utils/demoDataSeeder.js'
 
 // Mock data structure for Cognito Authorizer response
 const mockCognitoData = {
@@ -28,6 +29,17 @@ class AuthService {
       // In demo mode, skip API calls and use demo data
       if (this.isDemoMode) {
         console.log('Running in demo mode - using demo data instead of API calls')
+        
+        // Initialize demo data seeding
+        try {
+          console.log('Initializing demo data seeding...')
+          await demoDataSeeder.seedIfEmpty()
+          console.log('Demo data seeding completed')
+        } catch (error) {
+          console.error('Error during demo data seeding:', error)
+          // Continue with demo mode even if seeding fails
+        }
+        
         const businessInfo = {
           businessId: 'B0100001',
           businessName: 'Cabinetul Dr. Popescu',
@@ -35,7 +47,30 @@ class AuthService {
           locationName: 'Premier Central',
           address: 'Strada Exemplu 123, București',
           phone: '+40 21 123 4567',
-          email: 'contact@cabinet-popescu.ro'
+          email: 'contact@cabinet-popescu.ro',
+          locations: [
+            {
+              id: 'L0100001',
+              name: 'Premier Central',
+              address: 'Strada Florilor, Nr. 15, București, Sector 1',
+              active: true,
+              timezone: 'Europe/Bucharest'
+            },
+            {
+              id: 'L0100002',
+              name: 'Filiala Pipera',
+              address: 'Bulevardul Pipera, Nr. 45, București, Sector 1',
+              active: true,
+              timezone: 'Europe/Bucharest'
+            },
+            {
+              id: 'L0100003',
+              name: 'Centrul Medical Militari',
+              address: 'Strada Militari, Nr. 123, București, Sector 6',
+              active: true,
+              timezone: 'Europe/Bucharest'
+            }
+          ]
         }
         
         const userData = {
@@ -242,12 +277,25 @@ class AuthService {
     
     // Fallback to old format
     const businessInfo = businessInfoRepository.getStoredBusinessInfo()
-    const locations = businessInfo?.locations || []
+    let locations = businessInfo?.locations || []
     const userRoles = userData.locations || {}
     
     console.log('Getting accessible locations (fallback)')
     console.log('Available locations:', locations)
     console.log('User roles per location:', userRoles)
+
+    // If no locations in business info but user has roles, create locations from roles
+    if (locations.length === 0 && Object.keys(userRoles).length > 0) {
+      console.log('No locations in business info, creating from user roles')
+      locations = Object.keys(userRoles).map(locationId => ({
+        id: locationId,
+        name: this.getLocationNameById(locationId, businessInfo),
+        address: `Locația ${locationId}`,
+        active: true,
+        timezone: 'Europe/Bucharest'
+      }))
+      console.log('Generated locations from user roles:', locations)
+    }
 
     const accessibleLocations = locations.filter(location => {
       const userRoleForLocation = userRoles[location.id]
