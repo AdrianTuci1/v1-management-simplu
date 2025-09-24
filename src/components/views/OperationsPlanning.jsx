@@ -197,10 +197,40 @@ const OperationsPlanning = () => {
   const filteredAppointments = useMemo(() => {
     if (!appointments || appointments.length === 0) return []
 
+    let filteredByDate = appointments
+
+    // Filtrează după perioada selectată
+    if (viewType === 'day') {
+      const selectedDateStr = formatDate(selectedDate)
+      filteredByDate = appointments.filter(apt => apt.date === selectedDateStr)
+    } else if (viewType === 'week') {
+      const startOfWeek = new Date(currentViewDate)
+      startOfWeek.setDate(currentViewDate.getDate() - currentViewDate.getDay())
+      const endOfWeek = new Date(startOfWeek)
+      endOfWeek.setDate(startOfWeek.getDate() + 6)
+      
+      filteredByDate = appointments.filter(apt => {
+        const aptDate = new Date(apt.date)
+        return aptDate >= startOfWeek && aptDate <= endOfWeek
+      })
+    } else if (viewType === 'month') {
+      const currentMonth = currentViewDate.getMonth()
+      const currentYear = currentViewDate.getFullYear()
+      
+      filteredByDate = appointments.filter(apt => {
+        const aptDate = new Date(apt.date)
+        return aptDate.getMonth() === currentMonth && aptDate.getFullYear() === currentYear
+      })
+    }
+
     // Aplică sortarea optimistă pentru a prioritiza elementele în proces
-    const sortedAppointments = getSortedAppointments('time', 'asc')
+    const sortedAppointments = filteredByDate.sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date)
+      if (dateCompare !== 0) return dateCompare
+      return a.time.localeCompare(b.time)
+    })
     return sortedAppointments.slice(0, appointmentsLimit)
-  }, [appointments, appointmentsLimit, getSortedAppointments])
+  }, [appointments, appointmentsLimit, viewType, selectedDate, currentViewDate])
 
   // Check if date is current date
   const isCurrentDate = (date) => {

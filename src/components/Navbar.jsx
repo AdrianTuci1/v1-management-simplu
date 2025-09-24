@@ -59,12 +59,22 @@ const Navbar = ({ currentView, currentLocation }) => {
           <div className="hidden lg:block">
             <h1 className="text-lg font-semibold flex items-center gap-2">
               <BusinessIcon className="h-5 w-5" />
+              {isDemoMode && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                  DEMO
+                </span>
+              )}
             </h1>
           </div>
           
           <div className="lg:hidden">
-            <h1 className="text-lg font-semibold">
+            <h1 className="text-lg font-semibold flex items-center gap-2">
               {getViewTitle(currentView)}
+              {isDemoMode && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                  DEMO
+                </span>
+              )}
             </h1>
           </div>
         </div>

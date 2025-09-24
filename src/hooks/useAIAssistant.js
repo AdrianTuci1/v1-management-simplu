@@ -4,6 +4,9 @@ import { createAIWebSocketService } from '../services/aiWebSocketService';
 import { getConfig } from '../config/aiAssistantConfig';
 
 export const useAIAssistant = (businessId = null, userId = null, locationId = null) => {
+  // Check if we're in demo mode
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+  
   // Use default values if not provided
   const finalBusinessId = businessId || getConfig('DEFAULTS.BUSINESS_ID');
   const finalUserId = userId || getConfig('DEFAULTS.USER_ID');
@@ -30,16 +33,16 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       // Create AI Assistant Service
       aiServiceRef.current = createAIAssistantService(finalBusinessId, finalUserId, finalLocationId);
       
-      // Create WebSocket Service
-      webSocketRef.current = createAIWebSocketService(finalBusinessId, finalUserId, finalLocationId);
+      // Create WebSocket Service only if not in demo mode
+      if (!isDemoMode) {
+        webSocketRef.current = createAIWebSocketService(finalBusinessId, finalUserId, finalLocationId);
+      }
       
       // Set up AI Service event handlers
       aiServiceRef.current.onMessageReceived = (newMessages) => {
-        console.log('AI Service onMessageReceived called with:', newMessages);
         setMessages(prev => {
           const existingIds = new Set(prev.map(m => m.messageId));
           const filteredNew = newMessages.filter(m => !existingIds.has(m.messageId));
-          console.log('Adding new AI service messages:', filteredNew);
           return [...prev, ...filteredNew];
         });
       };
@@ -54,49 +57,48 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       
       aiServiceRef.current.onError = (message, error) => {
         setError({ message, error });
-        console.error('AI Service Error:', message, error);
       };
       
-      // Set up WebSocket event handlers
-      webSocketRef.current.onMessageReceived = (newMessages) => {
-        console.log('WebSocket onMessageReceived called with:', newMessages);
-        setMessages(prev => {
-          const existingIds = new Set(prev.map(m => m.messageId));
-          const filteredNew = newMessages.filter(m => !existingIds.has(m.messageId));
-          console.log('Adding new WebSocket messages:', filteredNew);
-          return [...prev, ...filteredNew];
-        });
-      };
-      
-      webSocketRef.current.onConnectionChange = (connected) => {
-        setIsConnected(connected);
-        setConnectionStatus(connected ? 'connected' : 'disconnected');
-      };
-      
-      webSocketRef.current.onError = (message, error) => {
-        setError({ message, error });
-        console.error('WebSocket Error:', message, error);
-      };
+      // Set up WebSocket event handlers only if not in demo mode
+      if (!isDemoMode && webSocketRef.current) {
+        webSocketRef.current.onMessageReceived = (newMessages) => {
+          setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.messageId));
+            const filteredNew = newMessages.filter(m => !existingIds.has(m.messageId));
+            return [...prev, ...filteredNew];
+          });
+        };
+        
+        webSocketRef.current.onConnectionChange = (connected) => {
+          setIsConnected(connected);
+          setConnectionStatus(connected ? 'connected' : 'disconnected');
+        };
+        
+        webSocketRef.current.onError = (message, error) => {
+          setError({ message, error });
+        };
+      }
       
       // Load today's session
       if (aiServiceRef.current) {
-        console.log('Loading today session...');
         await aiServiceRef.current.loadTodaySession();
-        console.log('Today session loaded, current session ID:', aiServiceRef.current.currentSessionId);
       }
       
-      // Connect to WebSocket
-      if (webSocketRef.current) {
-        console.log('Connecting to WebSocket...');
+      // Connect to WebSocket only if not in demo mode
+      if (!isDemoMode && webSocketRef.current) {
         await webSocketRef.current.connect();
-        console.log('WebSocket connection status:', webSocketRef.current.isConnected);
       }
 
-      setConnectionStatus('connected');
+      // In demo mode, set connected status to true
+      if (isDemoMode) {
+        setIsConnected(true);
+        setConnectionStatus('connected');
+      } else {
+        setConnectionStatus('connected');
+      }
     } catch (error) {
       setError({ message: 'Failed to initialize services', error });
       setConnectionStatus('error');
-      console.error('Failed to initialize AI Assistant services:', error);
     }
   }, [finalBusinessId, finalUserId, finalLocationId]);
 
@@ -145,12 +147,10 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       // Add user message to UI immediately
       setMessages(prev => [...prev, userMessage]);
 
-      // Try WebSocket first, fallback to API
-      if (webSocketRef.current?.isConnected) {
-        console.log('Sending message via WebSocket:', content.trim(), context);
+      // Try WebSocket first (if not in demo mode), fallback to API
+      if (!isDemoMode && webSocketRef.current?.isConnected) {
         await webSocketRef.current.sendMessage(content.trim(), context);
       } else if (aiServiceRef.current) {
-        console.log('Sending message via AI Service:', content.trim(), context);
         await aiServiceRef.current.sendMessage(content.trim(), context);
       } else {
         throw new Error('No service available to send message');
@@ -331,10 +331,10 @@ export const useAIAssistantConfig = () => {
       
       // Save to localStorage
       try {
-        localStorage.setItem('aiAssistantConfig', JSON.stringify(newConfig));
-      } catch (error) {
-        console.warn('Could not save AI Assistant configuration:', error);
-      }
+      localStorage.setItem('aiAssistantConfig', JSON.stringify(newConfig));
+    } catch (error) {
+      // Silent fail for configuration save
+    }
       
       return newConfig;
     });
@@ -344,7 +344,7 @@ export const useAIAssistantConfig = () => {
     try {
       localStorage.removeItem('aiAssistantConfig');
     } catch (error) {
-      console.warn('Could not reset AI Assistant configuration:', error);
+      // Silent fail for configuration reset
     }
     setConfig({});
   }, []);

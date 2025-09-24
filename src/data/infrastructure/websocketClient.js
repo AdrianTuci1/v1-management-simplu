@@ -42,7 +42,6 @@ function createWorker() {
       // Handle different message types
       switch (type) {
         case 'ready':
-          console.log('WebSocket Worker ready:', data.message);
           break;
           
         case 'status':
@@ -95,7 +94,7 @@ function createWorker() {
           break;
           
         default:
-          console.log('Unknown message type from worker:', type, data);
+          break;
       }
     };
     
@@ -135,17 +134,21 @@ function sendToWorker(type, data) {
 }
 
 export function connectWebSocket(url) {
+  // Check if we're in demo mode - if so, don't connect
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+  if (isDemoMode) {
+    return;
+  }
+
   if (worker && connectionStatus === 'connected') return;
   
   try {
     createWorker();
     const channelName = buildResourcesChannel();
-    console.log(`Connecting to WebSocket channel: ${channelName}`);
     
     sendToWorker('connect', { url, channelName });
     
   } catch (error) {
-    console.error('Error connecting to WebSocket:', error);
     connectionStatus = 'error';
   }
 }

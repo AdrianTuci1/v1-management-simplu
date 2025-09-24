@@ -1,6 +1,7 @@
 // Simplified API client for unified resources endpoint
 
 export async function apiRequest(resourceType, endpoint = "", options = {}) {
+  
   const base = import.meta.env.VITE_API_URL || "";
   const url = `${base}${endpoint}`;
 
@@ -71,6 +72,7 @@ export function buildResourcesEndpoint(path = "") {
 
 // Separate API client for AI Assistant endpoints (no data wrapping)
 export async function aiApiRequest(endpoint, options = {}) {
+  
   const base = import.meta.env.VITE_API_URL || "";
   const url = `${base}${endpoint}`;
 

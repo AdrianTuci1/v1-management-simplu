@@ -26,27 +26,40 @@ export const useProducts = () => {
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(sharedStats);
 
-  // Debug logging pentru a vedea când se schimbă starea
-  console.log('useProducts render - products count:', products.length, 'loading:', loading, 'error:', error)
+  // Check if we're in demo mode
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+
+  // Debug logging pentru a vedea când se schimbă starea (only in non-demo mode)
+  if (!isDemoMode) {
+    console.log('useProducts render - products count:', products.length, 'loading:', loading, 'error:', error)
+  }
 
   // Abonare la schimbările de stare partajată
   useEffect(() => {
     const handleStateChange = (newProducts, newStats) => {
-      console.log('State change received, products count:', newProducts.length, 'newProducts:', newProducts)
+      if (!isDemoMode) {
+        console.log('State change received, products count:', newProducts.length, 'newProducts:', newProducts)
+      }
       setProducts([...newProducts]) // Forțează o nouă referință
       setStats(newStats)
     }
     
     subscribers.add(handleStateChange)
-    console.log('Subscriber added, total subscribers:', subscribers.size)
+    if (!isDemoMode) {
+      console.log('Subscriber added, total subscribers:', subscribers.size)
+    }
     return () => {
       subscribers.delete(handleStateChange)
-      console.log('Subscriber removed, total subscribers:', subscribers.size)
+      if (!isDemoMode) {
+        console.log('Subscriber removed, total subscribers:', subscribers.size)
+      }
     }
-  }, [])
+  }, [isDemoMode])
 
-  // WebSocket handling pentru produse (reflectă starea finală)
+  // WebSocket handling pentru produse (reflectă starea finală) - only in non-demo mode
   useEffect(() => {
+    if (isDemoMode) return;
+
     const handler = async (message) => {
       const { type, data, resourceType } = message
       if (resourceType !== 'products' && resourceType !== 'product') return
@@ -78,7 +91,7 @@ export const useProducts = () => {
       unsubPlural()
       unsubSingular()
     }
-  }, [])
+  }, [isDemoMode])
 
   // Încarcă toate produsele
   const loadProducts = useCallback(async (filters = {}) => {

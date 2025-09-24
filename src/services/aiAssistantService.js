@@ -44,6 +44,7 @@ export class AIAssistantService {
     this.isConnected = false;
     this.reconnectAttempts = 0;
     this.heartbeatInterval = null;
+    this.isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
     
     // Event callbacks
     this.onMessageReceived = null;
@@ -86,6 +87,23 @@ export class AIAssistantService {
   // Load message history for a session
   async loadMessageHistory(sessionId, limit = null, before = null) {
     try {
+      // In demo mode, return mock message history
+      if (this.isDemoMode) {
+        this.messageHistory = [
+          {
+            messageId: 'demo-msg-1',
+            sessionId: sessionId,
+            content: 'Bună! Sunt AI Assistant-ul în modul demo. Cum vă pot ajuta astăzi?',
+            timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+            type: 'assistant'
+          }
+        ];
+        
+        // Notify about loaded messages
+        this.onMessageReceived?.(this.messageHistory);
+        return;
+      }
+
       let endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/${sessionId}/messages`;
       
       const params = new URLSearchParams();
@@ -96,7 +114,7 @@ export class AIAssistantService {
         endpoint += `?${params.toString()}`;
       }
       
-      const data = await fetch(endpoint);
+      const data = await aiApiRequest(endpoint);
       this.messageHistory = data.messages || [];
       
       Logger.log('info', 'Message history loaded', { 
@@ -130,6 +148,25 @@ export class AIAssistantService {
     }
 
     try {
+      // In demo mode, return mock response
+      if (this.isDemoMode) {
+        const mockResponse = {
+          message: "Aceasta este o răspuns demo de la AI Assistant. În modul demo, toate funcționalitățile AI sunt simulate.",
+          timestamp: new Date().toISOString(),
+          sessionId: this.currentSessionId
+        };
+        
+        // Simulate async response
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              status: 'success',
+              data: mockResponse
+            });
+          }, 1000);
+        });
+      }
+
       const messageData = {
         businessId: this.businessId,
         locationId: this.locationId,
@@ -178,6 +215,21 @@ export class AIAssistantService {
 
   // Get active sessions for business
   async getActiveSessions() {
+    // In demo mode, return mock data
+    if (this.isDemoMode) {
+      return {
+        activeSessions: [
+          {
+            sessionId: 'demo-session-1',
+            businessId: this.businessId,
+            userId: this.userId,
+            startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+            status: 'active'
+          }
+        ]
+      };
+    }
+
     try {
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/active`;
       const data = await aiApiRequest(endpoint);
@@ -229,6 +281,16 @@ export class AIAssistantService {
 
   // Get session statistics
   async getSessionStats() {
+    // In demo mode, return mock data
+    if (this.isDemoMode) {
+      return {
+        totalSessions: 15,
+        activeSessions: 1,
+        messagesToday: 42,
+        averageResponseTime: 1.2
+      };
+    }
+
     try {
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/stats`;
       const data = await aiApiRequest(endpoint);
@@ -246,6 +308,21 @@ export class AIAssistantService {
   async searchMessages(query, limit = 20) {
     if (!this.currentSessionId) {
       throw new Error('No active session');
+    }
+
+    // In demo mode, return mock data
+    if (this.isDemoMode) {
+      console.log('Demo mode: Mock message search');
+      return {
+        messages: [
+          {
+            messageId: 'demo-msg-1',
+            content: 'Exemplu de mesaj găsit în căutare',
+            timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString()
+          }
+        ],
+        totalFound: 1
+      };
     }
 
     try {

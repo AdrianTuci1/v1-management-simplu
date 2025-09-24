@@ -33,12 +33,31 @@ export class ResourceRepository {
       const resourcesEndpoint = buildResourcesEndpoint(path);
       return await apiRequest(this.resourceType, resourcesEndpoint, options);
     } catch (error) {
-      console.error('API request failed:', error);
+      // In demo mode, API calls are expected to fail - don't log as error
+      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+      if (!isDemoMode) {
+        console.error('API request failed:', error);
+      }
       throw error;
     }
   }
 
   async query(params) {
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    
+    // In demo mode, get data from IndexedDB instead of API
+    if (isDemoMode) {
+      console.log(`Demo mode: Getting ${this.resourceType} data from IndexedDB`);
+      try {
+        const data = await db.table(this.store).toArray();
+        console.log(`Demo mode: Found ${data.length} ${this.resourceType} items in IndexedDB`);
+        return data;
+      } catch (error) {
+        console.warn(`Demo mode: Error getting ${this.resourceType} from IndexedDB:`, error);
+        return [];
+      }
+    }
+    
     const query = params ? "?" + new URLSearchParams(params).toString() : "";
     const response = await this.request(query, { method: "GET" });
     
@@ -119,6 +138,21 @@ export class ResourceRepository {
   }
 
   async getById(id) {
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    
+    // In demo mode, get data from IndexedDB instead of API
+    if (isDemoMode) {
+      console.log(`Demo mode: Getting ${this.resourceType} with ID ${id} from IndexedDB`);
+      try {
+        const data = await db.table(this.store).get(id);
+        console.log(`Demo mode: Found ${this.resourceType} item:`, data);
+        return data;
+      } catch (error) {
+        console.warn(`Demo mode: Error getting ${this.resourceType} with ID ${id} from IndexedDB:`, error);
+        return null;
+      }
+    }
+    
     const response = await this.request(`/${id}`, { method: "GET" });
     
     // Extract data from API response structure
@@ -150,6 +184,32 @@ export class ResourceRepository {
   }
 
   async add(resource) {
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    
+    // In demo mode, add to IndexedDB directly
+    if (isDemoMode) {
+      console.log(`Demo mode: Adding ${this.resourceType} to IndexedDB`);
+      try {
+        const id = `${this.resourceType.toUpperCase()}${Date.now()}`;
+        const newResource = {
+          ...resource,
+          id,
+          resourceId: id,
+          businessId: 'B0100001',
+          locationId: 'L0100001',
+          resourceType: this.resourceType,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        await db.table(this.store).put(newResource);
+        console.log(`Demo mode: Added ${this.resourceType} with ID ${id}`);
+        return newResource;
+      } catch (error) {
+        console.error(`Demo mode: Error adding ${this.resourceType} to IndexedDB:`, error);
+        throw error;
+      }
+    }
+    
     // Trimite cererea dar tratează și cazul când serverul răspunde 201/202 fără body util
     try {
       const response = await this.request("", {
@@ -237,6 +297,33 @@ export class ResourceRepository {
   }
 
   async update(id, resource) {
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    
+    // In demo mode, update IndexedDB directly
+    if (isDemoMode) {
+      console.log(`Demo mode: Updating ${this.resourceType} with ID ${id} in IndexedDB`);
+      try {
+        const existingResource = await db.table(this.store).get(id);
+        if (!existingResource) {
+          throw new Error(`Resource with ID ${id} not found`);
+        }
+        
+        const updatedResource = {
+          ...existingResource,
+          ...resource,
+          id,
+          resourceId: id,
+          updatedAt: new Date().toISOString()
+        };
+        await db.table(this.store).put(updatedResource);
+        console.log(`Demo mode: Updated ${this.resourceType} with ID ${id}`);
+        return updatedResource;
+      } catch (error) {
+        console.error(`Demo mode: Error updating ${this.resourceType} with ID ${id}:`, error);
+        throw error;
+      }
+    }
+    
     try {
       const response = await this.request(`/${id}`, {
         method: "PUT",
@@ -320,6 +407,21 @@ export class ResourceRepository {
   }
 
   async remove(id) {
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    
+    // In demo mode, delete from IndexedDB directly
+    if (isDemoMode) {
+      console.log(`Demo mode: Deleting ${this.resourceType} with ID ${id} from IndexedDB`);
+      try {
+        await db.table(this.store).delete(id);
+        console.log(`Demo mode: Deleted ${this.resourceType} with ID ${id}`);
+        return true;
+      } catch (error) {
+        console.error(`Demo mode: Error deleting ${this.resourceType} with ID ${id}:`, error);
+        throw error;
+      }
+    }
+    
     try {
       const response = await this.request(`/${id}`, { method: "DELETE" });
       if (response && response.accepted === true) {

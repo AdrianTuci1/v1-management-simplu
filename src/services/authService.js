@@ -25,6 +25,58 @@ class AuthService {
   // Initialize authentication and business data
   async initialize() {
     try {
+      // In demo mode, skip API calls and use demo data
+      if (this.isDemoMode) {
+        console.log('Running in demo mode - using demo data instead of API calls')
+        const businessInfo = {
+          businessId: 'B0100001',
+          businessName: 'Cabinetul Dr. Popescu',
+          locationId: 'L0100001',
+          locationName: 'Premier Central',
+          address: 'Strada Exemplu 123, București',
+          phone: '+40 21 123 4567',
+          email: 'contact@cabinet-popescu.ro'
+        }
+        
+        const userData = {
+          user: {
+            id: 'demo-user',
+            email: 'demo@cabinet-popescu.ro',
+            name: 'Demo User'
+          },
+          profile: {
+            name: 'Demo User',
+            email: 'demo@cabinet-popescu.ro'
+          },
+          locations: {
+            'L0100001': 'admin',
+            'L0100002': 'manager',
+            'L0100003': 'user'
+          }
+        }
+        
+        const authUserData = {
+          success: true,
+          user: {
+            userId: 'demo-user',
+            userName: 'Demo User',
+            email: 'demo@cabinet-popescu.ro',
+            businessId: 'B0100001',
+            locations: [
+              { locationId: 'L0100001', locationName: 'Premier Central', role: 'admin' },
+              { locationId: 'L0100002', locationName: 'Filiala Pipera', role: 'manager' },
+              { locationId: 'L0100003', locationName: 'Centrul Medical Militari', role: 'user' }
+            ]
+          }
+        }
+        
+        return {
+          ...userData,
+          businessInfo,
+          authUserData
+        }
+      }
+      
       // First, get business info using command pattern
       const getBusinessInfoCommand = new GetCommand(businessInfoRepository, {})
       const businessInfo = await getBusinessInfoCommand.execute()

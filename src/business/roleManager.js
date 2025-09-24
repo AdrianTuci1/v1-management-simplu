@@ -91,7 +91,13 @@ class RoleManager {
       return 'Fără permisiuni'
     }
     
-    const resourceCount = new Set(permissions.map(p => p.resource)).size
+    // Handle both string format ("resource:action") and object format ({resource, action})
+    const resourceCount = new Set(permissions.map(p => {
+      if (typeof p === 'string') {
+        return p.split(':')[0] // Extract resource from "resource:action"
+      }
+      return p.resource
+    })).size
     const actionCount = permissions.length
     
     return `${resourceCount} resurse, ${actionCount} acțiuni`
