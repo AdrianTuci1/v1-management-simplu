@@ -227,7 +227,7 @@ const DashboardHome = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="max-h-80 overflow-y-auto space-y-4 pr-2">
                 {getRecentActivitiesData().map((activity, index) => (
                   <div key={index} className="flex items-start gap-3">
                     <div className={`h-8 w-8 rounded-full bg-muted flex items-center justify-center ${activity.color}`}>

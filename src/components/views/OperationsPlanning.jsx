@@ -155,6 +155,14 @@ const OperationsPlanning = () => {
     return currentViewDate.toLocaleDateString('ro-RO', options)
   }
 
+  // Funcție pentru formatarea datelor în format yyyy-mm-dd
+  const formatDate = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   // Încarcă programările și numărul de programări pentru perioada vizibilă
   useEffect(() => {
     const loadData = async () => {
@@ -245,14 +253,6 @@ const OperationsPlanning = () => {
     return date.getDate() === selectedDate.getDate() &&
       date.getMonth() === selectedDate.getMonth() &&
       date.getFullYear() === selectedDate.getFullYear()
-  }
-
-  // Funcție pentru formatarea datelor în format yyyy-mm-dd
-  const formatDate = (date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
   }
 
   // Obține numărul de programări pentru o dată specifică din cache

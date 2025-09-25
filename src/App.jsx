@@ -48,13 +48,21 @@ function AppContent() {
       try {
         setIsLoading(true)
         
-        // Load saved UI state
+        // Load saved UI state FIRST
         const savedView = localStorage.getItem('dashboard-view')
         const savedSidebarState = localStorage.getItem('sidebar-collapsed')
         const savedLocation = localStorage.getItem('selected-location')
         
-        if (savedView) setCurrentView(savedView)
-        if (savedSidebarState) setSidebarCollapsed(JSON.parse(savedSidebarState))
+        console.log('Loading saved state:', { savedView, savedSidebarState, savedLocation })
+        
+        // Set UI state immediately
+        if (savedView) {
+          console.log('Restoring view from localStorage:', savedView)
+          setCurrentView(savedView)
+        }
+        if (savedSidebarState) {
+          setSidebarCollapsed(JSON.parse(savedSidebarState))
+        }
         
         // Initialize authentication and business data
         const data = await authService.initialize()
@@ -104,7 +112,8 @@ function AppContent() {
 
   // Store auth data when user is authenticated via Cognito
   useEffect(() => {
-    if (auth.user && !isDemoMode) {
+    if (auth.user && !isDemoMode && !userData) {
+      console.log('User authenticated, storing auth data and reinitializing...')
       const authData = {
         id_token: auth.user.id_token,
         access_token: auth.user.access_token,
@@ -118,6 +127,20 @@ function AppContent() {
       const reinitialize = async () => {
         try {
           setIsLoading(true)
+          
+          // Load saved UI state again to preserve user's navigation
+          const savedView = localStorage.getItem('dashboard-view')
+          const savedSidebarState = localStorage.getItem('sidebar-collapsed')
+          const savedLocation = localStorage.getItem('selected-location')
+          
+          console.log('Reinitializing with saved state:', { savedView, savedSidebarState, savedLocation })
+          
+          if (savedView) {
+            console.log('Reinitializing with saved view:', savedView)
+            setCurrentView(savedView)
+          }
+          if (savedSidebarState) setSidebarCollapsed(JSON.parse(savedSidebarState))
+          
           const data = await authService.initialize()
           setUserData(data)
           
@@ -126,10 +149,15 @@ function AppContent() {
             return
           }
           
-          const defaultLocation = authService.getDefaultLocation(data)
-          if (defaultLocation) {
-            setSelectedLocation(defaultLocation)
-            localStorage.setItem('selected-location', JSON.stringify(defaultLocation))
+          // Restore saved location or set default
+          if (savedLocation) {
+            setSelectedLocation(JSON.parse(savedLocation))
+          } else {
+            const defaultLocation = authService.getDefaultLocation(data)
+            if (defaultLocation) {
+              setSelectedLocation(defaultLocation)
+              localStorage.setItem('selected-location', JSON.stringify(defaultLocation))
+            }
           }
           
           // Clean up URL by removing authorization code and state parameters
@@ -144,19 +172,28 @@ function AppContent() {
       
       reinitialize()
     }
-  }, [auth.isAuthenticated, auth.user, isDemoMode])
+  }, [auth.isAuthenticated, auth.user, isDemoMode, userData])
 
   // Save state to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('dashboard-view', currentView)
-  }, [currentView])
+    // Only save if we're not in the initial loading phase
+    if (!isLoading) {
+      console.log('Saving current view to localStorage:', currentView)
+      localStorage.setItem('dashboard-view', currentView)
+    }
+  }, [currentView, isLoading])
 
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed))
   }, [sidebarCollapsed])
 
   const handleViewChange = (view) => {
+    console.log('Changing view to:', view)
+    console.log('Current localStorage dashboard-view:', localStorage.getItem('dashboard-view'))
     setCurrentView(view)
+    // Force save immediately for testing
+    localStorage.setItem('dashboard-view', view)
+    console.log('Saved to localStorage:', view)
   }
 
   const handleSidebarToggle = () => {

@@ -13,6 +13,7 @@ export { default as WorkingHoursDrawer } from './WorkingHoursDrawer.jsx'
 export { default as CurrencyTaxDrawer } from './CurrencyTaxDrawer.jsx'
 export { default as LanguageDrawer } from './LanguageDrawer.jsx'
 export { default as CashRegisterDrawer } from './CashRegisterDrawer.jsx'
+export { default as ActivityDrawer } from './ActivityDrawer.jsx'
 
 // Export standardized drawer UI components
 export {

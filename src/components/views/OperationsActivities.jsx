@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command'
+import ActivityDrawer from '../drawers/ActivityDrawer.jsx'
 
 const OperationsActivities = () => {
   // Mock data pentru activitățile agentului
@@ -93,9 +94,215 @@ const OperationsActivities = () => {
     }
   ]);
 
+  // Obiect separat pentru datele detaliate - indexat după ID
+  const [detailedData] = useState({
+    1: {
+      // Detalii specifice SMS
+      smsDetails: {
+        recipientCount: 12,
+        messageTemplate: 'Confirmare programare pentru {{date}} la {{time}}',
+        deliveryRate: 100,
+        costPerSMS: 0.05,
+        totalCost: 0.60,
+        provider: 'Twilio',
+        language: 'ro'
+      },
+      // Metadata tehnică
+      technical: {
+        duration: 250,
+        apiCalls: 1,
+        creditsUsed: 15,
+        errorRate: 0,
+        retryCount: 0
+      },
+      // Context
+      context: {
+        trigger: 'scheduled_batch',
+        patientIds: [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112],
+        location: 'Clinică Centrală'
+      }
+    },
+    2: {
+      // Detalii specifice ElevenLabs
+      elevenLabsDetails: {
+        audioDuration: 125,
+        voiceModel: 'Nova',
+        language: 'ro',
+        transcription: 'Da, confirm programarea pentru mâine la ora 10.',
+        sentiment: 'positive',
+        confidence: 0.92,
+        costPerMinute: 0.30,
+        totalCost: 0.0625
+      },
+      // Metadata tehnică
+      technical: {
+        duration: 890,
+        apiCalls: 3,
+        creditsUsed: 45,
+        errorRate: 0,
+        retryCount: 0
+      },
+      // Context
+      context: {
+        trigger: 'incoming_call',
+        patientId: 203,
+        appointmentId: 456,
+        phoneNumber: '+40712345678'
+      }
+    },
+    3: {
+      // Detalii specifice Meta
+      metaDetails: {
+        platform: 'Instagram',
+        postId: 'ig_7890123456789',
+        commentText: '@clinica_mea vreau o programare pentru mâine',
+        responseTime: 45,
+        engagement: {
+          likes: 2,
+          replies: 0,
+          shares: 0
+        },
+        userProfile: {
+          followers: 150,
+          verified: false,
+          location: 'București'
+        }
+      },
+      // Metadata tehnică
+      technical: {
+        duration: 320,
+        apiCalls: 2,
+        creditsUsed: 25,
+        errorRate: 0,
+        retryCount: 0
+      },
+      // Context
+      context: {
+        trigger: 'social_mention',
+        patientId: 304,
+        socialMediaId: 'ig_user_789',
+        campaign: 'social_booking'
+      }
+    },
+    4: {
+      // Detalii specifice Gmail
+      gmailDetails: {
+        recipientEmail: 'pacient@email.com',
+        subject: 'Informații despre tratamentele disponibile',
+        templateUsed: 'treatment_info_template',
+        attachments: ['price_list.pdf', 'treatment_options.pdf'],
+        openRate: 0,
+        clickRate: 0,
+        responseTime: 120
+      },
+      // Metadata tehnică
+      technical: {
+        duration: 180,
+        apiCalls: 1,
+        creditsUsed: 8,
+        errorRate: 0,
+        retryCount: 0
+      },
+      // Context
+      context: {
+        trigger: 'email_inquiry',
+        patientId: 405,
+        inquiryType: 'treatment_info',
+        sourceEmail: 'info@clinica.com'
+      }
+    },
+    5: {
+      // Detalii specifice ElevenLabs
+      elevenLabsDetails: {
+        audioDuration: 95,
+        voiceModel: 'Nova',
+        language: 'ro',
+        transcription: 'Nu mai pot veni mâine, vă rog să anulați programarea.',
+        sentiment: 'neutral',
+        confidence: 0.88,
+        costPerMinute: 0.30,
+        totalCost: 0.0475
+      },
+      // Metadata tehnică
+      technical: {
+        duration: 650,
+        apiCalls: 4,
+        creditsUsed: 38,
+        errorRate: 0,
+        retryCount: 0
+      },
+      // Context
+      context: {
+        trigger: 'incoming_call',
+        patientId: 506,
+        appointmentId: 789,
+        phoneNumber: '+40787654321',
+        cancellationReason: 'schedule_conflict'
+      }
+    },
+    6: {
+      // Detalii specifice SMS
+      smsDetails: {
+        recipientCount: 1,
+        messageTemplate: 'Reamintire: Programarea dumneavoastră este mâine la {{time}}',
+        deliveryRate: 100,
+        costPerSMS: 0.05,
+        totalCost: 0.05,
+        provider: 'Twilio',
+        language: 'ro'
+      },
+      // Metadata tehnică
+      technical: {
+        duration: 150,
+        apiCalls: 1,
+        creditsUsed: 12,
+        errorRate: 0,
+        retryCount: 0
+      },
+      // Context
+      context: {
+        trigger: 'scheduled_reminder',
+        patientId: 607,
+        appointmentId: 890,
+        reminderType: '24h_before'
+      }
+    },
+    7: {
+      // Detalii specifice Meta
+      metaDetails: {
+        platform: 'Facebook',
+        messageId: 'fb_msg_123456789',
+        errorMessage: 'Rate limit exceeded for Facebook API',
+        retryAttempts: 3,
+        lastRetry: new Date(Date.now() - 2 * 60 * 60 * 1000)
+      },
+      // Metadata tehnică
+      technical: {
+        duration: 5000,
+        apiCalls: 5,
+        creditsUsed: 0,
+        errorRate: 100,
+        retryCount: 3,
+        errorDetails: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Too many requests to Facebook API',
+          retryAfter: 3600
+        }
+      },
+      // Context
+      context: {
+        trigger: 'direct_message',
+        patientId: 708,
+        socialMediaId: 'fb_user_456',
+        campaign: 'social_booking'
+      }
+    }
+  });
+
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Funcție pentru a obține iconița serviciului
   const getServiceIcon = (service) => {
@@ -260,7 +467,6 @@ const OperationsActivities = () => {
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Descriere</th>
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Prioritate</th>
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Timp</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Acțiuni</th>
                 </tr>
               </thead>
               <tbody>
@@ -274,9 +480,14 @@ const OperationsActivities = () => {
                   return (
                     <tr 
                       key={activity.id} 
-                      className={`border-b transition-colors hover:bg-muted/50 ${
+                      className={`border-b transition-colors hover:bg-muted/50 cursor-pointer ${
                         selectedActivity?.id === activity.id ? 'bg-muted' : ''
                       }`}
+                      onClick={() => {
+                        console.log('Opening drawer for activity:', activity);
+                        setSelectedActivity(activity);
+                        setDrawerOpen(true);
+                      }}
                     >
                       {/* Status */}
                       <td className="p-4 align-middle">
@@ -326,21 +537,6 @@ const OperationsActivities = () => {
                         </div>
                       </td>
 
-                      {/* Acțiuni */}
-                      <td className="p-4 align-middle">
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedActivity(activity)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
                     </tr>
                   );
                 })}
@@ -350,66 +546,16 @@ const OperationsActivities = () => {
         </CardContent>
       </Card>
 
-      {/* Preview detaliat */}
-      {selectedActivity && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center space-x-2">
-                  <span>{selectedActivity.description}</span>
-                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                    selectedActivity.status === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                  }`}>
-                    {selectedActivity.status === 'success' ? 'Succes' : 'Eroare'}
-                  </span>
-                </CardTitle>
-                <CardDescription>{selectedActivity.details}</CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedActivity(null)}>
-                ×
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Serviciu</div>
-                <div className="flex items-center space-x-2 mt-1">
-                  {React.createElement(getServiceIcon(selectedActivity.service), { className: "h-4 w-4" })}
-                  <span>{selectedActivity.service}</span>
-                </div>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Prioritate</div>
-                <div className="mt-1">
-                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                    getPriorityInfo(selectedActivity.priority).bgColor
-                  } ${getPriorityInfo(selectedActivity.priority).color}`}>
-                    {getPriorityInfo(selectedActivity.priority).text}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Acțiune</div>
-                <div className="mt-1">
-                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                    getActionInfo(selectedActivity.action).bgColor
-                  } ${getActionInfo(selectedActivity.action).color}`}>
-                    {getActionInfo(selectedActivity.action).text}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Timp</div>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{formatTimestamp(selectedActivity.timestamp)}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Activity Drawer */}
+      {drawerOpen && selectedActivity && (
+        <ActivityDrawer
+          onClose={() => {
+            setDrawerOpen(false);
+            setSelectedActivity(null);
+          }}
+          activity={selectedActivity}
+          detailedData={detailedData[selectedActivity.id]}
+        />
       )}
     </div>
   )

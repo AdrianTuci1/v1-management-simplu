@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   ChevronLeft, 
   ChevronRight,
@@ -22,7 +22,16 @@ import {
 import LocationSwitcher from './LocationSwitcher'
 
 const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocation, onLocationChange }) => {
-  const [expandedMenus, setExpandedMenus] = useState(['operations'])
+  // Initialize expanded menus from localStorage or default
+  const [expandedMenus, setExpandedMenus] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-expanded-menus')
+      return saved ? JSON.parse(saved) : ['operations']
+    } catch (error) {
+      console.error('Error loading expanded menus from localStorage:', error)
+      return ['operations']
+    }
+  })
 
   const menuItems = [
     {
@@ -158,6 +167,15 @@ const Sidebar = ({ collapsed, currentView, onViewChange, onToggle, currentLocati
       ]
     }
   ]
+
+  // Save expanded menus to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar-expanded-menus', JSON.stringify(expandedMenus))
+    } catch (error) {
+      console.error('Error saving expanded menus to localStorage:', error)
+    }
+  }, [expandedMenus])
 
   const toggleMenu = (menuId) => {
     setExpandedMenus(prev => 

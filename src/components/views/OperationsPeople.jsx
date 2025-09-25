@@ -397,24 +397,22 @@ const OperationsPeople = () => {
                       </td>
                       <td className="p-3">
                         <div className="space-y-1">
-                          {patient.address && patient.address !== '.' && (
+                          {patient.address && patient.address !== '.' && patient.city ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <MapPin className="h-3 w-3" />
+                              {patient.address}, {patient.city}
+                            </div>
+                          ) : patient.address && patient.address !== '.' ? (
                             <div className="flex items-center gap-1 text-sm">
                               <MapPin className="h-3 w-3" />
                               {patient.address}
                             </div>
-                          )}
-                          {patient.city && (
+                          ) : patient.city ? (
                             <div className="flex items-center gap-1 text-sm">
                               <MapPin className="h-3 w-3" />
                               {patient.city}
                             </div>
-                          )}
-                          {patient.county && (
-                            <div className="text-sm text-muted-foreground">
-                              {patient.county}
-                            </div>
-                          )}
-                          {(!patient.address || patient.address === '.') && !patient.city && !patient.county && (
+                          ) : (
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </div>
