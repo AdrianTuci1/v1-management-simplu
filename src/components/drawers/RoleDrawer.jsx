@@ -24,22 +24,20 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
 
   // Resurse disponibile pentru permisiuni
   const availableResources = [
-    { value: 'appointment', label: 'Programări' },
-    { value: 'medic', label: 'Medici' },
-    { value: 'patient', label: 'Pacienți' },
-    { value: 'role', label: 'Roluri' },
-    { value: 'product', label: 'Produse' },
-    { value: 'treatment', label: 'Tratamente' },
-    { value: 'sale', label: 'Vânzări' },
-    { value: 'history', label: 'Istoric' },
-    { value: 'bill', label: 'Facturi' },
-    { value: 'raport', label: 'Rapoarte' }
+    { value: 'appointments', label: 'Programări' },
+    { value: 'users', label: 'Medici' },
+    { value: 'patients', label: 'Pacienți' },
+    { value: 'roles', label: 'Roluri' },
+    { value: 'products', label: 'Produse' },
+    { value: 'treatments', label: 'Tratamente' },
+    { value: 'sales', label: 'Vânzări' },
+    { value: 'reports', label: 'Rapoarte' }
   ]
 
   const availableActions = [
-    { value: 'read', label: 'Citire' },
+    { value: 'view', label: 'Vizualizare' },
     { value: 'create', label: 'Creare' },
-    { value: 'update', label: 'Actualizare' },
+    { value: 'edit', label: 'Editare' },
     { value: 'delete', label: 'Ștergere' }
   ]
 

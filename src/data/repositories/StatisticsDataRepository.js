@@ -1,5 +1,6 @@
 import { db } from "../infrastructure/db";
 import { apiRequest, buildResourcesEndpoint } from "../infrastructure/apiClient.js";
+import { indexedDb } from "../infrastructure/db.js";
 
 export class StatisticsDataRepository {
   constructor() {
@@ -9,54 +10,15 @@ export class StatisticsDataRepository {
   async query(params = {}) {
     const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
     
-    // In demo mode, generate mock statistics data
+    // In demo mode, generate statistics from demo data
     if (isDemoMode) {
-      console.log('Demo mode: Generating mock statistics data');
+      console.log('Demo mode: Generating statistics from demo data');
       const statisticsType = params.type || 'business-statistics';
       
       if (statisticsType === 'business-statistics') {
-        const mockData = {
-          totalPatients: 1247,
-          totalAppointments: 3421,
-          totalRevenue: 156780,
-          monthlyGrowth: 12.5,
-          appointmentStats: {
-            completed: 2890,
-            scheduled: 531,
-            cancelled: 156
-          },
-          revenueByMonth: [
-            { month: 'Ian', revenue: 12500, appointments: 245 },
-            { month: 'Feb', revenue: 13200, appointments: 267 },
-            { month: 'Mar', revenue: 11800, appointments: 234 },
-            { month: 'Apr', revenue: 14200, appointments: 289 },
-            { month: 'Mai', revenue: 15800, appointments: 312 },
-            { month: 'Iun', revenue: 16500, appointments: 328 }
-          ]
-        };
-        
-        // Store in local database
-        await db.table('statistics').put({
-          id: 'business-statistics',
-          data: mockData,
-          timestamp: new Date().toISOString()
-        });
-        
-        return mockData;
+        return await this.generateBusinessStatisticsFromDemoData();
       } else if (statisticsType === 'recent-activities') {
-        const mockActivities = [
-          { id: 1, type: 'appointment', description: 'Programare nouă cu Dr. Popescu', timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString() },
-          { id: 2, type: 'patient', description: 'Pacient nou înregistrat', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString() },
-          { id: 3, type: 'payment', description: 'Plată procesată - 450 RON', timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString() }
-        ];
-        
-        await db.table('statistics').put({
-          id: 'recent-activities',
-          data: mockActivities,
-          timestamp: new Date().toISOString()
-        });
-        
-        return mockActivities;
+        return await this.generateRecentActivitiesFromDemoData();
       }
       
       return null;
@@ -139,6 +101,199 @@ export class StatisticsDataRepository {
       console.warn('Failed to get cached recent activities:', error);
     }
     return null;
+  }
+
+  async generateBusinessStatisticsFromDemoData() {
+    try {
+      // Get all demo data
+      const [patients, appointments, sales, treatments] = await Promise.all([
+        indexedDb.getAll('patients').catch(() => []),
+        indexedDb.getAll('appointments').catch(() => []),
+        indexedDb.getAll('sales').catch(() => []),
+        indexedDb.getAll('treatments').catch(() => [])
+      ]);
+
+      // Calculate statistics
+      const totalPatients = patients.length;
+      const activePatients = patients.filter(p => p.status === 'active').length;
+      const totalAppointments = appointments.length;
+      
+      // Appointment status breakdown
+      const appointmentStats = {
+        completed: appointments.filter(a => a.status === 'completed').length,
+        scheduled: appointments.filter(a => a.status === 'scheduled').length,
+        cancelled: appointments.filter(a => a.status === 'cancelled').length,
+        'in-progress': appointments.filter(a => a.status === 'in-progress').length
+      };
+
+      // Revenue calculations
+      const totalRevenue = sales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const completedSales = sales.filter(s => s.status === 'completed');
+      const revenueThisMonth = completedSales
+        .filter(s => {
+          const saleDate = new Date(s.createdAt);
+          const now = new Date();
+          return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
+        })
+        .reduce((sum, sale) => sum + (sale.total || 0), 0);
+
+      // Monthly revenue data (last 6 months)
+      const revenueByMonth = this.generateMonthlyRevenueData(sales);
+      
+      // Growth calculation (simplified)
+      const monthlyGrowth = this.calculateGrowthRate(revenueByMonth);
+
+      const statistics = {
+        totalPatients,
+        activePatients,
+        totalAppointments,
+        totalRevenue,
+        revenueThisMonth,
+        monthlyGrowth,
+        appointmentStats,
+        revenueByMonth,
+        lowStockProducts: await this.getLowStockProductsCount()
+      };
+
+      // Store in local database
+      await db.table('statistics').put({
+        id: 'business-statistics',
+        data: statistics,
+        timestamp: new Date().toISOString()
+      });
+
+      return statistics;
+    } catch (error) {
+      console.error('Error generating business statistics from demo data:', error);
+      // Fallback to basic mock data
+      return {
+        totalPatients: 0,
+        activePatients: 0,
+        totalAppointments: 0,
+        totalRevenue: 0,
+        revenueThisMonth: 0,
+        monthlyGrowth: 0,
+        appointmentStats: { completed: 0, scheduled: 0, cancelled: 0, 'in-progress': 0 },
+        revenueByMonth: [],
+        lowStockProducts: 0
+      };
+    }
+  }
+
+  async generateRecentActivitiesFromDemoData() {
+    try {
+      const [appointments, patients, sales] = await Promise.all([
+        indexedDb.getAll('appointments').catch(() => []),
+        indexedDb.getAll('patients').catch(() => []),
+        indexedDb.getAll('sales').catch(() => [])
+      ]);
+
+      const activities = [];
+
+      // Recent appointments
+      const recentAppointments = appointments
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 5)
+        .map(appointment => ({
+          id: `apt-${appointment.id}`,
+          type: 'appointment',
+          title: `${appointment.patient?.name || 'Pacient'} - ${appointment.service?.name || 'Serviciu'}`,
+          subtitle: `${appointment.date} ${appointment.time} cu ${appointment.doctor?.name || 'Doctor'}`,
+          timestamp: appointment.createdAt
+        }));
+
+      // Recent patients
+      const recentPatients = patients
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 3)
+        .map(patient => ({
+          id: `patient-${patient.id}`,
+          type: 'patient',
+          title: `Pacient nou înregistrat`,
+          subtitle: patient.patientName || patient.name,
+          timestamp: patient.createdAt
+        }));
+
+      // Recent sales
+      const recentSales = sales
+        .filter(sale => sale.status === 'completed')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 3)
+        .map(sale => ({
+          id: `sale-${sale.id}`,
+          type: 'payment',
+          title: `Plată procesată - ${sale.total} RON`,
+          subtitle: `Metodă: ${sale.paymentMethod}`,
+          timestamp: sale.createdAt
+        }));
+
+      const allActivities = [...recentAppointments, ...recentPatients, ...recentSales]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 10);
+
+      // Store in local database
+      await db.table('statistics').put({
+        id: 'recent-activities',
+        data: allActivities,
+        timestamp: new Date().toISOString()
+      });
+
+      return allActivities;
+    } catch (error) {
+      console.error('Error generating recent activities from demo data:', error);
+      return [];
+    }
+  }
+
+  generateMonthlyRevenueData(sales) {
+    const months = ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const revenueByMonth = [];
+    const now = new Date();
+    
+    // Generate data for last 6 months
+    for (let i = 5; i >= 0; i--) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = months[targetDate.getMonth()];
+      
+      const monthSales = sales.filter(sale => {
+        const saleDate = new Date(sale.createdAt);
+        return saleDate.getMonth() === targetDate.getMonth() && 
+               saleDate.getFullYear() === targetDate.getFullYear() &&
+               sale.status === 'completed';
+      });
+      
+      const revenue = monthSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const appointments = monthSales.length; // Simplified - in real app would count appointments
+      
+      revenueByMonth.push({
+        month: monthName,
+        revenue: Math.round(revenue),
+        appointments: appointments
+      });
+    }
+    
+    return revenueByMonth;
+  }
+
+  calculateGrowthRate(revenueByMonth) {
+    if (revenueByMonth.length < 2) return 0;
+    
+    const current = revenueByMonth[revenueByMonth.length - 1].revenue;
+    const previous = revenueByMonth[revenueByMonth.length - 2].revenue;
+    
+    if (previous === 0) return 0;
+    
+    return Math.round(((current - previous) / previous) * 100 * 10) / 10; // Round to 1 decimal
+  }
+
+  async getLowStockProductsCount() {
+    try {
+      const products = await indexedDb.getAll('products');
+      return products.filter(p => p.stock <= p.reorderLevel).length;
+    } catch (error) {
+      console.warn('Error getting low stock products count:', error);
+      return 0;
+    }
   }
 }
 

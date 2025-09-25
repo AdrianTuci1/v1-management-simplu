@@ -77,35 +77,35 @@ const DashboardHome = () => {
     return [
       {
         title: 'Pacienți Înregistrați',
-        subtitle: `Luna ${getCurrentMonthName()}`,
-        value: businessStatistics.registeredPatients?.toString() || '0',
+        subtitle: `Total: ${businessStatistics.totalPatients || 0}`,
+        value: businessStatistics.activePatients?.toString() || '0',
         icon: Users,
         color: 'bg-blue-500',
         change: '+0',
         changeType: 'positive'
       },
       {
-        title: 'Vizite Programate',
+        title: 'Programări Totale',
         subtitle: `Luna ${getCurrentMonthName()}`,
-        value: businessStatistics.scheduledVisits?.toString() || '0',
+        value: businessStatistics.totalAppointments?.toString() || '0',
         icon: Calendar,
         color: 'bg-green-500',
         change: '+0',
         changeType: 'positive'
       },
       {
-        title: 'Vizite Finalizate',
+        title: 'Programări Finalizate',
         subtitle: `Luna ${getCurrentMonthName()}`,
-        value: businessStatistics.completedVisits?.toString() || '0',
+        value: businessStatistics.appointmentStats?.completed?.toString() || '0',
         icon: CheckCircle,
         color: 'bg-emerald-500',
         change: '+0',
         changeType: 'positive'
       },
       {
-        title: 'Vizite Anulate',
+        title: 'Programări Anulate',
         subtitle: `Luna ${getCurrentMonthName()}`,
-        value: businessStatistics.canceledVisits?.toString() || '0',
+        value: businessStatistics.appointmentStats?.cancelled?.toString() || '0',
         icon: XCircle,
         color: 'bg-red-500',
         change: '0',
@@ -135,10 +135,12 @@ const DashboardHome = () => {
         switch (activityType) {
           case 'appointment':
             return { icon: Calendar, color: 'text-blue-500' }
-          case 'sale':
-            return { icon: TrendingUp, color: 'text-green-500' }
+          case 'patient':
+            return { icon: Users, color: 'text-green-500' }
           case 'payment':
             return { icon: CreditCard, color: 'text-emerald-500' }
+          case 'sale':
+            return { icon: TrendingUp, color: 'text-green-500' }
           case 'inventory':
             return { icon: Package, color: 'text-orange-500' }
           default:
@@ -146,7 +148,7 @@ const DashboardHome = () => {
         }
       }
 
-      const config = getActivityConfig(activity.activityType)
+      const config = getActivityConfig(activity.type)
       
       // Format time
       const formatTime = (timestamp) => {
@@ -161,10 +163,10 @@ const DashboardHome = () => {
       }
 
       return {
-        type: activity.activityType,
+        type: activity.type,
         title: activity.title || 'Activitate',
-        description: activity.description || 'Activitate în sistem',
-        time: formatTime(activity.updatedAt || activity.createdAt),
+        description: activity.subtitle || 'Activitate în sistem',
+        time: formatTime(activity.timestamp),
         icon: config.icon,
         color: config.color
       }

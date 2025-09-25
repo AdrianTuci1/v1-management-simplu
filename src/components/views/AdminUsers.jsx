@@ -5,6 +5,7 @@ import {
 import { useUsers } from '../../hooks/useUsers.js'
 import { useDrawer } from '../../contexts/DrawerContext'
 import { userManager } from '../../business/userManager.js'
+import PermissionGate from '../PermissionGate'
 
 const AdminUsers = () => {
   const { openDrawer } = useDrawer()
@@ -162,13 +163,15 @@ const AdminUsers = () => {
           <p className="text-muted-foreground">Gestionează medicii sistemului</p>
         </div>
         <div className="flex gap-2">
-          <button 
-            onClick={() => openDrawer({ type: 'medic' })} 
-            className="btn btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Medic nou
-          </button>
+          <PermissionGate permission="users:create">
+            <button 
+              onClick={() => openDrawer({ type: 'medic' })} 
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Medic nou
+            </button>
+          </PermissionGate>
         </div>
       </div>
 
@@ -245,13 +248,15 @@ const AdminUsers = () => {
                 }
               </p>
               {!searchTerm && !statusFilter && !roleFilter && (
-                <button 
-                  onClick={() => openDrawer({ type: 'medic' })}
-                  className="btn btn-primary"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adaugă primul medic
-                </button>
+                <PermissionGate permission="users:create">
+                  <button 
+                    onClick={() => openDrawer({ type: 'medic' })}
+                    className="btn btn-primary"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adaugă primul medic
+                  </button>
+                </PermissionGate>
               )}
             </div>
           ) : (

@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { TrendingUp } from "lucide-react"
 import { Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 
@@ -15,84 +16,118 @@ import {
   ChartConfig,
   ChartContainer,
 } from "@/components/ui/chart"
+import { useAppointments, Appointment } from "../../hooks/useAppointments"
 
-export const description = "A mixed bar chart"
+// Type definitions
+interface DoctorData {
+  doctor: string
+  appointments: number
+  fill: string
+}
 
-const chartData = [
-  { browser: "chrome", visitors: 275, fill: "var(--color-chrome)" },
-  { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
-  { browser: "firefox", visitors: 187, fill: "var(--color-firefox)" },
-  { browser: "edge", visitors: 173, fill: "var(--color-edge)" },
-  { browser: "other", visitors: 90, fill: "var(--color-other)" },
-]
+export const description = "A mixed bar chart showing doctors with appointment counts"
+
+// Generate sample data for doctors
+const generateDoctorData = () => {
+  const doctors = [
+    { name: "Dr. Popescu", appointments: 45 },
+    { name: "Dr. Ionescu", appointments: 38 },
+    { name: "Dr. Georgescu", appointments: 32 },
+    { name: "Dr. Marinescu", appointments: 28 },
+    { name: "Dr. Dumitrescu", appointments: 22 }
+  ]
+  
+  return doctors.map(doctor => ({
+    doctor: doctor.name,
+    appointments: doctor.appointments,
+    fill: "var(--color-doctor)"
+  }))
+}
+
+const chartData = generateDoctorData()
 
 const chartConfig = {
-  visitors: {
-    label: "Visitors",
+  appointments: {
+    label: "Programări",
   },
-  chrome: {
-    label: "Chrome",
+  doctor: {
+    label: "Doctor",
     color: "var(--chart-1)",
-  },
-  safari: {
-    label: "Safari",
-    color: "var(--chart-2)",
-  },
-  firefox: {
-    label: "Firefox",
-    color: "var(--chart-3)",
-  },
-  edge: {
-    label: "Edge",
-    color: "var(--chart-4)",
-  },
-  other: {
-    label: "Other",
-    color: "var(--chart-5)",
   },
 } satisfies ChartConfig
 
 export function ChartBarMixed() {
+  const { appointments } = useAppointments()
+  
+  // Process real appointment data by doctor
+  const processedData = React.useMemo((): DoctorData[] => {
+    if (!appointments || appointments.length === 0) {
+      return chartData // fallback to sample data
+    }
+    
+    // Group appointments by doctor
+    const appointmentsByDoctor: Record<string, DoctorData> = {}
+    appointments.forEach((appointment: Appointment) => {
+      const doctor = appointment.doctor || appointment.medic
+      if (!doctor) return
+      
+      const doctorName = doctor.name || doctor.fullName || `Dr. ${doctor.firstName} ${doctor.lastName}` || 'Doctor necunoscut'
+      
+      if (!appointmentsByDoctor[doctorName]) {
+        appointmentsByDoctor[doctorName] = {
+          doctor: doctorName,
+          appointments: 0,
+          fill: "var(--color-doctor)"
+        }
+      }
+      
+      appointmentsByDoctor[doctorName].appointments++
+    })
+    
+    // Convert to array and sort by appointment count
+    return Object.values(appointmentsByDoctor)
+      .sort((a: DoctorData, b: DoctorData) => b.appointments - a.appointments)
+      .slice(0, 5) // Show top 5 doctors
+  }, [appointments])
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Bar Chart - Mixed</CardTitle>
-        <CardDescription>January - June 2024</CardDescription>
+        <CardTitle>Medici cu numărul de programări</CardTitle>
+        <CardDescription>Top 5 medici după numărul de programări</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               accessibilityLayer
-              data={chartData}
+              data={processedData}
               layout="vertical"
               margin={{
                 left: 0,
               }}
             >
               <YAxis
-                dataKey="browser"
+                dataKey="doctor"
                 type="category"
                 tickLine={false}
                 tickMargin={10}
                 axisLine={false}
-                tickFormatter={(value) =>
-                  chartConfig[value as keyof typeof chartConfig]?.label
-                }
+                tickFormatter={(value) => value}
               />
-              <XAxis dataKey="visitors" type="number" hide />
+              <XAxis dataKey="appointments" type="number" hide />
               <Tooltip />
-              <Bar dataKey="visitors" radius={5} />
+              <Bar dataKey="appointments" radius={5} />
             </BarChart>
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
       <CardFooter className="flex-col items-start gap-2 text-sm">
         <div className="flex gap-2 leading-none font-medium">
-          Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
+          Top medici după activitate <TrendingUp className="h-4 w-4" />
         </div>
         <div className="text-muted-foreground leading-none">
-          Showing total visitors for the last 6 months
+          Afișarea celor mai activi medici din clinică
         </div>
       </CardFooter>
     </Card>

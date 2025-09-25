@@ -61,8 +61,7 @@ class AppointmentManager {
 
   // Transformare date pentru UI (Backend -> UI)
   transformAppointmentForUI(appointmentData) {
-    // Debug: să vedem ce primim
-    console.log('appointmentManager.transformAppointmentForUI - input:', appointmentData)
+
     
     // Extragem datele din structura nested dacă există
     const data = appointmentData.data || appointmentData

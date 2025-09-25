@@ -74,12 +74,29 @@ const UserContent = () => {
       try {
         // Get user info from localStorage
         const savedCognitoData = localStorage.getItem('cognito-data')
+        const businessInfo = localStorage.getItem('business-info')
         if (savedCognitoData) {
           const userData = JSON.parse(savedCognitoData)
+          let userRole = 'Administrator' // Default role
+          
+          // Try to get actual role from business info
+          if (businessInfo) {
+            try {
+              const businessData = JSON.parse(businessInfo)
+              if (businessData.locations && businessData.locations.length > 0) {
+                // Get role from first location (or current location)
+                const currentLocation = businessData.locations.find(loc => loc.isCurrent) || businessData.locations[0]
+                userRole = currentLocation.role || 'Administrator'
+              }
+            } catch (e) {
+              console.warn('Error parsing business info:', e)
+            }
+          }
+          
           setUserInfo({
             name: userData.profile?.name || userData.user?.name || 'Utilizator',
             email: userData.profile?.email || userData.user?.email || '',
-            role: 'Administrator'
+            role: userRole
           })
         }
 

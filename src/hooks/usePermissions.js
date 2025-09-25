@@ -3,262 +3,176 @@ import { permissionService } from '../services/permissionService.js'
 import { permissionManager } from '../business/permissionManager.js'
 
 export const usePermissions = () => {
-  const [permissions, setPermissions] = useState([])
+  const [userPermissions, setUserPermissions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [stats, setStats] = useState(null)
-  const [filters, setFilters] = useState({})
-  const [sortBy, setSortBy] = useState('resource')
-  const [sortOrder, setSortOrder] = useState('asc')
 
-  // Cache pentru numărul de permisiuni
-  const [permissionCount, setPermissionCount] = useState(0)
-
-  // Încarcă toate permisiunile
-  const loadPermissions = useCallback(async (customFilters = {}) => {
+  // Load user permissions based on their role
+  const loadUserPermissions = useCallback(async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const allFilters = { ...filters, ...customFilters }
-      const permissionsData = await permissionService.getPermissions(allFilters)
+      // Get user role from localStorage
+      const businessInfo = localStorage.getItem('business-info')
+      let userRole = 'Administrator' // Default role
       
-      // Aplică filtrele și sortarea
-      let filteredPermissions = permissionManager.filterPermissions(permissionsData, allFilters)
-      filteredPermissions = permissionManager.sortPermissions(filteredPermissions, sortBy, sortOrder)
+      if (businessInfo) {
+        try {
+          const businessData = JSON.parse(businessInfo)
+          if (businessData.locations && businessData.locations.length > 0) {
+            const currentLocation = businessData.locations.find(loc => loc.isCurrent) || businessData.locations[0]
+            userRole = currentLocation.role || 'Administrator'
+          }
+        } catch (e) {
+          console.warn('Error parsing business info:', e)
+        }
+      }
+
+      // Map role to permissions
+      const rolePermissions = getRolePermissions(userRole)
+      setUserPermissions(rolePermissions)
       
-      setPermissions(filteredPermissions)
-      setPermissionCount(filteredPermissions.length)
+      return rolePermissions
     } catch (err) {
       setError(err.message)
-      console.error('Error loading permissions:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, sortBy, sortOrder])
-
-  // Obține o permisiune după ID din lista locală
-  const getPermissionById = useCallback((id) => {
-    return permissions.find(permission => permission.id === id) || null
-  }, [permissions])
-
-  // Adaugă o permisiune nouă
-  const addPermission = useCallback(async (permissionData) => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const newPermission = await permissionService.addPermission(permissionData)
-      setPermissions(prev => [...prev, newPermission])
-      setPermissionCount(prev => prev + 1)
-      return newPermission
-    } catch (err) {
-      setError(err.message)
-      console.error('Error adding permission:', err)
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  // Actualizează o permisiune
-  const updatePermission = useCallback(async (id, permissionData) => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const updatedPermission = await permissionService.updatePermission(id, permissionData)
-      setPermissions(prev => prev.map(permission => 
-        permission.id === id ? updatedPermission : permission
-      ))
-      return updatedPermission
-    } catch (err) {
-      setError(err.message)
-      console.error('Error updating permission:', err)
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  // Șterge o permisiune
-  const deletePermission = useCallback(async (id) => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      await permissionService.deletePermission(id)
-      setPermissions(prev => prev.filter(permission => permission.id !== id))
-      setPermissionCount(prev => prev - 1)
-      return true
-    } catch (err) {
-      setError(err.message)
-      console.error('Error deleting permission:', err)
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  // Căutare permisiuni
-  const searchPermissions = useCallback(async (query, searchFilters = {}) => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const searchResults = await permissionService.searchPermissions(query, searchFilters)
-      return searchResults
-    } catch (err) {
-      setError(err.message)
-      console.error('Error searching permissions:', err)
+      console.error('Error loading user permissions:', err)
       return []
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // Încarcă statisticile
-  const loadStats = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const permissionStats = await permissionService.getPermissionStats()
-      setStats(permissionStats)
-      return permissionStats
-    } catch (err) {
-      setError(err.message)
-      console.error('Error loading permission stats:', err)
-      return null
-    } finally {
-      setLoading(false)
+  // Get permissions for a specific role
+  const getRolePermissions = (role) => {
+    const rolePermissionMap = {
+      'admin': [
+        'appointments:view', 'appointments:create', 'appointments:edit', 'appointments:delete',
+        'patients:view', 'patients:create', 'patients:edit', 'patients:delete',
+        'users:view', 'users:create', 'users:edit', 'users:delete',
+        'roles:view', 'roles:create', 'roles:edit', 'roles:delete',
+        'reports:view', 'reports:create',
+        'products:view', 'products:create', 'products:edit', 'products:delete',
+        'sales:view', 'sales:create', 'sales:edit',
+        'treatments:view', 'treatments:create', 'treatments:edit', 'treatments:delete'
+      ],
+      'manager': [
+        'appointments:view', 'appointments:create', 'appointments:edit',
+        'patients:view', 'patients:create', 'patients:edit',
+        'users:view', 'users:edit',
+        'reports:view', 'reports:create',
+        'products:view', 'products:create', 'products:edit',
+        'sales:view', 'sales:create',
+        'treatments:view', 'treatments:create', 'treatments:edit'
+      ],
+      'doctor': [
+        'appointments:view', 'appointments:create', 'appointments:edit',
+        'patients:view', 'patients:create', 'patients:edit',
+        'treatments:view', 'treatments:create', 'treatments:edit'
+      ],
+      'nurse': [
+        'appointments:view', 'appointments:create',
+        'patients:view', 'patients:edit',
+        'treatments:view'
+      ],
+      'specialist': [
+        'appointments:view', 'appointments:create', 'appointments:edit',
+        'patients:view', 'patients:create', 'patients:edit',
+        'treatments:view', 'treatments:create', 'treatments:edit',
+        'reports:view'
+      ],
+      'resident': [
+        'appointments:view', 'appointments:create',
+        'patients:view', 'patients:edit',
+        'treatments:view'
+      ],
+      'Administrator': [
+        'appointments:view', 'appointments:create', 'appointments:edit', 'appointments:delete',
+        'patients:view', 'patients:create', 'patients:edit', 'patients:delete',
+        'users:view', 'users:create', 'users:edit', 'users:delete',
+        'roles:view', 'roles:create', 'roles:edit', 'roles:delete',
+        'reports:view', 'reports:create',
+        'products:view', 'products:create', 'products:edit', 'products:delete',
+        'sales:view', 'sales:create', 'sales:edit',
+        'treatments:view', 'treatments:create', 'treatments:edit', 'treatments:delete'
+      ]
     }
-  }, [])
 
-  // Export permisiuni
-  const exportPermissions = useCallback(async (format = 'json') => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const exportData = await permissionService.exportPermissions(format)
-      return exportData
-    } catch (err) {
-      setError(err.message)
-      console.error('Error exporting permissions:', err)
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    return rolePermissionMap[role] || []
+  }
 
-  // Filtrare locală
-  const filterPermissions = useCallback((filterOptions) => {
-    setFilters(prev => ({ ...prev, ...filterOptions }))
-  }, [])
+  // Check if user has a specific permission
+  const hasPermission = useCallback((resource, action) => {
+    const permissionKey = `${resource}:${action}`
+    return userPermissions.includes(permissionKey)
+  }, [userPermissions])
 
-  // Sortare
-  const sortPermissions = useCallback((newSortBy, newSortOrder = 'asc') => {
-    setSortBy(newSortBy)
-    setSortOrder(newSortOrder)
-  }, [])
-
-  // Reset filtre
-  const resetFilters = useCallback(() => {
-    setFilters({})
-    setSortBy('resource')
-    setSortOrder('asc')
-  }, [])
-
-  // Populează cu date de test
-  const populateTestData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const testPermissions = permissionManager.generateTestPermissions()
-      
-      // Adaugă permisiunile unul câte unul
-      for (const permissionData of testPermissions) {
-        await addPermission(permissionData)
+  // Check if user has any of the specified permissions
+  const hasAnyPermission = useCallback((permissions) => {
+    return permissions.some(permission => {
+      if (typeof permission === 'string') {
+        return userPermissions.includes(permission)
       }
-      
-      return testPermissions.length
-    } catch (err) {
-      setError(err.message)
-      console.error('Error populating test data:', err)
-      return 0
-    } finally {
-      setLoading(false)
-    }
-  }, [addPermission])
+      return userPermissions.includes(`${permission.resource}:${permission.action}`)
+    })
+  }, [userPermissions])
 
-  // Curăță toate datele
-  const clearAllData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      // Șterge toate permisiunile
-      const permissionIds = permissions.map(permission => permission.id)
-      for (const id of permissionIds) {
-        await deletePermission(id)
+  // Check if user has all of the specified permissions
+  const hasAllPermissions = useCallback((permissions) => {
+    return permissions.every(permission => {
+      if (typeof permission === 'string') {
+        return userPermissions.includes(permission)
       }
-      
-      setPermissions([])
-      setPermissionCount(0)
-      setStats(null)
-      return true
-    } catch (err) {
-      setError(err.message)
-      console.error('Error clearing all data:', err)
-      return false
-    } finally {
-      setLoading(false)
-    }
-  }, [permissions, deletePermission])
+      return userPermissions.includes(`${permission.resource}:${permission.action}`)
+    })
+  }, [userPermissions])
 
-  // Încarcă permisiunile la prima renderizare
+  // Get permissions for a specific resource
+  const getPermissionsForResource = useCallback((resource) => {
+    return userPermissions.filter(permission => permission.startsWith(`${resource}:`))
+  }, [userPermissions])
+
+  // Check if user can access a specific view
+  const canAccessView = useCallback((viewName) => {
+    const viewPermissions = {
+      'operations-planning': ['appointments:view'],
+      'operations-people': ['patients:view'],
+      'operations-treatments': ['treatments:view'],
+      'business-sales': ['sales:view'],
+      'business-inventory': ['products:view'],
+      'admin-access': ['roles:view'],
+      'admin-users': ['users:view'],
+      'analytics-reports': ['reports:view']
+    }
+
+    const requiredPermissions = viewPermissions[viewName] || []
+    return hasAnyPermission(requiredPermissions)
+  }, [hasAnyPermission])
+
+  // Load permissions on mount
   useEffect(() => {
-    loadPermissions()
-  }, [loadPermissions])
+    loadUserPermissions()
+  }, [loadUserPermissions])
 
   return {
     // State
-    permissions,
+    userPermissions,
     loading,
     error,
-    stats,
-    permissionCount,
-    filters,
-    sortBy,
-    sortOrder,
 
     // Actions
-    loadPermissions,
-    getPermissionById,
-    addPermission,
-    updatePermission,
-    deletePermission,
-    searchPermissions,
-    loadStats,
-    exportPermissions,
-    filterPermissions,
-    sortPermissions,
-    resetFilters,
-    populateTestData,
-    clearAllData,
+    loadUserPermissions,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    getPermissionsForResource,
+    canAccessView,
 
     // Utilitare
-    getPermissionsByResource: (resource) => 
-      permissions.filter(permission => permission.resource === resource),
-    getPermissionsByAction: (action) => 
-      permissions.filter(permission => permission.action === action),
-    getAvailableResources: () => 
-      permissionManager.getAvailableResources(permissions),
-    getAvailableActions: () => 
-      permissionManager.getAvailableActions(permissions),
-    hasPermission: (userPermissions, resource, action) => 
-      permissionManager.hasPermission(userPermissions, resource, action)
+    isAdmin: hasPermission('roles', 'view') && hasPermission('users', 'view'),
+    canManageUsers: hasPermission('users', 'create') || hasPermission('users', 'edit'),
+    canManageRoles: hasPermission('roles', 'create') || hasPermission('roles', 'edit'),
+    canViewReports: hasPermission('reports', 'view'),
+    canManageSales: hasPermission('sales', 'create') || hasPermission('sales', 'edit')
   }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Shield, Plus, Search, Download, Edit, Trash2, Users, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react'
 import { useDrawer } from '../../contexts/DrawerContext'
 import { useRoles } from '../../hooks/useRoles.js'
+import PermissionGate from '../PermissionGate'
 
 const AdminAccess = () => {
   const { openDrawer } = useDrawer()
@@ -105,17 +106,19 @@ const AdminAccess = () => {
           <h1 className="text-3xl font-bold">Control Acces</h1>
           <p className="text-muted-foreground">Gestionează rolurile și permisiunile</p>
         </div>
-        <button 
-          onClick={() => {
-            openDrawer({
-              type: 'role',
-            })
-          }} 
-          className="btn btn-primary"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Rol nou
-        </button>
+        <PermissionGate permission="roles:create">
+          <button 
+            onClick={() => {
+              openDrawer({
+                type: 'role',
+              })
+            }} 
+            className="btn btn-primary"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Rol nou
+          </button>
+        </PermissionGate>
       </div>
 
       {/* Statistici */}
@@ -190,15 +193,17 @@ const AdminAccess = () => {
               <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Nu există roluri</h3>
               <p className="text-muted-foreground mb-4">Creează primul rol pentru a începe.</p>
-              <button
-                onClick={() => {
-                  openRoleDrawer(null)
-                }}
-                className="btn btn-primary"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Rol nou
-              </button>
+              <PermissionGate permission="roles:create">
+                <button
+                  onClick={() => {
+                    openDrawer({ type: 'role' })
+                  }}
+                  className="btn btn-primary"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Rol nou
+                </button>
+              </PermissionGate>
             </div>
           ) : (
             <div className="overflow-x-auto">

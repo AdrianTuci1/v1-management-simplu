@@ -8,7 +8,7 @@ const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
   const [locations, setLocations] = useState([])
 
   useEffect(() => {
-    const loadLocations = () => {
+    const loadLocations = async () => {
       try {
         console.log('LocationSwitcher: Loading locations...')
         
@@ -17,8 +17,20 @@ const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
         console.log('LocationSwitcher: User data from localStorage:', userData)
 
         // Get business info locations for names/addresses
-        const businessInfo = businessInfoRepository.getStoredBusinessInfo()
-        const businessLocations = businessInfo?.locations || []
+        let businessInfo = businessInfoRepository.getStoredBusinessInfo()
+        let businessLocations = businessInfo?.locations || []
+        
+        // If no business info is stored, try to load it
+        if (!businessInfo || !businessLocations.length) {
+          console.log('LocationSwitcher: No business info found, attempting to load...')
+          try {
+            businessInfo = await businessInfoRepository.getBusinessInfo(userData?.user?.businessId)
+            businessLocations = businessInfo?.locations || []
+            console.log('LocationSwitcher: Loaded business info:', businessInfo)
+          } catch (error) {
+            console.log('LocationSwitcher: Could not load business info, using fallback')
+          }
+        }
 
         if (userData?.user?.locations) {
           console.log('LocationSwitcher: Raw locations from API:', userData.user.locations)
@@ -27,11 +39,25 @@ const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
           const accessibleLocations = userData.user.locations
             .filter(location => location.role && location.role !== 'user')
             .map(location => {
+              // Try to find matching business location
               const match = businessLocations.find(loc => loc.id === location.locationId)
+              
+              // If no match found, create a basic location object
+              if (!match) {
+                console.log(`LocationSwitcher: No business info found for location ${location.locationId}`)
+                return {
+                  id: location.locationId,
+                  name: location.locationName || `Locația ${location.locationId}`,
+                  address: `Adresa pentru ${location.locationName || location.locationId}`,
+                  role: location.role,
+                  businessId: userData.user.businessId
+                }
+              }
+              
               return {
                 id: location.locationId,
-                name: match?.name || location.locationName || location.locationId,
-                address: match?.address || `Locația ${location.locationId}`,
+                name: match.name || location.locationName || location.locationId,
+                address: match.address || `Locația ${location.locationId}`,
                 role: location.role,
                 businessId: userData.user.businessId
               }
@@ -41,7 +67,20 @@ const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
           setLocations(accessibleLocations)
         } else {
           console.log('LocationSwitcher: No user locations found in API response')
-          setLocations([])
+          // Fallback: try to get locations from business info if available
+          if (businessLocations.length > 0) {
+            console.log('LocationSwitcher: Using business info locations as fallback')
+            const fallbackLocations = businessLocations.map(loc => ({
+              id: loc.id,
+              name: loc.name,
+              address: loc.address,
+              role: 'user', // Default role
+              businessId: userData?.user?.businessId
+            }))
+            setLocations(fallbackLocations)
+          } else {
+            setLocations([])
+          }
         }
       } catch (error) {
         console.error('LocationSwitcher: Error loading locations:', error)
@@ -62,10 +101,10 @@ const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full p-3 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
-          title="Schimbă locația"
+          className="w-full p-3 flex items-center justify-center hover:bg-accent rounded-md transition-colors group"
+          title={currentLocation ? currentLocation.name : "Schimbă locația"}
         >
-          <Building className="h-5 w-5 text-muted-foreground" />
+          <Building className="h-5 w-5 text-muted-foreground group-hover:text-foreground" />
         </button>
         
         {/* Dropdown for collapsed state */}
@@ -113,11 +152,6 @@ const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
             <div className="text-sm font-medium truncate">
               {currentLocation?.name || 'Selectează locația'}
             </div>
-            {currentLocation && (
-              <div className="text-xs text-muted-foreground truncate">
-                {currentLocation.address}
-              </div>
-            )}
           </div>
         </div>
         <ChevronDown 
