@@ -7,7 +7,9 @@ import {
   DrawerFooter 
 } from '../ui/drawer'
 
-const CashRegisterDrawer = ({ onClose }) => {
+const CashRegisterDrawer = ({ onClose, appointmentData = null }) => {
+  // Debug: să vedem ce date primim
+  console.log('CashRegisterDrawer received:', appointmentData)
   const [cashRegisterSettings, setCashRegisterSettings] = useState({
     receiptSettings: {
       header: 'Cabinet Medical Dr. Popescu',
@@ -88,6 +90,23 @@ const CashRegisterDrawer = ({ onClose }) => {
       
       <DrawerContent padding="spacious">
         <div className="space-y-8">
+          {/* Date din programare */}
+          {appointmentData && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Receipt className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Date programare</h3>
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div><strong>Pacient:</strong> {appointmentData.patientName || 'N/A'}</div>
+                <div><strong>Tratament:</strong> {appointmentData.treatmentName || 'N/A'}</div>
+                <div><strong>Preț:</strong> {appointmentData.price ? `${appointmentData.price} RON` : 'N/A'}</div>
+                <div><strong>ID Programare:</strong> {appointmentData.appointmentId || 'N/A'}</div>
+              </div>
+            </div>
+          )}
+
           {/* Setări bon fiscal */}
           <div>
             <div className="flex items-center gap-2 mb-4">

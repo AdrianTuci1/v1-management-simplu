@@ -1,5 +1,7 @@
 import { X, Bell, User, Settings, Calendar, Loader2 } from 'lucide-react'
 import { QuickActionsDrawer, AppointmentDrawer, PatientDrawer, ProductDrawer, UserDrawer, TreatmentDrawer, RoleDrawer, SalesDrawer, WorkingHoursDrawer, CurrencyTaxDrawer, LanguageDrawer, CashRegisterDrawer } from './index.js'
+import DataDownloadDrawer from './DataDownloadDrawer'
+import StripePaymentDrawer from './StripePaymentDrawer'
 import { useState, useEffect } from 'react'
 import appointmentService from '../../services/appointmentService.js'
 
@@ -27,7 +29,7 @@ const Drawer = ({ open, content, onClose }) => {
       case 'role':
         return <RoleDrawer onClose={onClose} roleData={content?.data} />
       case 'new-sale':
-        return <SalesDrawer isOpen={open} onClose={onClose} />
+        return <SalesDrawer onClose={onClose} appointmentData={content?.data} />
       case 'working-hours':
         return <WorkingHoursDrawer onClose={onClose} />
       case 'currency-tax':
@@ -35,7 +37,11 @@ const Drawer = ({ open, content, onClose }) => {
       case 'language':
         return <LanguageDrawer onClose={onClose} />
       case 'cash-register':
-        return <CashRegisterDrawer onClose={onClose} />
+        return <CashRegisterDrawer onClose={onClose} appointmentData={content?.data} />
+      case 'data-download':
+        return <DataDownloadDrawer onClose={onClose} />
+      case 'stripe-payment':
+        return <StripePaymentDrawer onClose={onClose} />
       default:
         return <DefaultContent />
     }

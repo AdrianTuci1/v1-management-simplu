@@ -73,12 +73,56 @@ const useSettingsStore = create(
         }
       },
 
+      // Data Download Settings
+      dataDownload: {
+        exportFormats: {
+          csv: { enabled: true, includeHeaders: true },
+          pdf: { enabled: true, includeCharts: true },
+          excel: { enabled: true, includeFormulas: false }
+        },
+        dataTypes: {
+          patients: { enabled: true, includeHistory: true },
+          appointments: { enabled: true, includeNotes: true },
+          treatments: { enabled: true, includePrices: true },
+          sales: { enabled: true, includeDetails: true },
+          users: { enabled: false, includePermissions: false }
+        },
+        schedule: {
+          autoExport: false,
+          frequency: 'weekly',
+          lastExport: null
+        }
+      },
+
+      // Stripe Payment Settings
+      stripePayment: {
+        apiKeys: {
+          publishableKey: '',
+          secretKey: '',
+          webhookSecret: ''
+        },
+        settings: {
+          enabled: false,
+          testMode: true,
+          currency: 'RON',
+          allowedMethods: ['card', 'bank_transfer'],
+          requireAuthentication: true
+        },
+        webhook: {
+          enabled: false,
+          endpoint: '',
+          events: ['payment_intent.succeeded', 'payment_intent.payment_failed']
+        }
+      },
+
       // Settings Status
       settingsStatus: {
         'working-hours': { configured: true, lastUpdated: new Date().toISOString() },
         'currency-tax': { configured: true, lastUpdated: new Date().toISOString() },
         'language': { configured: true, lastUpdated: new Date().toISOString() },
-        'cash-register': { configured: false, lastUpdated: null }
+        'cash-register': { configured: false, lastUpdated: null },
+        'data-download': { configured: false, lastUpdated: null },
+        'stripe-payment': { configured: false, lastUpdated: null }
       },
 
       // Actions
@@ -130,6 +174,22 @@ const useSettingsStore = create(
         settingsStatus: {
           ...state.settingsStatus,
           'cash-register': { configured: true, lastUpdated: new Date().toISOString() }
+        }
+      })),
+
+      updateDataDownload: (updates) => set((state) => ({
+        dataDownload: { ...state.dataDownload, ...updates },
+        settingsStatus: {
+          ...state.settingsStatus,
+          'data-download': { configured: true, lastUpdated: new Date().toISOString() }
+        }
+      })),
+
+      updateStripePayment: (updates) => set((state) => ({
+        stripePayment: { ...state.stripePayment, ...updates },
+        settingsStatus: {
+          ...state.settingsStatus,
+          'stripe-payment': { configured: true, lastUpdated: new Date().toISOString() }
         }
       })),
 
@@ -206,11 +266,51 @@ const useSettingsStore = create(
             showCashierInfo: true
           }
         },
+        dataDownload: {
+          exportFormats: {
+            csv: { enabled: true, includeHeaders: true },
+            pdf: { enabled: true, includeCharts: true },
+            excel: { enabled: true, includeFormulas: false }
+          },
+          dataTypes: {
+            patients: { enabled: true, includeHistory: true },
+            appointments: { enabled: true, includeNotes: true },
+            treatments: { enabled: true, includePrices: true },
+            sales: { enabled: true, includeDetails: true },
+            users: { enabled: false, includePermissions: false }
+          },
+          schedule: {
+            autoExport: false,
+            frequency: 'weekly',
+            lastExport: null
+          }
+        },
+        stripePayment: {
+          apiKeys: {
+            publishableKey: '',
+            secretKey: '',
+            webhookSecret: ''
+          },
+          settings: {
+            enabled: false,
+            testMode: true,
+            currency: 'RON',
+            allowedMethods: ['card', 'bank_transfer'],
+            requireAuthentication: true
+          },
+          webhook: {
+            enabled: false,
+            endpoint: '',
+            events: ['payment_intent.succeeded', 'payment_intent.payment_failed']
+          }
+        },
         settingsStatus: {
           'working-hours': { configured: false, lastUpdated: null },
           'currency-tax': { configured: false, lastUpdated: null },
           'language': { configured: false, lastUpdated: null },
-          'cash-register': { configured: false, lastUpdated: null }
+          'cash-register': { configured: false, lastUpdated: null },
+          'data-download': { configured: false, lastUpdated: null },
+          'stripe-payment': { configured: false, lastUpdated: null }
         }
       })
     }),
@@ -223,6 +323,8 @@ const useSettingsStore = create(
         taxSettings: state.taxSettings,
         language: state.language,
         cashRegister: state.cashRegister,
+        dataDownload: state.dataDownload,
+        stripePayment: state.stripePayment,
         settingsStatus: state.settingsStatus
       })
     }

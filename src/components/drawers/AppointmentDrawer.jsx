@@ -6,13 +6,16 @@ import {
   Calendar,
   FileText,
   Image,
-  X
+  X,
+  CreditCard
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAppointments } from '../../hooks/useAppointments.js'
 import { usePatients } from '../../hooks/usePatients.js'
 import { useUsers } from '../../hooks/useUsers.js'
 import { useTreatments } from '../../hooks/useTreatments.js'
+import { useDrawer } from '../../contexts/DrawerContext.jsx'
+import { useSalesDrawerStore } from '../../stores/salesDrawerStore'
 import PatientCombobox from '../combobox/PatientCombobox.jsx'
 import DoctorCombobox from '../combobox/DoctorCombobox.jsx'
 import TreatmentCombobox from '../combobox/TreatmentCombobox.jsx'
@@ -37,6 +40,8 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   const { patients } = usePatients()
   const { users } = useUsers()
   const { treatments } = useTreatments()
+  const { openDrawer } = useDrawer()
+  const { openSalesDrawer } = useSalesDrawerStore()
   
   // Populăm cache-ul cu datele din combobox-uri
   useEffect(() => {
@@ -90,6 +95,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         doctor: uiData.doctor || '',
         service: uiData.service || '',
         serviceDuration: uiData.service?.duration || '',
+        status: 'scheduled', // Statusul este întotdeauna 'scheduled' inițial
         images: appointmentData.images || []
       }
     }
@@ -100,13 +106,26 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       time: '',
       service: '',
       serviceDuration: '',
-      status: 'scheduled',
+      status: 'scheduled', // Statusul este întotdeauna 'scheduled' inițial
       postOperativeNotes: '',
       prescription: '',
       price: '',
       images: []
     }
   })
+
+  // State pentru checkbox-ul de completat
+  const [isCompleted, setIsCompleted] = useState(() => {
+    if (appointmentData) {
+      return appointmentData.status === 'completed'
+    }
+    return false
+  })
+
+  // Sincronizăm isCompleted cu formData.status
+  useEffect(() => {
+    setIsCompleted(formData.status === 'completed')
+  }, [formData.status])
 
 
 
@@ -210,6 +229,40 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     }
   }
 
+  const handlePayment = () => {
+    // Găsim numele tratamentului - verificăm dacă este obiect sau string
+    let treatmentName = ''
+    if (typeof formData.service === 'object' && formData.service?.name) {
+      treatmentName = formData.service.name
+    } else if (typeof formData.service === 'string') {
+      treatmentName = formData.service
+    } else {
+      // Căutăm în treatments array
+      const treatment = treatments.find(t => t.id === formData.service)
+      treatmentName = treatment?.name || 'Tratament necunoscut'
+    }
+    
+    // Găsim numele pacientului - verificăm dacă este obiect sau string
+    let patientName = ''
+    if (typeof formData.patient === 'object' && formData.patient?.name) {
+      patientName = formData.patient.name
+    } else if (typeof formData.patient === 'string') {
+      patientName = formData.patient
+    } else {
+      patientName = 'Pacient necunoscut'
+    }
+    
+    const paymentData = {
+      treatmentName: treatmentName,
+      price: formData.price || '0',
+      appointmentId: formData.id || '',
+      patientName: patientName
+    }
+    
+    // Deschidem SalesDrawer cu datele programării
+    openSalesDrawer(paymentData)
+  }
+
   const renderMenu1 = () => (
     <div className="space-y-4">
       <div className="text-sm font-medium text-muted-foreground">
@@ -295,21 +348,41 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         />
       </div>
 
-      {/* Status */}
+      {/* Status - Checkbox pentru completat */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Status</label>
-        <select
-          value={formData.status}
-          onChange={(e) => handleInputChange('status', e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <option value="scheduled">Programat</option>
-          <option value="in-progress">În curs</option>
-          <option value="completed">Completat</option>
-          <option value="cancelled">Anulat</option>
-          <option value="urgent">Urgent</option>
-        </select>
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="completed"
+            checked={isCompleted}
+            onChange={(e) => {
+              setIsCompleted(e.target.checked)
+              if (e.target.checked) {
+                handleInputChange('status', 'completed')
+              } else {
+                handleInputChange('status', 'scheduled')
+              }
+            }}
+            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+          />
+          <label htmlFor="completed" className="text-sm font-medium">
+            Completat
+          </label>
+        </div>
       </div>
+
+      {/* Buton de plată */}
+      {isCompleted && (
+        <div className="space-y-2">
+          <button
+            onClick={handlePayment}
+            className="w-full flex items-center justify-center gap-2 h-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <CreditCard className="h-4 w-4" />
+            {formData.price ? `Plată - ${formData.price} RON` : 'Plată'}
+          </button>
+        </div>
+      )}
     </div>
   )
 

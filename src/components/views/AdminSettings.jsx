@@ -1,4 +1,4 @@
-import { Settings, Clock, DollarSign, Globe, Receipt, ChevronRight } from 'lucide-react'
+import { Settings, Clock, DollarSign, Globe, Receipt, Download, CreditCard, ChevronRight } from 'lucide-react'
 import { useDrawer } from '../../contexts/DrawerContext'
 import useSettingsStore from '../../stores/settingsStore'
 
@@ -30,6 +30,18 @@ const AdminSettings = () => {
       title: 'Casa de marcat',
       description: 'Configurează setările pentru bonurile fiscale și imprimanta',
       icon: Receipt
+    },
+    {
+      id: 'data-download',
+      title: 'Descărcare date',
+      description: 'Exportă datele sistemului în diferite formate (CSV, PDF, Excel)',
+      icon: Download
+    },
+    {
+      id: 'stripe-payment',
+      title: 'Configurare plată Stripe',
+      description: 'Configurează integrarea cu Stripe pentru plăți online',
+      icon: CreditCard
     }
   ]
 

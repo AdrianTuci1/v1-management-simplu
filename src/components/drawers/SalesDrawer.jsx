@@ -4,7 +4,7 @@ import { useProducts } from '../../hooks/useProducts'
 import { useSalesDrawerStore } from '../../stores/salesDrawerStore'
 
 const SalesDrawer = () => {
-  const { isOpen, closeSalesDrawer } = useSalesDrawerStore()
+  const { isOpen, closeSalesDrawer, appointmentData } = useSalesDrawerStore()
   const { products, loading } = useProducts()
   const [cart, setCart] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -122,6 +122,23 @@ const SalesDrawer = () => {
       setSelectedCategory('all')
     }
   }, [isOpen])
+
+  // Adaugă programarea în coș când se deschide cu date din programare
+  useEffect(() => {
+    if (isOpen && appointmentData && appointmentData.treatmentName) {
+      const treatmentItem = {
+        id: `appointment-${appointmentData.appointmentId}`,
+        name: appointmentData.treatmentName,
+        price: parseFloat(appointmentData.price) || 0,
+        quantity: 1,
+        category: 'Servicii Medicale',
+        stock: 1,
+        isAppointment: true // Flag pentru a identifica că este o programare
+      }
+      
+      setCart([treatmentItem])
+    }
+  }, [isOpen, appointmentData])
 
   if (!isOpen) return null
 

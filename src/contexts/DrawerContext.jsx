@@ -67,6 +67,21 @@ export const DrawerProvider = ({ children }) => {
     })
   }
 
+  const openCashRegisterDrawer = (cashRegisterData = null) => {
+    openDrawer({
+      type: 'cash-register',
+      data: cashRegisterData
+    })
+  }
+
+  const openDataDownloadDrawer = () => {
+    openDrawer({ type: 'data-download' })
+  }
+
+  const openStripePaymentDrawer = () => {
+    openDrawer({ type: 'stripe-payment' })
+  }
+
 
 
 
@@ -83,6 +98,9 @@ export const DrawerProvider = ({ children }) => {
     openQuickActionsDrawer,
     openTreatmentDrawer,
     openRoleDrawer,
+    openCashRegisterDrawer,
+    openDataDownloadDrawer,
+    openStripePaymentDrawer,
   }
 
   return (
