@@ -1,16 +1,12 @@
-import { ResourceRepository } from '../data/repositories/ResourceRepository.js'
-import { ResourceInvoker } from '../data/invoker/ResourceInvoker.js'
-import { GetCommand } from '../data/commands/GetCommand.js'
-import { AddCommand } from '../data/commands/AddCommand.js'
-import { UpdateCommand } from '../data/commands/UpdateCommand.js'
-import { DeleteCommand } from '../data/commands/DeleteCommand.js'
+import { dataFacade } from '../data/DataFacade.js'
+import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import appointmentManager from '../business/appointmentManager.js'
 
 
 class AppointmentService {
   constructor() {
-    this.repository = new ResourceRepository('appointment', 'appointments')
-    this.invoker = new ResourceInvoker()
+    this.repository = new DraftAwareResourceRepository('appointments', 'appointments')
+    this.dataFacade = dataFacade
   }
 
   // Funcție utilitară pentru formatarea datelor în format yyyy-mm-dd
@@ -23,21 +19,17 @@ class AppointmentService {
 
   // Obține programările pentru o perioadă specifică
   async getAppointments(params = {}) {
-    const command = new GetCommand(this.repository, params)
-    const result = await this.invoker.run(command)
-    
-    // Extragem datele din răspunsul API
-    let appointments = []
-    if (result && result.data) {
-      appointments = Array.isArray(result.data) ? result.data : []
-    } else if (Array.isArray(result)) {
-      appointments = result
+    try {
+      const appointments = await this.dataFacade.getAll('appointments', params)
+      
+      // Transformăm fiecare programare pentru UI
+      return appointments.map(appointment => 
+        appointmentManager.transformAppointmentForUI(appointment)
+      )
+    } catch (error) {
+      console.error('Error getting appointments:', error)
+      return []
     }
-    
-    // Transformăm fiecare programare pentru UI
-    return appointments.map(appointment => 
-      appointmentManager.transformAppointmentForUI(appointment)
-    )
   }
 
   // Obține programările pentru o zi specifică
@@ -111,8 +103,7 @@ class AppointmentService {
       throw new Error('Există o programare conflictuală pentru această dată și oră')
     }
     
-    const command = new AddCommand(this.repository, transformedData)
-    const result = await this.invoker.run(command)
+    const result = await this.dataFacade.create('appointments', transformedData)
     
     // Transformăm rezultatul pentru UI înainte de returnare
     return appointmentManager.transformAppointmentForUI(result)
@@ -132,8 +123,7 @@ class AppointmentService {
       throw new Error('Există o programare conflictuală pentru această dată și oră')
     }
     
-    const command = new UpdateCommand(this.repository, id, transformedData)
-    const result = await this.invoker.run(command)
+    const result = await this.dataFacade.update('appointments', id, transformedData)
     
     // Transformăm rezultatul pentru UI înainte de returnare
     return appointmentManager.transformAppointmentForUI(result)
@@ -141,13 +131,12 @@ class AppointmentService {
 
   // Șterge o programare
   async deleteAppointment(id) {
-    const command = new DeleteCommand(this.repository, id)
-    return this.invoker.run(command)
+    return await this.dataFacade.delete('appointments', id)
   }
 
   // Obține o programare după ID
   async getAppointmentById(id) {
-    const appointment = await this.repository.getById(id)
+    const appointment = await this.dataFacade.getById('appointments', id)
     return appointment ? appointmentManager.transformAppointmentForUI(appointment) : null
   }
 
@@ -274,6 +263,152 @@ class AppointmentService {
       console.error('Error fetching appointments by medic ID:', error);
       return [];
     }
+  }
+
+  // ========================================
+  // DRAFT MANAGEMENT
+  // ========================================
+
+  /**
+   * Creează un draft pentru o programare
+   * @param {Object} appointmentData - Datele programării
+   * @param {string} sessionId - ID-ul sesiunii (opțional)
+   * @returns {Promise<Object>} Draft-ul creat
+   */
+  async createAppointmentDraft(appointmentData, sessionId = null) {
+    // Validare
+    appointmentManager.validateAppointment(appointmentData)
+    
+    // Transformare pentru API
+    const transformedData = appointmentManager.transformAppointmentForAPI(appointmentData)
+    
+    return await this.dataFacade.createDraft('appointments', transformedData, sessionId)
+  }
+
+  /**
+   * Actualizează un draft de programare
+   * @param {string} draftId - ID-ul draft-ului
+   * @param {Object} appointmentData - Datele actualizate
+   * @returns {Promise<Object>} Draft-ul actualizat
+   */
+  async updateAppointmentDraft(draftId, appointmentData) {
+    // Validare
+    appointmentManager.validateAppointment(appointmentData)
+    
+    // Transformare pentru API
+    const transformedData = appointmentManager.transformAppointmentForAPI(appointmentData)
+    
+    return await this.dataFacade.updateDraft(draftId, transformedData)
+  }
+
+  /**
+   * Confirmă un draft de programare
+   * @param {string} draftId - ID-ul draft-ului
+   * @returns {Promise<Object>} Rezultatul confirmării
+   */
+  async commitAppointmentDraft(draftId) {
+    return await this.dataFacade.commitDraft(draftId)
+  }
+
+  /**
+   * Anulează un draft de programare
+   * @param {string} draftId - ID-ul draft-ului
+   * @returns {Promise<Object>} Rezultatul anulării
+   */
+  async cancelAppointmentDraft(draftId) {
+    return await this.dataFacade.cancelDraft(draftId)
+  }
+
+  /**
+   * Obține draft-urile pentru programări
+   * @param {string} sessionId - ID-ul sesiunii (opțional)
+   * @returns {Promise<Array>} Lista de draft-uri
+   */
+  async getAppointmentDrafts(sessionId = null) {
+    if (sessionId) {
+      return await this.dataFacade.getDraftsBySession(sessionId)
+    }
+    return await this.dataFacade.getDraftsByResourceType('appointments')
+  }
+
+  /**
+   * Obține programările cu draft-uri incluse
+   * @param {Object} params - Parametrii de query
+   * @returns {Promise<Array>} Lista de programări cu draft-uri
+   */
+  async getAppointmentsWithDrafts(params = {}) {
+    try {
+      const appointments = await this.repository.queryWithDrafts(params)
+      
+      // Transformăm fiecare programare pentru UI
+      return appointments.map(appointment => 
+        appointmentManager.transformAppointmentForUI(appointment)
+      )
+    } catch (error) {
+      console.error('Error getting appointments with drafts:', error)
+      return []
+    }
+  }
+
+  // ========================================
+  // SESSION MANAGEMENT
+  // ========================================
+
+  /**
+   * Creează o sesiune pentru programări
+   * @param {string} type - Tipul sesiunii
+   * @param {Object} data - Datele sesiunii
+   * @returns {Promise<Object>} Sesiunea creată
+   */
+  async createAppointmentSession(type, data = {}) {
+    return await this.dataFacade.createSession(type, data)
+  }
+
+  /**
+   * Salvează o sesiune de programări
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {Object} sessionData - Datele sesiunii
+   * @returns {Promise<Object>} Sesiunea salvată
+   */
+  async saveAppointmentSession(sessionId, sessionData) {
+    return await this.dataFacade.saveSession(sessionId, sessionData)
+  }
+
+  /**
+   * Obține programările pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Array>} Lista de programări pentru sesiune
+   */
+  async getAppointmentsForSession(sessionId) {
+    try {
+      const appointments = await this.repository.getResourcesForSession(sessionId)
+      
+      // Transformăm fiecare programare pentru UI
+      return appointments.map(appointment => 
+        appointmentManager.transformAppointmentForUI(appointment)
+      )
+    } catch (error) {
+      console.error('Error getting appointments for session:', error)
+      return []
+    }
+  }
+
+  /**
+   * Confirmă toate draft-urile pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Rezultatul confirmării
+   */
+  async commitAllAppointmentDraftsForSession(sessionId) {
+    return await this.repository.commitAllDraftsForSession(sessionId)
+  }
+
+  /**
+   * Anulează toate draft-urile pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Rezultatul anulării
+   */
+  async cancelAllAppointmentDraftsForSession(sessionId) {
+    return await this.repository.cancelAllDraftsForSession(sessionId)
   }
 }
 

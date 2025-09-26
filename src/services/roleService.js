@@ -1,42 +1,23 @@
-import { ResourceRepository } from '../data/repositories/ResourceRepository.js'
-import { ResourceInvoker } from '../data/invoker/ResourceInvoker.js'
-import { GetCommand } from '../data/commands/GetCommand.js'
-import { AddCommand } from '../data/commands/AddCommand.js'
-import { UpdateCommand } from '../data/commands/UpdateCommand.js'
-import { DeleteCommand } from '../data/commands/DeleteCommand.js'
+import { dataFacade } from '../data/DataFacade.js'
+import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { roleManager } from '../business/roleManager.js'
 
 class RoleService {
   constructor() {
-    this.repository = new ResourceRepository('role', 'role')
-    this.invoker = new ResourceInvoker()
+    this.repository = new DraftAwareResourceRepository('roles', 'role')
+    this.dataFacade = dataFacade
   }
 
   // Obține toate rolurile
   async getRoles(filters = {}) {
     try {
-      const command = new GetCommand(this.repository, filters)
-      const roles = await this.invoker.run(command)
+      const roles = await this.dataFacade.getAll('roles', filters)
       
-            // Asigură-te că rezultatul este întotdeauna un array
-            const rolesArray = Array.isArray(roles) ? roles : [];
-      
-                  // Transformă datele pentru UI
-      return rolesArray.map(role => roleManager.transformRoleForUI(role));
+      // Transformă datele pentru UI
+      return roles.map(role => roleManager.transformRoleForUI(role));
     } catch (error) {
-      console.error('Error getting roles from API, trying IndexedDB:', error)
-      
-      // Fallback la IndexedDB
-      try {
-        const { indexedDb } = await import('../data/infrastructure/db.js');
-        const cachedRoles = await indexedDb.getAll('role');
-        console.log(`Loaded ${cachedRoles.length} roles from IndexedDB cache`);
-        
-        return cachedRoles.map(role => roleManager.transformRoleForUI(role));
-      } catch (cacheError) {
-        console.error('Error loading roles from IndexedDB:', cacheError);
-        return [];
-      }
+      console.error('Error getting roles:', error)
+      return []
     }
   }
 
@@ -52,8 +33,7 @@ class RoleService {
       // Transformare pentru API
       const apiData = roleManager.transformRoleForAPI(roleData)
       
-      const command = new AddCommand(this.repository, apiData)
-      const result = await this.invoker.run(command)
+      const result = await this.dataFacade.create('roles', apiData)
       
       return roleManager.transformRoleForUI(result)
     } catch (error) {
@@ -74,8 +54,7 @@ class RoleService {
       // Transformare pentru API
       const apiData = roleManager.transformRoleForAPI(roleData)
       
-      const command = new UpdateCommand(this.repository, id, apiData)
-      const result = await this.invoker.run(command)
+      const result = await this.dataFacade.update('roles', id, apiData)
       
       return roleManager.transformRoleForUI(result)
     } catch (error) {
@@ -87,8 +66,7 @@ class RoleService {
   // Șterge un rol
   async deleteRole(id) {
     try {
-      const command = new DeleteCommand(this.repository, id)
-      await this.invoker.run(command)
+      await this.dataFacade.delete('roles', id)
       return true
     } catch (error) {
       console.error('Error deleting role:', error)

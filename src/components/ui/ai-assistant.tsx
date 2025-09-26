@@ -14,8 +14,8 @@ const aiAssistantVariants = cva(
         "side": "flex-shrink-0 h-full",
       },
       size: {
-        sm: "w-64 h-full",
-        md: "w-80 h-full",
+        sm: "w-96 h-full",
+        md: "w-96 h-full",
         lg: "w-96 h-full",
         xl: "w-[500px] h-full",
       },

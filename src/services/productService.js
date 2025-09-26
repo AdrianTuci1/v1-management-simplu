@@ -1,99 +1,49 @@
-import { GetCommand } from '../data/commands/GetCommand.js';
-import { AddCommand } from '../data/commands/AddCommand.js';
-import { UpdateCommand } from '../data/commands/UpdateCommand.js';
-import { DeleteCommand } from '../data/commands/DeleteCommand.js';
+import { dataFacade } from '../data/DataFacade.js';
+import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js';
 import { productManager } from '../business/productManager.js';
-import { ResourceInvoker } from '../data/invoker/ResourceInvoker.js';
-import { ResourceRepository } from '../data/repositories/ResourceRepository.js';
 
 
 // Serviciu pentru produse
 class ProductService {
   constructor() {
-    this.repository = new ResourceRepository('product', 'products');
-    this.invoker = new ResourceInvoker()
+    this.repository = new DraftAwareResourceRepository('products', 'products');
+    this.dataFacade = dataFacade;
   }
 
   // Încarcă toate produsele
   async loadProducts(filters = {}) {
     try {
-      const command = new GetCommand(this.repository, filters);
-      const products = await this.invoker.run(command);
-      
-      // Asigură-te că rezultatul este întotdeauna un array
-      const productsArray = Array.isArray(products) ? products : [];
+      const products = await this.dataFacade.getAll('products', filters);
       
       // Transformă datele pentru UI
-      return productsArray.map(product => productManager.transformForUI(product));
+      return products.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading products from API, trying IndexedDB:', error);
-      
-      // Fallback la IndexedDB
-      try {
-        const { indexedDb } = await import('../data/infrastructure/db.js');
-        const cachedProducts = await indexedDb.getAll('products');
-        console.log(`Loaded ${cachedProducts.length} products from IndexedDB cache`);
-        
-        // Transformă datele pentru UI
-        return cachedProducts.map(product => productManager.transformForUI(product));
-      } catch (cacheError) {
-        console.error('Error loading products from IndexedDB:', cacheError);
-        return [];
-      }
+      console.error('Error loading products:', error);
+      return [];
     }
   }
 
   // Încarcă produsele după categorie
   async loadProductsByCategory(category) {
     try {
-      const command = new GetCommand(this.repository, { category });
-      const products = await command.execute();
+      const products = await this.dataFacade.getAll('products', { category });
       
-      // Asigură-te că rezultatul este întotdeauna un array
-      const productsArray = Array.isArray(products) ? products : [];
-      
-      return productsArray.map(product => productManager.transformForUI(product));
+      return products.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading products by category from API, trying IndexedDB:', error);
-      
-      // Fallback la IndexedDB
-      try {
-        const { indexedDb } = await import('../data/infrastructure/db.js');
-        const cachedProducts = await indexedDb.getProductsByCategory(category);
-        console.log(`Loaded ${cachedProducts.length} products for category "${category}" from IndexedDB cache`);
-        
-        return cachedProducts.map(product => productManager.transformForUI(product));
-      } catch (cacheError) {
-        console.error('Error loading products by category from IndexedDB:', cacheError);
-        return [];
-      }
+      console.error('Error loading products by category:', error);
+      return [];
     }
   }
 
   // Încarcă produsele cu stoc scăzut
   async loadLowStockProducts() {
     try {
-      const command = new GetCommand(this.repository, { lowStock: true });
-      const products = await command.execute();
+      const products = await this.dataFacade.getAll('products', { lowStock: true });
       
-      // Asigură-te că rezultatul este întotdeauna un array
-      const productsArray = Array.isArray(products) ? products : [];
-      
-      return productsArray.map(product => productManager.transformForUI(product));
+      return products.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading low stock products from API, trying IndexedDB:', error);
-      
-      // Fallback la IndexedDB
-      try {
-        const { indexedDb } = await import('../data/infrastructure/db.js');
-        const cachedProducts = await indexedDb.getLowStockProducts();
-        console.log(`Loaded ${cachedProducts.length} low stock products from IndexedDB cache`);
-        
-        return cachedProducts.map(product => productManager.transformForUI(product));
-      } catch (cacheError) {
-        console.error('Error loading low stock products from IndexedDB:', cacheError);
-        return [];
-      }
+      console.error('Error loading low stock products:', error);
+      return [];
     }
   }
 
@@ -164,8 +114,7 @@ class ProductService {
       // Transformă datele pentru API
       const transformedData = productManager.transformForAPI(productData);
       
-      const command = new AddCommand(this.repository, transformedData);
-      const result = await command.execute();
+      const result = await this.dataFacade.create('products', transformedData);
       
       return productManager.transformForUI(result);
     } catch (error) {
@@ -186,8 +135,7 @@ class ProductService {
       // Transformă datele pentru API
       const transformedData = productManager.transformForAPI(productData);
       
-      const command = new UpdateCommand(this.repository, id, transformedData);
-      const result = await command.execute();
+      const result = await this.dataFacade.update('products', id, transformedData);
       
       return productManager.transformForUI(result);
     } catch (error) {
@@ -199,8 +147,7 @@ class ProductService {
   // Șterge un produs
   async deleteProduct(id) {
     try {
-      const command = new DeleteCommand(this.repository, id);
-      await command.execute();
+      await this.dataFacade.delete('products', id);
       
       return { success: true };
     } catch (error) {
@@ -229,6 +176,152 @@ class ProductService {
       console.error('Error exporting products:', error);
       throw error;
     }
+  }
+
+  // ========================================
+  // DRAFT MANAGEMENT
+  // ========================================
+
+  /**
+   * Creează un draft pentru un produs
+   * @param {Object} productData - Datele produsului
+   * @param {string} sessionId - ID-ul sesiunii (opțional)
+   * @returns {Promise<Object>} Draft-ul creat
+   */
+  async createProductDraft(productData, sessionId = null) {
+    // Validează datele
+    const validationResult = productManager.validateProduct(productData);
+    if (!validationResult.isValid) {
+      throw new Error(validationResult.errors.join(', '));
+    }
+
+    // Transformă datele pentru API
+    const transformedData = productManager.transformForAPI(productData);
+    
+    return await this.dataFacade.createDraft('products', transformedData, sessionId);
+  }
+
+  /**
+   * Actualizează un draft de produs
+   * @param {string} draftId - ID-ul draft-ului
+   * @param {Object} productData - Datele actualizate
+   * @returns {Promise<Object>} Draft-ul actualizat
+   */
+  async updateProductDraft(draftId, productData) {
+    // Validează datele
+    const validationResult = productManager.validateProduct(productData);
+    if (!validationResult.isValid) {
+      throw new Error(validationResult.errors.join(', '));
+    }
+
+    // Transformă datele pentru API
+    const transformedData = productManager.transformForAPI(productData);
+    
+    return await this.dataFacade.updateDraft(draftId, transformedData);
+  }
+
+  /**
+   * Confirmă un draft de produs
+   * @param {string} draftId - ID-ul draft-ului
+   * @returns {Promise<Object>} Rezultatul confirmării
+   */
+  async commitProductDraft(draftId) {
+    return await this.dataFacade.commitDraft(draftId);
+  }
+
+  /**
+   * Anulează un draft de produs
+   * @param {string} draftId - ID-ul draft-ului
+   * @returns {Promise<Object>} Rezultatul anulării
+   */
+  async cancelProductDraft(draftId) {
+    return await this.dataFacade.cancelDraft(draftId);
+  }
+
+  /**
+   * Obține draft-urile pentru produse
+   * @param {string} sessionId - ID-ul sesiunii (opțional)
+   * @returns {Promise<Array>} Lista de draft-uri
+   */
+  async getProductDrafts(sessionId = null) {
+    if (sessionId) {
+      return await this.dataFacade.getDraftsBySession(sessionId);
+    }
+    return await this.dataFacade.getDraftsByResourceType('products');
+  }
+
+  /**
+   * Obține produsele cu draft-uri incluse
+   * @param {Object} params - Parametrii de query
+   * @returns {Promise<Array>} Lista de produse cu draft-uri
+   */
+  async getProductsWithDrafts(params = {}) {
+    try {
+      const products = await this.repository.queryWithDrafts(params);
+      
+      return products.map(product => productManager.transformForUI(product));
+    } catch (error) {
+      console.error('Error getting products with drafts:', error);
+      return [];
+    }
+  }
+
+  // ========================================
+  // SESSION MANAGEMENT
+  // ========================================
+
+  /**
+   * Creează o sesiune pentru produse
+   * @param {string} type - Tipul sesiunii
+   * @param {Object} data - Datele sesiunii
+   * @returns {Promise<Object>} Sesiunea creată
+   */
+  async createProductSession(type, data = {}) {
+    return await this.dataFacade.createSession(type, data);
+  }
+
+  /**
+   * Salvează o sesiune de produse
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {Object} sessionData - Datele sesiunii
+   * @returns {Promise<Object>} Sesiunea salvată
+   */
+  async saveProductSession(sessionId, sessionData) {
+    return await this.dataFacade.saveSession(sessionId, sessionData);
+  }
+
+  /**
+   * Obține produsele pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Array>} Lista de produse pentru sesiune
+   */
+  async getProductsForSession(sessionId) {
+    try {
+      const products = await this.repository.getResourcesForSession(sessionId);
+      
+      return products.map(product => productManager.transformForUI(product));
+    } catch (error) {
+      console.error('Error getting products for session:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Confirmă toate draft-urile pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Rezultatul confirmării
+   */
+  async commitAllProductDraftsForSession(sessionId) {
+    return await this.repository.commitAllDraftsForSession(sessionId);
+  }
+
+  /**
+   * Anulează toate draft-urile pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Rezultatul anulării
+   */
+  async cancelAllProductDraftsForSession(sessionId) {
+    return await this.repository.cancelAllDraftsForSession(sessionId);
   }
 }
 

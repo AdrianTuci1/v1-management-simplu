@@ -205,16 +205,6 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="card">
-          <div className="card-content">
-            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md text-destructive">
-              {error}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Users List */}
       <div className="card">

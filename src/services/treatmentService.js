@@ -1,34 +1,27 @@
-import { ResourceRepository } from '../data/repositories/ResourceRepository.js'
-import { ResourceInvoker } from '../data/invoker/ResourceInvoker.js'
-import { GetCommand } from '../data/commands/GetCommand.js'
-import { AddCommand } from '../data/commands/AddCommand.js'
-import { UpdateCommand } from '../data/commands/UpdateCommand.js'
-import { DeleteCommand } from '../data/commands/DeleteCommand.js'
+import { dataFacade } from '../data/DataFacade.js'
+import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
+import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js'
 import treatmentManager from '../business/treatmentManager.js'
 
 class TreatmentService {
   constructor() {
-    this.repository = new ResourceRepository('treatment', 'treatments')
-    this.invoker = new ResourceInvoker()
+    this.repository = new DraftAwareResourceRepository('treatments', 'treatments')
+    this.dataFacade = dataFacade
   }
 
   // Obține toate tratamentele
   async getTreatments(params = {}) {
-    const command = new GetCommand(this.repository, params)
-    const result = await this.invoker.run(command)
-    
-    // Extragem datele din răspunsul API
-    let treatments = []
-    if (result && result.data) {
-      treatments = Array.isArray(result.data) ? result.data : []
-    } else if (Array.isArray(result)) {
-      treatments = result
+    try {
+      const treatments = await this.dataFacade.getAll('treatments', params)
+      
+      // Transformăm fiecare tratament pentru UI
+      return treatments.map(treatment => 
+        treatmentManager.transformTreatmentForUI(treatment)
+      )
+    } catch (error) {
+      console.error('Error getting treatments:', error)
+      return []
     }
-    
-    // Transformăm fiecare tratament pentru UI
-    return treatments.map(treatment => 
-      treatmentManager.transformTreatmentForUI(treatment)
-    )
   }
 
   // Obține tratamentele după categorie
@@ -53,8 +46,7 @@ class TreatmentService {
     // Transformare pentru API
     const transformedData = treatmentManager.transformTreatmentForAPI(treatmentData)
     
-    const command = new AddCommand(this.repository, transformedData)
-    return this.invoker.run(command)
+    return await this.dataFacade.create('treatments', transformedData)
   }
 
   // Actualizează un tratament existent
@@ -65,14 +57,12 @@ class TreatmentService {
     // Transformare pentru API
     const transformedData = treatmentManager.transformTreatmentForAPI(treatmentData)
     
-    const command = new UpdateCommand(this.repository, id, transformedData)
-    return this.invoker.run(command)
+    return await this.dataFacade.update('treatments', id, transformedData)
   }
 
   // Șterge un tratament
   async deleteTreatment(id) {
-    const command = new DeleteCommand(this.repository, id)
-    return this.invoker.run(command)
+    return await this.dataFacade.delete('treatments', id)
   }
 
   // Obține un tratament după ID
@@ -114,36 +104,26 @@ class TreatmentService {
   // Căutare tratamente folosind resource queries
   async searchTreatments(query, limit = 50) {
     try {
-      const businessId = localStorage.getItem("businessId") || 'B0100001';
-      const locationId = localStorage.getItem("locationId") || 'L0100001';
-      
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.treatmentName=${encodeURIComponent(query)}&page=1&limit=${limit}`;
-      console.log('Treatment search endpoint:', endpoint);
-      const response = await fetch(endpoint, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Resource-Type": "treatment",
-          ...(localStorage.getItem('cognito-data') && {
-            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
-          })
+      // Folosește ResourceSearchRepository pentru căutare eficientă
+      const treatments = await resourceSearchRepository.searchWithFallback(
+        'treatmentType',
+        query,
+        limit,
+        // Fallback method
+        async (searchTerm, fallbackFilters) => {
+          try {
+            const searchFilters = {
+              search: searchTerm,
+              limit: fallbackFilters.limit || limit
+            }
+            const treatments = await this.dataFacade.getAll('treatments', searchFilters)
+            return Array.isArray(treatments) ? treatments : []
+          } catch (fallbackError) {
+            console.error('Fallback search also failed:', fallbackError)
+            return []
+          }
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Extract data from API response structure
-      let treatments = [];
-      if (data && data.data) {
-        treatments = Array.isArray(data.data) ? data.data : [];
-      } else if (Array.isArray(data)) {
-        treatments = data;
-      }
+      );
       
       // Transformăm fiecare tratament pentru UI
       return treatments.map(treatment => 
@@ -151,20 +131,152 @@ class TreatmentService {
       );
     } catch (error) {
       console.error('Error searching treatments by name:', error);
-      // Fallback to old method if resource query fails
-      try {
-        const searchFilters = {
-          search: query,
-          limit
-        }
-        const command = new GetCommand(this.repository, searchFilters)
-        const treatments = await this.invoker.run(command)
-        return Array.isArray(treatments) ? treatments : []
-      } catch (fallbackError) {
-        console.error('Fallback search also failed:', fallbackError)
-        return []
-      }
+      return [];
     }
+  }
+
+  // ========================================
+  // DRAFT MANAGEMENT
+  // ========================================
+
+  /**
+   * Creează un draft pentru un tratament
+   * @param {Object} treatmentData - Datele tratamentului
+   * @param {string} sessionId - ID-ul sesiunii (opțional)
+   * @returns {Promise<Object>} Draft-ul creat
+   */
+  async createTreatmentDraft(treatmentData, sessionId = null) {
+    // Validare
+    treatmentManager.validateTreatment(treatmentData)
+    
+    // Transformare pentru API
+    const transformedData = treatmentManager.transformTreatmentForAPI(treatmentData)
+    
+    return await this.dataFacade.createDraft('treatments', transformedData, sessionId)
+  }
+
+  /**
+   * Actualizează un draft de tratament
+   * @param {string} draftId - ID-ul draft-ului
+   * @param {Object} treatmentData - Datele actualizate
+   * @returns {Promise<Object>} Draft-ul actualizat
+   */
+  async updateTreatmentDraft(draftId, treatmentData) {
+    // Validare
+    treatmentManager.validateTreatment(treatmentData)
+    
+    // Transformare pentru API
+    const transformedData = treatmentManager.transformTreatmentForAPI(treatmentData)
+    
+    return await this.dataFacade.updateDraft(draftId, transformedData)
+  }
+
+  /**
+   * Confirmă un draft de tratament
+   * @param {string} draftId - ID-ul draft-ului
+   * @returns {Promise<Object>} Rezultatul confirmării
+   */
+  async commitTreatmentDraft(draftId) {
+    return await this.dataFacade.commitDraft(draftId)
+  }
+
+  /**
+   * Anulează un draft de tratament
+   * @param {string} draftId - ID-ul draft-ului
+   * @returns {Promise<Object>} Rezultatul anulării
+   */
+  async cancelTreatmentDraft(draftId) {
+    return await this.dataFacade.cancelDraft(draftId)
+  }
+
+  /**
+   * Obține draft-urile pentru tratamente
+   * @param {string} sessionId - ID-ul sesiunii (opțional)
+   * @returns {Promise<Array>} Lista de draft-uri
+   */
+  async getTreatmentDrafts(sessionId = null) {
+    if (sessionId) {
+      return await this.dataFacade.getDraftsBySession(sessionId)
+    }
+    return await this.dataFacade.getDraftsByResourceType('treatments')
+  }
+
+  /**
+   * Obține tratamentele cu draft-uri incluse
+   * @param {Object} params - Parametrii de query
+   * @returns {Promise<Array>} Lista de tratamente cu draft-uri
+   */
+  async getTreatmentsWithDrafts(params = {}) {
+    try {
+      const treatments = await this.repository.queryWithDrafts(params)
+      
+      return treatments.map(treatment => 
+        treatmentManager.transformTreatmentForUI(treatment)
+      )
+    } catch (error) {
+      console.error('Error getting treatments with drafts:', error)
+      return []
+    }
+  }
+
+  // ========================================
+  // SESSION MANAGEMENT
+  // ========================================
+
+  /**
+   * Creează o sesiune pentru tratamente
+   * @param {string} type - Tipul sesiunii
+   * @param {Object} data - Datele sesiunii
+   * @returns {Promise<Object>} Sesiunea creată
+   */
+  async createTreatmentSession(type, data = {}) {
+    return await this.dataFacade.createSession(type, data)
+  }
+
+  /**
+   * Salvează o sesiune de tratamente
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {Object} sessionData - Datele sesiunii
+   * @returns {Promise<Object>} Sesiunea salvată
+   */
+  async saveTreatmentSession(sessionId, sessionData) {
+    return await this.dataFacade.saveSession(sessionId, sessionData)
+  }
+
+  /**
+   * Obține tratamentele pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Array>} Lista de tratamente pentru sesiune
+   */
+  async getTreatmentsForSession(sessionId) {
+    try {
+      const treatments = await this.repository.getResourcesForSession(sessionId)
+      
+      return treatments.map(treatment => 
+        treatmentManager.transformTreatmentForUI(treatment)
+      )
+    } catch (error) {
+      console.error('Error getting treatments for session:', error)
+      return []
+    }
+  }
+
+  /**
+   * Confirmă toate draft-urile pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Rezultatul confirmării
+   */
+  async commitAllTreatmentDraftsForSession(sessionId) {
+    return await this.repository.commitAllDraftsForSession(sessionId)
+  }
+
+  /**
+   * Anulează toate draft-urile pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Rezultatul anulării
+   */
+  async cancelAllTreatmentDraftsForSession(sessionId) {
+    return await this.repository.cancelAllDraftsForSession(sessionId)
   }
 }
 

@@ -8,7 +8,7 @@ import {
   DrawerFooter 
 } from '../ui/drawer'
 
-const RoleDrawer = ({ onClose, roleData = null }) => {
+const RoleDrawer = ({ onClose, roleData = null, position = "side" }) => {
   const { addRole, updateRole, deleteRole } = useRoles()
   
   const [formData, setFormData] = useState({
@@ -187,7 +187,7 @@ const RoleDrawer = ({ onClose, roleData = null }) => {
   }
 
   return (
-    <Drawer onClose={onClose} size="default">
+    <Drawer onClose={onClose} size="default" position={position}>
       <DrawerHeader
         title={isEditing ? 'Editează Rol' : 'Rol Nou'}
         subtitle={isEditing ? 'Modifică detaliile rolului' : 'Creează un nou rol'}

@@ -1,32 +1,23 @@
-import { ResourceRepository } from '../data/repositories/ResourceRepository.js'
-import { ResourceInvoker } from '../data/invoker/ResourceInvoker.js'
-import { GetCommand } from '../data/commands/GetCommand.js'
-import { AddCommand } from '../data/commands/AddCommand.js'
-import { UpdateCommand } from '../data/commands/UpdateCommand.js'
-import { DeleteCommand } from '../data/commands/DeleteCommand.js'
+import { dataFacade } from '../data/DataFacade.js'
+import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { permissionManager } from '../business/permissionManager.js'
 
 class PermissionService {
   constructor() {
-    this.repository = new ResourceRepository('permissions', 'permissions')
-    this.invoker = new ResourceInvoker()
+    this.repository = new DraftAwareResourceRepository('permissions', 'permissions')
+    this.dataFacade = dataFacade
   }
 
   // Obține toate permisiunile
   async getPermissions(filters = {}) {
     try {
-      const command = new GetCommand(this.repository, filters)
-      const permissions = await this.invoker.run(command)
-
-            // Asigură-te că rezultatul este întotdeauna un array
-            const permissionsArray = Array.isArray(permissions) ? permissions : [];
+      const permissions = await this.dataFacade.getAll('permissions', filters)
       
-            // Transformă datele pentru UI
-            return permissionsArray.map(permission => permissionManager.transformPermissionForUI(permission));
-
+      // Transformă datele pentru UI
+      return permissions.map(permission => permissionManager.transformPermissionForUI(permission));
     } catch (error) {
       console.error('Error getting permissions:', error)
-      throw error
+      return []
     }
   }
 
@@ -42,8 +33,7 @@ class PermissionService {
       // Transformare pentru API
       const apiData = permissionManager.transformPermissionForAPI(permissionData)
       
-      const command = new AddCommand(this.repository, apiData)
-      const result = await this.invoker.run(command)
+      const result = await this.dataFacade.create('permissions', apiData)
       
       return permissionManager.transformPermissionForUI(result)
     } catch (error) {
@@ -64,8 +54,7 @@ class PermissionService {
       // Transformare pentru API
       const apiData = permissionManager.transformPermissionForAPI(permissionData)
       
-      const command = new UpdateCommand(this.repository, id, apiData)
-      const result = await this.invoker.run(command)
+      const result = await this.dataFacade.update('permissions', id, apiData)
       
       return permissionManager.transformPermissionForUI(result)
     } catch (error) {
@@ -77,8 +66,7 @@ class PermissionService {
   // Șterge o permisiune
   async deletePermission(id) {
     try {
-      const command = new DeleteCommand(this.repository, id)
-      await this.invoker.run(command)
+      await this.dataFacade.delete('permissions', id)
       return true
     } catch (error) {
       console.error('Error deleting permission:', error)

@@ -1,16 +1,18 @@
 import { Bell, User, Search, Menu, MapPin, Bot, Plus, LogOut } from 'lucide-react'
 import { useAuth } from "react-oidc-context"
 import { useDrawer } from '../contexts/DrawerContext'
-import { useAIAssistantStore } from '../stores/aiAssistantStore'
 import { useQuickActionsStore } from '../stores/quickActionsStore'
 import { useBusinessConfig } from '../config/businessConfig'
+import { useHealthRepository } from '../hooks/useHealthRepository'
 
 const Navbar = ({ currentView, currentLocation }) => {
   const auth = useAuth()
-  const { openMenuDrawer, openUserDrawer } = useDrawer()
-  const { toggleAIAssistant } = useAIAssistantStore()
+  const { openMenuDrawer, openUserDrawer, openAIAssistantDrawer } = useDrawer()
   const { toggleQuickActions } = useQuickActionsStore()
   const { businessName, BusinessIcon } = useBusinessConfig()
+  
+  // Health status using repository hook
+  const { isHealthy, isOffline, isServerDown, canMakeRequests, performHealthCheck } = useHealthRepository()
   
   // Check if we're in demo mode
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
@@ -58,7 +60,30 @@ const Navbar = ({ currentView, currentLocation }) => {
           
           <div className="hidden lg:block">
             <h1 className="text-lg font-semibold flex items-center gap-2">
-              <BusinessIcon className="h-5 w-5" />
+              <div className="relative">
+                <BusinessIcon className="h-5 w-5" />
+                {/* Health indicator dot */}
+                <div 
+                  className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                    isHealthy 
+                      ? 'bg-green-500' 
+                      : isOffline 
+                        ? 'bg-gray-400' 
+                        : isServerDown 
+                          ? 'bg-red-500' 
+                          : 'bg-yellow-500'
+                  }`}
+                  title={
+                    isHealthy 
+                      ? 'Sistem online și funcțional' 
+                      : isOffline 
+                        ? 'Fără conexiune la internet' 
+                        : isServerDown 
+                          ? 'Server indisponibil' 
+                          : 'Verificare în curs...'
+                  }
+                />
+              </div>
               {isDemoMode && (
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
                   DEMO
@@ -69,7 +94,30 @@ const Navbar = ({ currentView, currentLocation }) => {
           
           <div className="lg:hidden">
             <h1 className="text-lg font-semibold flex items-center gap-2">
-              {getViewTitle(currentView)}
+              <div className="relative">
+                <span>{getViewTitle(currentView)}</span>
+                {/* Health indicator dot for mobile */}
+                <div 
+                  className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                    isHealthy 
+                      ? 'bg-green-500' 
+                      : isOffline 
+                        ? 'bg-gray-400' 
+                        : isServerDown 
+                          ? 'bg-red-500' 
+                          : 'bg-yellow-500'
+                  }`}
+                  title={
+                    isHealthy 
+                      ? 'Sistem online și funcțional' 
+                      : isOffline 
+                        ? 'Fără conexiune la internet' 
+                        : isServerDown 
+                          ? 'Server indisponibil' 
+                          : 'Verificare în curs...'
+                  }
+                />
+              </div>
               {isDemoMode && (
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
                   DEMO
@@ -82,15 +130,15 @@ const Navbar = ({ currentView, currentLocation }) => {
         {/* Right side - Robot, Notifications and user */}
         <div className="flex items-center gap-2">
           {/* Robot AI Assistant - Hidden in demo mode */}
-          {/* {!isDemoMode && (
+          {!isDemoMode && (
             <button
-              onClick={toggleAIAssistant}
+              onClick={openAIAssistantDrawer}
               className="btn btn-ghost btn-sm"
               title="Deschide AI Assistant"
             >
               <Bot className="h-5 w-5" />
             </button>
-          )} */}
+          )}
 
           <button
             onClick={toggleQuickActions}

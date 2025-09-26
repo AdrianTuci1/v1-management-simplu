@@ -15,7 +15,7 @@ import {
 } from '../ui/drawer'
 import CategoryCombobox from '../combobox/CategoryCombobox.jsx'
 
-const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null }) => {
+const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null, position = "side" }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   
@@ -106,7 +106,7 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
   }
 
   return (
-    <Drawer onClose={onClose}>
+    <Drawer onClose={onClose} size="default" position={position}>
       <DrawerHeader
         title="Tratament"
         subtitle={isNewTreatment ? 'Tratament nou' : 'Editează tratamentul'}

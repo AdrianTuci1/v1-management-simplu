@@ -6,8 +6,9 @@ import { Button } from './ui/button';
 import { useAIAssistant } from '../hooks/useAIAssistant';
 import { getConfig } from '../config/aiAssistantConfig';
 
-const AIAssistantComponent = () => {
-  const { isOpen, closeAIAssistant } = useAIAssistantStore();
+const AIAssistantComponent = ({ onClose }) => {
+  // Nu mai folosim store-ul intern, ci props-urile primite
+  const isOpen = true; // Întotdeauna deschis când este renderizat prin drawer
   const [inputValue, setInputValue] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -173,7 +174,7 @@ const AIAssistantComponent = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={closeAIAssistant}
+              onClick={onClose}
               className="h-6 w-6 p-0"
             >
               <X className="h-3 w-3" />

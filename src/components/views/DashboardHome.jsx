@@ -175,15 +175,6 @@ const DashboardHome = () => {
 
   return (
     <div className="space-y-6">
-      {/* Error Message - doar când nu avem date */}
-      {error && !businessStatistics && !recentActivities?.length && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <XCircle className="h-5 w-5 text-red-500" />
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        </div>
-      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react'
 import { useAuth } from "react-oidc-context"
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
-import { MainDrawer as Drawer } from './components/drawers'
+import { MainDrawer as MainDrawer } from './components/drawers'
+import { Drawer } from './components/ui/drawer'
 import Dashboard from './components/Dashboard'
 import AuthScreen from './components/AuthScreen'
 import LoadingScreen from './components/LoadingScreen'
 import AccessDenied from './components/AccessDenied'
-import AIAssistantComponent from './components/AIAssistant'
 import QuickActionsDrawer from './components/drawers/QuickActionsDrawer'
 import SalesDrawer from './components/drawers/SalesDrawer'
 import authService from './services/authService'
@@ -265,16 +265,24 @@ function AppContent() {
             />
           </div>
           
-          {/* AI Assistant Side Panel */}
-          <AIAssistantComponent />
+          
+          {/* Drawer as Side Panel */}
+          {drawerOpen && (
+            <Drawer 
+              onClose={closeDrawer}
+              position="side"
+              size="md"
+            >
+              <MainDrawer 
+                open={drawerOpen}
+                content={drawerContent}
+                onClose={closeDrawer}
+              />
+            </Drawer>
+          )}
+
         </main>
 
-        {/* Drawer */}
-        <Drawer 
-          open={drawerOpen}
-          content={drawerContent}
-          onClose={closeDrawer}
-        />
       </div>
       
       {/* Quick Actions Drawer */}

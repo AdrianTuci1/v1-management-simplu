@@ -221,16 +221,6 @@ const OperationsTreatments = () => {
         </div>
       </div>
 
-      {/* Error Display - doar când nu avem date în cache */}
-      {error && sortedTreatments.length === 0 && (
-        <div className="card">
-          <div className="card-content">
-            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md text-destructive">
-              {error}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Treatments List */}
       <div className="card">

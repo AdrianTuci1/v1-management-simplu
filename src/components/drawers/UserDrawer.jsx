@@ -10,7 +10,7 @@ import {
   DrawerFooter 
 } from '../ui/drawer'
 
-const UserDrawer = ({ onClose, user = null }) => {
+const UserDrawer = ({ onClose, user = null, position = "side" }) => {
   const { addUser, updateUser, deleteUser, loading, error } = useUsers()
   const { roles } = useRoles()
   
@@ -170,7 +170,7 @@ const UserDrawer = ({ onClose, user = null }) => {
   ]
 
   return (
-    <Drawer onClose={onClose} size="default">
+    <Drawer onClose={onClose} size="default" position={position}>
       <DrawerHeader
         title={user ? 'Editează medic' : 'Medic nou'}
         subtitle={user ? 'Modifică informațiile medicului' : 'Adaugă un medic nou în sistem'}

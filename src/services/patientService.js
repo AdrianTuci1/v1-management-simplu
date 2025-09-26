@@ -1,36 +1,28 @@
-import { ResourceRepository } from '../data/repositories/ResourceRepository.js'
-import { ResourceInvoker } from '../data/invoker/ResourceInvoker.js'
-import { GetCommand } from '../data/commands/GetCommand.js'
-import { AddCommand } from '../data/commands/AddCommand.js'
-import { UpdateCommand } from '../data/commands/UpdateCommand.js'
-import { DeleteCommand } from '../data/commands/DeleteCommand.js'
+import { dataFacade } from '../data/DataFacade.js'
+import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
+import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js'
 import patientManager from '../business/patientManager.js'
 
 
 class PatientService {
   constructor() {
-    this.repository = new ResourceRepository('patient', 'patients')
-    this.invoker = new ResourceInvoker()
+    this.repository = new DraftAwareResourceRepository('patients', 'patients')
+    this.dataFacade = dataFacade
   }
 
   // Obține pacienții cu parametri de filtrare
   async getPatients(params = {}) {
-    const command = new GetCommand(this.repository, params)
-
-    const result = await this.invoker.run(command)
-    
-    // Extragem datele din răspunsul API
-    let patients = []
-    if (result && result.data) {
-      patients = Array.isArray(result.data) ? result.data : []
-    } else if (Array.isArray(result)) {
-      patients = result
+    try {
+      const patients = await this.dataFacade.getAll('patients', params)
+      
+      // Transformăm fiecare pacient pentru UI
+      return patients.map(patient => 
+        patientManager.transformPatientForUI(patient)
+      )
+    } catch (error) {
+      console.error('Error getting patients:', error)
+      return []
     }
-    
-    // Transformăm fiecare pacient pentru UI
-    return patients.map(patient => 
-      patientManager.transformPatientForUI(patient)
-    )
   }
 
   // Obține pacienții pentru o pagină specifică
@@ -48,35 +40,23 @@ class PatientService {
   // Obține pacienții după nume (căutare) folosind resource queries
   async searchPatients(searchTerm, limit = 50) {
     try {
-      const businessId = localStorage.getItem("businessId") || 'B0100001';
-      const locationId = localStorage.getItem("locationId") || 'L0100001';
-      
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.patientName=${encodeURIComponent(searchTerm)}&page=1&limit=${limit}`;
-      const response = await fetch(endpoint, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Resource-Type": "patient",
-          ...(localStorage.getItem('cognito-data') && {
-            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
-          })
+      // Folosește ResourceSearchRepository pentru căutare eficientă
+      const patients = await resourceSearchRepository.searchWithFallback(
+        'patientName',
+        searchTerm,
+        limit,
+        // Fallback method
+        async (searchTerm, fallbackFilters) => {
+          const params = {
+            search: searchTerm,
+            limit: fallbackFilters.limit || limit,
+            sortBy: 'name',
+            sortOrder: 'asc'
+          }
+          const result = await this.getPatients(params)
+          return Array.isArray(result) ? result : []
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Extract data from API response structure
-      let patients = [];
-      if (data && data.data) {
-        patients = Array.isArray(data.data) ? data.data : [];
-      } else if (Array.isArray(data)) {
-        patients = data;
-      }
+      );
       
       // Transformăm fiecare pacient pentru UI
       return patients.map(patient => 
@@ -84,15 +64,7 @@ class PatientService {
       );
     } catch (error) {
       console.error('Error searching patients by name:', error);
-      // Fallback to old method if resource query fails
-      const params = {
-        search: searchTerm,
-        limit,
-        sortBy: 'name',
-        sortOrder: 'asc'
-      }
-      const result = await this.getPatients(params)
-      return Array.isArray(result) ? result : []
+      return [];
     }
   }
 
@@ -111,8 +83,7 @@ class PatientService {
     // Transformare pentru API
     const transformedData = patientManager.transformPatientForAPI(patientData)
     
-    const command = new AddCommand(this.repository, transformedData)
-    return this.invoker.run(command)
+    return await this.dataFacade.create('patients', transformedData)
   }
 
   // Actualizează un pacient existent
@@ -123,14 +94,12 @@ class PatientService {
     // Transformare pentru API
     const transformedData = patientManager.transformPatientForAPI(patientData)
     
-    const command = new UpdateCommand(this.repository, id, transformedData)
-    return this.invoker.run(command)
+    return await this.dataFacade.update('patients', id, transformedData)
   }
 
   // Șterge un pacient
   async deletePatient(id) {
-    const command = new DeleteCommand(this.repository, id)
-    return this.invoker.run(command)
+    return await this.dataFacade.delete('patients', id)
   }
 
   // Obține statistici despre pacienți
@@ -171,6 +140,152 @@ class PatientService {
       console.error('Error exporting patients:', error)
       throw new Error('Eroare la exportul pacienților')
     }
+  }
+
+  // ========================================
+  // DRAFT MANAGEMENT
+  // ========================================
+
+  /**
+   * Creează un draft pentru un pacient
+   * @param {Object} patientData - Datele pacientului
+   * @param {string} sessionId - ID-ul sesiunii (opțional)
+   * @returns {Promise<Object>} Draft-ul creat
+   */
+  async createPatientDraft(patientData, sessionId = null) {
+    // Validare
+    patientManager.validatePatient(patientData)
+    
+    // Transformare pentru API
+    const transformedData = patientManager.transformPatientForAPI(patientData)
+    
+    return await this.dataFacade.createDraft('patients', transformedData, sessionId)
+  }
+
+  /**
+   * Actualizează un draft de pacient
+   * @param {string} draftId - ID-ul draft-ului
+   * @param {Object} patientData - Datele actualizate
+   * @returns {Promise<Object>} Draft-ul actualizat
+   */
+  async updatePatientDraft(draftId, patientData) {
+    // Validare
+    patientManager.validatePatient(patientData)
+    
+    // Transformare pentru API
+    const transformedData = patientManager.transformPatientForAPI(patientData)
+    
+    return await this.dataFacade.updateDraft(draftId, transformedData)
+  }
+
+  /**
+   * Confirmă un draft de pacient
+   * @param {string} draftId - ID-ul draft-ului
+   * @returns {Promise<Object>} Rezultatul confirmării
+   */
+  async commitPatientDraft(draftId) {
+    return await this.dataFacade.commitDraft(draftId)
+  }
+
+  /**
+   * Anulează un draft de pacient
+   * @param {string} draftId - ID-ul draft-ului
+   * @returns {Promise<Object>} Rezultatul anulării
+   */
+  async cancelPatientDraft(draftId) {
+    return await this.dataFacade.cancelDraft(draftId)
+  }
+
+  /**
+   * Obține draft-urile pentru pacienți
+   * @param {string} sessionId - ID-ul sesiunii (opțional)
+   * @returns {Promise<Array>} Lista de draft-uri
+   */
+  async getPatientDrafts(sessionId = null) {
+    if (sessionId) {
+      return await this.dataFacade.getDraftsBySession(sessionId)
+    }
+    return await this.dataFacade.getDraftsByResourceType('patients')
+  }
+
+  /**
+   * Obține pacienții cu draft-uri incluse
+   * @param {Object} params - Parametrii de query
+   * @returns {Promise<Array>} Lista de pacienți cu draft-uri
+   */
+  async getPatientsWithDrafts(params = {}) {
+    try {
+      const patients = await this.repository.queryWithDrafts(params)
+      
+      // Transformăm fiecare pacient pentru UI
+      return patients.map(patient => 
+        patientManager.transformPatientForUI(patient)
+      )
+    } catch (error) {
+      console.error('Error getting patients with drafts:', error)
+      return []
+    }
+  }
+
+  // ========================================
+  // SESSION MANAGEMENT
+  // ========================================
+
+  /**
+   * Creează o sesiune pentru pacienți
+   * @param {string} type - Tipul sesiunii
+   * @param {Object} data - Datele sesiunii
+   * @returns {Promise<Object>} Sesiunea creată
+   */
+  async createPatientSession(type, data = {}) {
+    return await this.dataFacade.createSession(type, data)
+  }
+
+  /**
+   * Salvează o sesiune de pacienți
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {Object} sessionData - Datele sesiunii
+   * @returns {Promise<Object>} Sesiunea salvată
+   */
+  async savePatientSession(sessionId, sessionData) {
+    return await this.dataFacade.saveSession(sessionId, sessionData)
+  }
+
+  /**
+   * Obține pacienții pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Array>} Lista de pacienți pentru sesiune
+   */
+  async getPatientsForSession(sessionId) {
+    try {
+      const patients = await this.repository.getResourcesForSession(sessionId)
+      
+      // Transformăm fiecare pacient pentru UI
+      return patients.map(patient => 
+        patientManager.transformPatientForUI(patient)
+      )
+    } catch (error) {
+      console.error('Error getting patients for session:', error)
+      return []
+    }
+  }
+
+  /**
+   * Confirmă toate draft-urile pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Rezultatul confirmării
+   */
+  async commitAllPatientDraftsForSession(sessionId) {
+    return await this.repository.commitAllDraftsForSession(sessionId)
+  }
+
+  /**
+   * Anulează toate draft-urile pentru o sesiune
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Rezultatul anulării
+   */
+  async cancelAllPatientDraftsForSession(sessionId) {
+    return await this.repository.cancelAllDraftsForSession(sessionId)
   }
 }
 

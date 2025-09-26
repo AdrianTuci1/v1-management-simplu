@@ -30,11 +30,11 @@ import {
 import { TimePicker } from '../ui/time-picker'
 
 
-const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null }) => {
+const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null, position = "overlay" }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  
+
   // Hook-uri pentru gestionarea datelor
   const { addAppointment, updateAppointment, deleteAppointment, updateLookupData } = useAppointments()
   const { patients } = usePatients()
@@ -286,7 +286,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
               placeholder="Selectează pacient"
             />
           </div>
-          <button className="btn btn-primary btn-sm">
+          <button className="btn btn-primary btn-sm" onClick={() => openDrawer({ type: 'new-person' })}>
             <Plus className="h-4 w-4" />
           </button>
         </div>
@@ -517,7 +517,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   ]
 
   return (
-    <Drawer onClose={onClose}>
+    <Drawer onClose={onClose} position={position}>
       <DrawerHeader
         title="Programare"
         subtitle={isNewAppointment ? 'Programare nouă' : 'Editează programarea'}

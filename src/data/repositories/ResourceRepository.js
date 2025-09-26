@@ -2,7 +2,7 @@ import { db, indexedDb } from "../infrastructure/db";
 import { buildResourcesEndpoint, apiRequest } from "../infrastructure/apiClient.js";
 import { enqueue } from "../queue/offlineQueue";
 import { applyOptimistic, makeTempId } from "../store/optimistic";
-import { mapTempToPermId } from "../store/idMap";
+import { healthRepository } from "./HealthRepository.js";
 
 export class ResourceRepository {
   constructor(resourceType, store = "resources") {
@@ -29,6 +29,16 @@ export class ResourceRepository {
   }
 
   async request(path = "", options = {}) {
+    // Verifică dacă sistemul poate face cereri
+    const healthStatus = healthRepository.getCurrentStatus();
+    if (!healthStatus.canMakeRequests) {
+      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+      if (!isDemoMode) {
+        console.warn('System is offline or server is down. Request blocked.');
+        throw new Error('System is offline or server is down');
+      }
+    }
+
     try {
       const resourcesEndpoint = buildResourcesEndpoint(path);
       return await apiRequest(this.resourceType, resourcesEndpoint, options);

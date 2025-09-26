@@ -2,19 +2,28 @@ import React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 import { X } from "lucide-react"
+import { useDrawerStackStore } from "../../stores/drawerStackStore"
 
 const drawerVariants = cva(
-  "fixed inset-y-0 right-0 z-50 flex flex-col bg-white shadow-xl transition-transform duration-300 ease-in-out",
+  "flex flex-col bg-white shadow-xl transition-all duration-300 ease-in-out",
   {
     variants: {
       size: {
-        default: "w-full max-w-2xl",
-        lg: "w-full max-w-4xl",
-        xl: "w-full max-w-6xl",
+        default: "w-96", // Match AI Assistant md size
+        sm: "w-96",
+        md: "w-96", 
+        lg: "w-96",
+        xl: "w-[500px]",
+        full: "w-full max-w-2xl",
+      },
+      position: {
+        overlay: "relative inset-y-0 right-0 z-50",
+        side: "flex-shrink-0 h-full",
       },
     },
     defaultVariants: {
       size: "default",
+      position: "overlay",
     },
   }
 )
@@ -154,7 +163,21 @@ export interface NavigationItemProps
 }
 
 const Drawer = React.forwardRef<HTMLDivElement, DrawerProps>(
-  ({ className, size, onClose, children, ...props }, ref) => {
+  ({ className, size, position = "side", onClose, children, ...props }, ref) => {
+    // If position is "side", render without backdrop - just the drawer content
+    if (position === "side") {
+      return (
+        <div
+          ref={ref}
+          className={cn(drawerVariants({ size, position }), className)}
+          {...props}
+        >
+          {children}
+        </div>
+      )
+    }
+
+    // Original overlay behavior with backdrop
     return (
       <>
         {/* Backdrop */}
@@ -166,7 +189,7 @@ const Drawer = React.forwardRef<HTMLDivElement, DrawerProps>(
         {/* Drawer */}
         <div
           ref={ref}
-          className={cn(drawerVariants({ size }), className)}
+          className={cn(drawerVariants({ size, position }), className)}
           {...props}
         >
           {children}
@@ -179,16 +202,28 @@ Drawer.displayName = "Drawer"
 
 const DrawerHeader = React.forwardRef<HTMLDivElement, DrawerHeaderProps>(
   ({ className, variant, title, subtitle, onClose, ...props }, ref) => {
+    const { getStackSize } = useDrawerStackStore()
+    const stackSize = getStackSize()
+    
     return (
       <div
         ref={ref}
         className={cn(drawerHeaderVariants({ variant }), className)}
         {...props}
       >
-        <div>
-          <h2 className="text-lg font-semibold">{title}</h2>
-          {subtitle && (
-            <p className="text-sm text-gray-500">{subtitle}</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">{title}</h2>
+            {subtitle && (
+              <p className="text-sm text-gray-500">{subtitle}</p>
+            )}
+          </div>
+          {stackSize > 0 && (
+            <div className="flex items-center gap-1">
+              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-xs font-medium text-primary">{stackSize}</span>
+              </div>
+            </div>
           )}
         </div>
         <button
@@ -225,7 +260,7 @@ const DrawerNavigation = React.forwardRef<HTMLDivElement, DrawerNavigationProps>
               )}
             >
               {Icon && <Icon className="h-4 w-4" />}
-              <span className="hidden sm:inline">{item.label}</span>
+
             </button>
           )
         })}

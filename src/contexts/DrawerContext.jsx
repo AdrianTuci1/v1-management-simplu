@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from 'react'
+import { useDrawerStackStore } from '../stores/drawerStackStore.js'
 
 const DrawerContext = createContext()
 
@@ -13,15 +14,43 @@ export const useDrawer = () => {
 export const DrawerProvider = ({ children }) => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerContent, setDrawerContent] = useState(null)
+  
+  // Folosește stiva de drawere din Zustand
+  const { 
+    pushDrawer, 
+    popDrawer, 
+    getCurrentDrawer, 
+    getStackSize,
+    hasDrawers 
+  } = useDrawerStackStore()
 
   const openDrawer = (content) => {
+    // Adaugă drawer-ul în stivă
+    pushDrawer(content)
+    
+    // Setează conținutul curent
     setDrawerContent(content)
     setDrawerOpen(true)
   }
 
   const closeDrawer = () => {
-    setDrawerOpen(false)
-    setDrawerContent(null)
+    // Elimină ultimul drawer din stivă
+    popDrawer()
+    
+    // Verifică dacă mai există drawere în stivă
+    if (hasDrawers()) {
+      const nextDrawer = getCurrentDrawer()
+      if (nextDrawer) {
+        setDrawerContent(nextDrawer)
+        setDrawerOpen(true)
+      } else {
+        setDrawerOpen(false)
+        setDrawerContent(null)
+      }
+    } else {
+      setDrawerOpen(false)
+      setDrawerContent(null)
+    }
   }
 
   const openAppointmentDrawer = (appointmentData = null) => {
@@ -82,8 +111,18 @@ export const DrawerProvider = ({ children }) => {
     openDrawer({ type: 'stripe-payment' })
   }
 
+  const openAIAssistantDrawer = () => {
+    openDrawer({ type: 'ai-assistant' })
+  }
 
-
+  // Funcții pentru gestionarea stivei
+  const getStackInfo = () => {
+    return {
+      size: getStackSize(),
+      hasDrawers: hasDrawers(),
+      currentDrawer: getCurrentDrawer()
+    }
+  }
 
   const value = {
     drawerOpen,
@@ -101,6 +140,11 @@ export const DrawerProvider = ({ children }) => {
     openCashRegisterDrawer,
     openDataDownloadDrawer,
     openStripePaymentDrawer,
+    openAIAssistantDrawer,
+    // Funcții pentru stiva de drawere
+    getStackInfo,
+    getStackSize,
+    hasDrawers,
   }
 
   return (

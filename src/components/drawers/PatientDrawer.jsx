@@ -25,7 +25,7 @@ import {
 } from '../ui/drawer'
 import TeethChartTab from '../dental-chart/TeethChartTab'
 
-const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) => {
+const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, position = "side" }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -407,7 +407,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null }) =>
   ]
 
   return (
-    <Drawer onClose={onClose}>
+    <Drawer onClose={onClose} position={position}>
       <DrawerHeader
         title={isNewPatient ? 'Pacient nou' : 'Editare pacient'}
         subtitle={isNewPatient ? 'Adaugă un pacient nou în sistem' : 'Modifică informațiile pacientului'}

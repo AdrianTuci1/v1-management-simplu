@@ -24,6 +24,44 @@ class AppDatabase extends Dexie {
       queue: '++seq, createdAt, status, resourceType, action, tempId',
       meta: 'key'
     });
+    
+    // Versiunea 4 - Agent Support & Draft System
+    this.version(4).stores({
+      // ... stores existente (appointments, patients, etc.)
+      appointments: 'resourceId, date, doctor, patient, status',
+      appointmentCounts: 'date, count',
+      patients: 'resourceId, name, email, phone, status, city, county',
+      products: 'resourceId, name, category, price, stock, reorderLevel',
+      productCounts: 'category, count',
+      users: 'resourceId, email, licenseNumber, specialization, status, role',
+      sales: 'resourceId, date, amount, status, customerId',
+      role: 'resourceId, name, description, status',
+      permissions: 'resourceId, resource, action, description',
+      treatments: 'resourceId, treatmentType, category, duration, price',
+      statistics: 'id, timestamp',
+      outbox: '++id, tempId, resourceType, operation, createdAt, status',
+      idMap: 'tempId, permId, resourceType',
+      queue: '++seq, createdAt, status, resourceType, action, tempId',
+      meta: 'key',
+      
+      // Draft/Session System
+      drafts: '++id, sessionId, resourceType, data, timestamp, status, parentId',
+      sessions: '++id, sessionId, type, data, timestamp, status, parentId',
+      sessionOperations: '++id, sessionId, operation, data, timestamp, status',
+      
+      // Agent Communication
+      agentSessions: '++id, sessionId, agentId, permissions, createdAt, lastActivity',
+      agentCommands: '++id, sessionId, commandId, repositoryType, operation, data, timestamp, status',
+      agentQueryModifications: '++id, sessionId, repositoryType, modifications, timestamp, status',
+      
+      // Remote Versions (pentru sincronizare cu server)
+      remoteVersions: '++id, resourceType, resourceId, remoteData, timestamp, source, status',
+      pendingApprovals: '++id, resourceType, resourceId, operation, data, timestamp, source, status',
+      
+      // Management & Audit
+      managementLog: '++id, resourceType, resourceId, operation, oldData, newData, timestamp, approvedBy, status',
+      auditTrail: '++id, sessionId, action, data, timestamp, source'
+    });
   }
 }
 

@@ -9,7 +9,7 @@ import {
   DrawerFooter 
 } from '../ui/drawer';
 
-const ProductDrawer = ({ isOpen, onClose, product = null }) => {
+const ProductDrawer = ({ isOpen, onClose, product = null, position = "side" }) => {
   const { addProduct, updateProduct, deleteProduct, loading, error } = useProducts();
   
   // Debug logging pentru a vedea când se schimbă starea
@@ -136,7 +136,7 @@ const ProductDrawer = ({ isOpen, onClose, product = null }) => {
   const categories = productManager.getCategories();
 
   return (
-    <Drawer onClose={onClose} size="default">
+    <Drawer onClose={onClose} size="default" position={position}>
       <DrawerHeader
         title={isEditing ? 'Editează Produs' : 'Produs Nou'}
         subtitle={isEditing ? 'Modifică detaliile produsului' : 'Adaugă un produs nou în inventar'}
