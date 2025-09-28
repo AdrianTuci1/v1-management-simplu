@@ -31,7 +31,7 @@ export class StatisticsDataRepository {
       // Build the endpoint with businessId-locationId
       const businessId = localStorage.getItem("businessId") || 'B0100001';
       const locationId = localStorage.getItem("locationId") || 'L0100001';
-      const endpoint = `/api/resources/statistics/${businessId}-${locationId}`;
+      const endpoint = `/resources/statistics/${businessId}-${locationId}`;
       
       console.log('Making statistics API request:', {
         endpoint: endpoint,

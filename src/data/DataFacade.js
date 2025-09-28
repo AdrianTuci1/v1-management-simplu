@@ -16,6 +16,7 @@ import BusinessInfoRepository from './repositories/BusinessInfoRepository.js';
 import { ResourceRepository } from './repositories/ResourceRepository.js';
 import StatisticsDataRepository from './repositories/StatisticsDataRepository.js';
 import UserRolesRepository from './repositories/UserRolesRepository.js';
+import { aiAssistantRepository } from './repositories/AIAssistantRepository.js';
 
 // Import commands
 import { AddCommand } from './commands/AddCommand.js';
@@ -23,14 +24,15 @@ import { UpdateCommand } from './commands/UpdateCommand.js';
 import { DeleteCommand } from './commands/DeleteCommand.js';
 import { GetCommand } from './commands/GetCommand.js';
 
+
 // Import infrastructure
-import { connectWebSocket, onMessage, sendMessage, getConnectionStatus } from './infrastructure/websocketClient.js';
 import { db } from './infrastructure/db.js';
 import { enqueue, processQueue } from './queue/offlineQueue.js';
 import { healthMonitor } from './infrastructure/healthMonitor.js';
 import { draftManager } from './infrastructure/draftManager.js';
 import { agentWebSocketHandler } from './infrastructure/agentWebSocketHandler.js';
 import { agentQueryModifier } from './infrastructure/agentQueryModifier.js';
+import { socketFacade } from './SocketFacade.js';
 
 // Import invokers
 import AuthInvoker from './invoker/AuthInvoker.js';
@@ -45,6 +47,7 @@ export class DataFacade {
     this.invokers = new Map();
     this.isInitialized = false;
     this.healthListeners = new Set();
+    this.socketFacade = socketFacade; // Reference to SocketFacade
     
     this.initializeRepositories();
     this.initializeInvokers();
@@ -60,16 +63,17 @@ export class DataFacade {
     this.repositories.set('businessInfo', BusinessInfoRepository);
     this.repositories.set('statistics', StatisticsDataRepository);
     this.repositories.set('userRoles', UserRolesRepository);
+    this.repositories.set('aiAssistant', aiAssistantRepository);
     
-    // Repository-uri pentru resurse
-    this.repositories.set('appointments', new ResourceRepository('appointments', 'appointments'));
-    this.repositories.set('patients', new ResourceRepository('patients', 'patients'));
-    this.repositories.set('products', new ResourceRepository('products', 'products'));
-    this.repositories.set('users', new ResourceRepository('users', 'users'));
-    this.repositories.set('treatments', new ResourceRepository('treatments', 'treatments'));
+    // Repository-uri pentru resurse (resource type singular pentru API, store name plural pentru IndexedDB)
+    this.repositories.set('appointment', new ResourceRepository('appointment', 'appointments'));
+    this.repositories.set('patient', new ResourceRepository('patient', 'patients'));
+    this.repositories.set('product', new ResourceRepository('product', 'products'));
+    this.repositories.set('medic', new ResourceRepository('medic', 'users'));
+    this.repositories.set('treatment', new ResourceRepository('treatment', 'treatments'));
     this.repositories.set('sales', new ResourceRepository('sales', 'sales'));
-    this.repositories.set('roles', new ResourceRepository('roles', 'role'));
-    this.repositories.set('permissions', new ResourceRepository('permissions', 'permissions'));
+    this.repositories.set('role', new ResourceRepository('role', 'roles'));
+    this.repositories.set('permission', new ResourceRepository('permission', 'permissions'));
   }
 
   initializeInvokers() {
@@ -486,64 +490,132 @@ export class DataFacade {
   }
 
   // ========================================
-  // UTILITY METHODS
+  // AI ASSISTANT INTEGRATION
   // ========================================
 
   /**
-   * Obține informații despre sistem
-   * @returns {Object} Informații despre sistem
+   * Generează ID-ul sesiunii pentru AI Assistant
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @returns {string} ID-ul sesiunii generate
    */
-  getSystemInfo() {
-    return {
-      repositories: Array.from(this.repositories.keys()),
-      invokers: Array.from(this.invokers.keys()),
-      websocketStatus: this.getWebSocketStatus(),
-      isInitialized: this.isInitialized
-    };
+  generateAIAssistantSessionId(businessId, userId) {
+    return this.repositories.get('aiAssistant').generateSessionId(businessId, userId);
   }
 
   /**
-   * Verifică dacă un tip de resursă este suportat
-   * @param {string} resourceType - Tipul de resursă
-   * @returns {boolean} True dacă este suportat
+   * Încarcă sesiunea de astăzi pentru AI Assistant
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @param {string} locationId - ID-ul locației
+   * @returns {Promise<Object>} Sesiunea încărcată
    */
-  isResourceTypeSupported(resourceType) {
-    return this.repositories.has(resourceType);
+  async loadTodayAIAssistantSession(businessId, userId, locationId) {
+    return await this.repositories.get('aiAssistant').loadTodaySession(businessId, userId, locationId);
   }
 
   /**
-   * Obține toate tipurile de resurse suportate
-   * @returns {Array<string>} Lista tipurilor de resurse
+   * Trimite un mesaj către AI Assistant prin repository
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {string} content - Conținutul mesajului
+   * @param {Object} context - Contextul mesajului
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @param {string} locationId - ID-ul locației
+   * @returns {Promise<Object>} Rezultatul trimiterii mesajului
    */
-  getSupportedResourceTypes() {
-    return Array.from(this.repositories.keys());
+  async sendAIAssistantRepositoryMessage(sessionId, content, context, businessId, userId, locationId) {
+    return await this.repositories.get('aiAssistant').sendMessage(sessionId, content, context, businessId, userId, locationId);
   }
-
-  // ========================================
-  // INITIALIZATION
-  // ========================================
 
   /**
-   * Inițializează facade-ul
-   * @returns {Promise<void>}
+   * Obține sesiunile active pentru AI Assistant
+   * @param {string} businessId - ID-ul business-ului
+   * @returns {Promise<Array>} Lista sesiunilor active
    */
-  async initialize() {
-    if (this.isInitialized) return;
-
-    try {
-      // Inițializează queue processing
-      // await processQueue();
-      
-      // Pornește monitorizarea stării sistemului
-      this.startHealthMonitoring();
-      
-      this.isInitialized = true;
-      console.log('DataFacade initialized successfully');
-    } catch (error) {
-      console.error('Error initializing DataFacade:', error);
-      throw error;
-    }
+  async getActiveAIAssistantSessions(businessId) {
+    return await this.repositories.get('aiAssistant').getActiveSessions(businessId);
   }
+
+  /**
+   * Închide o sesiune AI Assistant
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {string} status - Statusul de închidere
+   * @returns {Promise<boolean>} True dacă închiderea a reușit
+   */
+  async closeAIAssistantSession(sessionId, status = 'resolved') {
+    return await this.repositories.get('aiAssistant').closeSession(sessionId, status);
+  }
+
+  /**
+   * Obține statisticile sesiunilor AI Assistant
+   * @param {string} businessId - ID-ul business-ului
+   * @returns {Promise<Object>} Statisticile sesiunilor
+   */
+  async getAIAssistantSessionStats(businessId) {
+    return await this.repositories.get('aiAssistant').getSessionStats(businessId);
+  }
+
+  /**
+   * Caută mesaje în sesiunea AI Assistant
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {string} query - Query-ul de căutare
+   * @param {number} limit - Limita de rezultate
+   * @returns {Promise<Array>} Rezultatele căutării
+   */
+  async searchAIAssistantMessages(sessionId, query, limit = 20) {
+    return await this.repositories.get('aiAssistant').searchMessages(sessionId, query, limit);
+  }
+
+  /**
+   * Exportă datele sesiunii AI Assistant
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {string} format - Formatul de export
+   * @returns {Promise<Object>} Datele exportate
+   */
+  async exportAIAssistantSession(sessionId, format = 'json') {
+    return await this.repositories.get('aiAssistant').exportSession(sessionId, format);
+  }
+
+  /**
+   * Obține sesiunea activă pentru un utilizator
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @returns {Promise<Object|null>} Sesiunea activă sau null
+   */
+  async getActiveAIAssistantSessionForUser(businessId, userId) {
+    return await this.repositories.get('aiAssistant').getActiveSessionForUser(businessId, userId);
+  }
+
+  /**
+   * Obține istoricul sesiunilor pentru un utilizator
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @param {number} limit - Limita de sesiuni
+   * @returns {Promise<Object>} Istoricul sesiunilor
+   */
+  async getUserAIAssistantSessionHistory(businessId, userId, limit = 20) {
+    return await this.repositories.get('aiAssistant').getUserSessionHistory(businessId, userId, limit);
+  }
+
+  /**
+   * Obține o sesiune specifică după ID
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object|null>} Sesiunea sau null
+   */
+  async getAIAssistantSessionById(sessionId) {
+    return await this.repositories.get('aiAssistant').getSessionById(sessionId);
+  }
+
+  /**
+   * Încarcă o sesiune specifică și mesajele sale
+   * @param {string} sessionId - ID-ul sesiunii
+   * @returns {Promise<Object>} Sesiunea cu mesajele sale
+   */
+  async loadAIAssistantSession(sessionId) {
+    return await this.repositories.get('aiAssistant').loadSession(sessionId);
+  }
+
 }
 
 // Export singleton instance

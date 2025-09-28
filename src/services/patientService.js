@@ -1,4 +1,5 @@
 import { dataFacade } from '../data/DataFacade.js'
+import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js'
 import patientManager from '../business/patientManager.js'
@@ -6,21 +7,21 @@ import patientManager from '../business/patientManager.js'
 
 class PatientService {
   constructor() {
-    this.repository = new DraftAwareResourceRepository('patients', 'patients')
+    this.repository = new DraftAwareResourceRepository('patients', 'patient')
     this.dataFacade = dataFacade
+    this.socketFacade = socketFacade
   }
 
   // Obține pacienții cu parametri de filtrare
   async getPatients(params = {}) {
     try {
-      const patients = await this.dataFacade.getAll('patients', params)
+      const patients = await this.dataFacade.getAll('patient', params)
       
       // Transformăm fiecare pacient pentru UI
       return patients.map(patient => 
         patientManager.transformPatientForUI(patient)
       )
     } catch (error) {
-      console.error('Error getting patients:', error)
       return []
     }
   }
@@ -42,6 +43,7 @@ class PatientService {
     try {
       // Folosește ResourceSearchRepository pentru căutare eficientă
       const patients = await resourceSearchRepository.searchWithFallback(
+        'patient',
         'patientName',
         searchTerm,
         limit,
@@ -63,7 +65,6 @@ class PatientService {
         patientManager.transformPatientForUI(patient)
       );
     } catch (error) {
-      console.error('Error searching patients by name:', error);
       return [];
     }
   }
@@ -83,7 +84,7 @@ class PatientService {
     // Transformare pentru API
     const transformedData = patientManager.transformPatientForAPI(patientData)
     
-    return await this.dataFacade.create('patients', transformedData)
+    return await this.dataFacade.create('patient', transformedData)
   }
 
   // Actualizează un pacient existent
@@ -94,12 +95,12 @@ class PatientService {
     // Transformare pentru API
     const transformedData = patientManager.transformPatientForAPI(patientData)
     
-    return await this.dataFacade.update('patients', id, transformedData)
+    return await this.dataFacade.update('patient', id, transformedData)
   }
 
   // Șterge un pacient
   async deletePatient(id) {
-    return await this.dataFacade.delete('patients', id)
+    return await this.dataFacade.delete('patient', id)
   }
 
   // Obține statistici despre pacienți
@@ -121,7 +122,6 @@ class PatientService {
       
       return stats
     } catch (error) {
-      console.error('Error getting patient stats:', error)
       return {
         total: 0,
         active: 0,
@@ -137,7 +137,6 @@ class PatientService {
       const patients = await this.getPatients({ limit: 10000 })
       return patientManager.exportPatients(patients, format)
     } catch (error) {
-      console.error('Error exporting patients:', error)
       throw new Error('Eroare la exportul pacienților')
     }
   }
@@ -159,7 +158,7 @@ class PatientService {
     // Transformare pentru API
     const transformedData = patientManager.transformPatientForAPI(patientData)
     
-    return await this.dataFacade.createDraft('patients', transformedData, sessionId)
+    return await this.dataFacade.createDraft('patient', transformedData, sessionId)
   }
 
   /**
@@ -205,7 +204,7 @@ class PatientService {
     if (sessionId) {
       return await this.dataFacade.getDraftsBySession(sessionId)
     }
-    return await this.dataFacade.getDraftsByResourceType('patients')
+    return await this.dataFacade.getDraftsByResourceType('patient')
   }
 
   /**
@@ -222,7 +221,6 @@ class PatientService {
         patientManager.transformPatientForUI(patient)
       )
     } catch (error) {
-      console.error('Error getting patients with drafts:', error)
       return []
     }
   }
@@ -265,7 +263,6 @@ class PatientService {
         patientManager.transformPatientForUI(patient)
       )
     } catch (error) {
-      console.error('Error getting patients for session:', error)
       return []
     }
   }

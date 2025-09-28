@@ -98,7 +98,7 @@ export class HealthClient {
    * @returns {string} Endpoint-ul pentru health check
    */
   buildHealthEndpoint() {
-    return `${this.baseUrl}/api/health`;
+    return `${this.baseUrl}/health`;
   }
 
   /**

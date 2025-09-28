@@ -1,4 +1,5 @@
 import { dataFacade } from '../data/DataFacade.js';
+import { socketFacade } from '../data/SocketFacade.js';
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js';
 import { productManager } from '../business/productManager.js';
 
@@ -6,19 +7,19 @@ import { productManager } from '../business/productManager.js';
 // Serviciu pentru produse
 class ProductService {
   constructor() {
-    this.repository = new DraftAwareResourceRepository('products', 'products');
+    this.repository = new DraftAwareResourceRepository('products', 'product');
     this.dataFacade = dataFacade;
+    this.socketFacade = socketFacade;
   }
 
   // Încarcă toate produsele
   async loadProducts(filters = {}) {
     try {
-      const products = await this.dataFacade.getAll('products', filters);
+      const products = await this.dataFacade.getAll('product', filters);
       
       // Transformă datele pentru UI
       return products.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading products:', error);
       return [];
     }
   }
@@ -26,11 +27,10 @@ class ProductService {
   // Încarcă produsele după categorie
   async loadProductsByCategory(category) {
     try {
-      const products = await this.dataFacade.getAll('products', { category });
+      const products = await this.dataFacade.getAll('product', { category });
       
       return products.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading products by category:', error);
       return [];
     }
   }
@@ -38,11 +38,10 @@ class ProductService {
   // Încarcă produsele cu stoc scăzut
   async loadLowStockProducts() {
     try {
-      const products = await this.dataFacade.getAll('products', { lowStock: true });
+      const products = await this.dataFacade.getAll('product', { lowStock: true });
       
       return products.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error loading low stock products:', error);
       return [];
     }
   }
@@ -85,7 +84,6 @@ class ProductService {
         productManager.transformForUI(product)
       );
     } catch (error) {
-      console.error('Error searching products by name:', error);
       // Fallback to old method if resource query fails
       try {
         const command = new GetCommand(this.repository, { search: searchTerm });
@@ -96,7 +94,6 @@ class ProductService {
         
         return productsArray.map(product => productManager.transformForUI(product));
       } catch (fallbackError) {
-        console.error('Fallback search also failed:', fallbackError);
         return [];
       }
     }
@@ -114,11 +111,10 @@ class ProductService {
       // Transformă datele pentru API
       const transformedData = productManager.transformForAPI(productData);
       
-      const result = await this.dataFacade.create('products', transformedData);
+      const result = await this.dataFacade.create('product', transformedData);
       
       return productManager.transformForUI(result);
     } catch (error) {
-      console.error('Error adding product:', error);
       throw error;
     }
   }
@@ -135,11 +131,10 @@ class ProductService {
       // Transformă datele pentru API
       const transformedData = productManager.transformForAPI(productData);
       
-      const result = await this.dataFacade.update('products', id, transformedData);
+      const result = await this.dataFacade.update('product', id, transformedData);
       
       return productManager.transformForUI(result);
     } catch (error) {
-      console.error('Error updating product:', error);
       throw error;
     }
   }
@@ -147,11 +142,10 @@ class ProductService {
   // Șterge un produs
   async deleteProduct(id) {
     try {
-      await this.dataFacade.delete('products', id);
+      await this.dataFacade.delete('product', id);
       
       return { success: true };
     } catch (error) {
-      console.error('Error deleting product:', error);
       throw error;
     }
   }
@@ -162,7 +156,6 @@ class ProductService {
       const products = await this.loadProducts();
       return productManager.calculateStats(products);
     } catch (error) {
-      console.error('Error getting product stats:', error);
       throw error;
     }
   }
@@ -173,7 +166,6 @@ class ProductService {
       const products = await this.loadProducts();
       return productManager.exportData(products, format);
     } catch (error) {
-      console.error('Error exporting products:', error);
       throw error;
     }
   }
@@ -198,7 +190,7 @@ class ProductService {
     // Transformă datele pentru API
     const transformedData = productManager.transformForAPI(productData);
     
-    return await this.dataFacade.createDraft('products', transformedData, sessionId);
+    return await this.dataFacade.createDraft('product', transformedData, sessionId);
   }
 
   /**
@@ -247,7 +239,7 @@ class ProductService {
     if (sessionId) {
       return await this.dataFacade.getDraftsBySession(sessionId);
     }
-    return await this.dataFacade.getDraftsByResourceType('products');
+    return await this.dataFacade.getDraftsByResourceType('product');
   }
 
   /**
@@ -261,7 +253,6 @@ class ProductService {
       
       return products.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error getting products with drafts:', error);
       return [];
     }
   }
@@ -301,7 +292,6 @@ class ProductService {
       
       return products.map(product => productManager.transformForUI(product));
     } catch (error) {
-      console.error('Error getting products for session:', error);
       return [];
     }
   }

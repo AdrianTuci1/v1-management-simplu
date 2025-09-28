@@ -1,22 +1,23 @@
 import { dataFacade } from '../data/DataFacade.js'
+import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { permissionManager } from '../business/permissionManager.js'
 
 class PermissionService {
   constructor() {
-    this.repository = new DraftAwareResourceRepository('permissions', 'permissions')
+    this.repository = new DraftAwareResourceRepository('permissions', 'permission')
     this.dataFacade = dataFacade
+    this.socketFacade = socketFacade
   }
 
   // Obține toate permisiunile
   async getPermissions(filters = {}) {
     try {
-      const permissions = await this.dataFacade.getAll('permissions', filters)
+      const permissions = await this.dataFacade.getAll('permission', filters)
       
       // Transformă datele pentru UI
       return permissions.map(permission => permissionManager.transformPermissionForUI(permission));
     } catch (error) {
-      console.error('Error getting permissions:', error)
       return []
     }
   }
@@ -33,11 +34,10 @@ class PermissionService {
       // Transformare pentru API
       const apiData = permissionManager.transformPermissionForAPI(permissionData)
       
-      const result = await this.dataFacade.create('permissions', apiData)
+      const result = await this.dataFacade.create('permission', apiData)
       
       return permissionManager.transformPermissionForUI(result)
     } catch (error) {
-      console.error('Error adding permission:', error)
       throw error
     }
   }
@@ -54,11 +54,10 @@ class PermissionService {
       // Transformare pentru API
       const apiData = permissionManager.transformPermissionForAPI(permissionData)
       
-      const result = await this.dataFacade.update('permissions', id, apiData)
+      const result = await this.dataFacade.update('permission', id, apiData)
       
       return permissionManager.transformPermissionForUI(result)
     } catch (error) {
-      console.error('Error updating permission:', error)
       throw error
     }
   }
@@ -66,10 +65,9 @@ class PermissionService {
   // Șterge o permisiune
   async deletePermission(id) {
     try {
-      await this.dataFacade.delete('permissions', id)
+      await this.dataFacade.delete('permission', id)
       return true
     } catch (error) {
-      console.error('Error deleting permission:', error)
       throw error
     }
   }
@@ -85,7 +83,6 @@ class PermissionService {
       const permissions = await this.invoker.run(command)
       return permissions.map(permission => permissionManager.transformPermissionForUI(permission))
     } catch (error) {
-      console.error('Error searching permissions:', error)
       throw error
     }
   }
@@ -96,7 +93,6 @@ class PermissionService {
       const permissions = await this.getPermissions()
       return permissionManager.getPermissionStats(permissions)
     } catch (error) {
-      console.error('Error getting permission stats:', error)
       throw error
     }
   }
@@ -107,7 +103,6 @@ class PermissionService {
       const permissions = await this.getPermissions()
       return permissionManager.exportPermissions(permissions, format)
     } catch (error) {
-      console.error('Error exporting permissions:', error)
       throw error
     }
   }
@@ -122,7 +117,6 @@ class PermissionService {
       }
       return null
     } catch (error) {
-      console.error('Error getting permission by ID:', error)
       throw error
     }
   }
@@ -134,7 +128,6 @@ class PermissionService {
       const permissions = await this.invoker.run(command)
       return permissions.map(permission => permissionManager.transformPermissionForUI(permission))
     } catch (error) {
-      console.error('Error getting permissions by resource:', error)
       throw error
     }
   }
@@ -146,7 +139,6 @@ class PermissionService {
       const permissions = await this.invoker.run(command)
       return permissions.map(permission => permissionManager.transformPermissionForUI(permission))
     } catch (error) {
-      console.error('Error getting permissions by action:', error)
       throw error
     }
   }
@@ -157,7 +149,6 @@ class PermissionService {
       const permissions = await this.getPermissions()
       return permissionManager.getAvailableResources(permissions)
     } catch (error) {
-      console.error('Error getting available resources:', error)
       throw error
     }
   }
@@ -168,7 +159,6 @@ class PermissionService {
       const permissions = await this.getPermissions()
       return permissionManager.getAvailableActions(permissions)
     } catch (error) {
-      console.error('Error getting available actions:', error)
       throw error
     }
   }
@@ -178,7 +168,6 @@ class PermissionService {
     try {
       return permissionManager.hasPermission(userPermissions, resource, action)
     } catch (error) {
-      console.error('Error checking permission:', error)
       throw error
     }
   }
@@ -188,7 +177,6 @@ class PermissionService {
     try {
       return permissionManager.getPermissionsForResource(permissions, resource)
     } catch (error) {
-      console.error('Error getting permissions for resource:', error)
       throw error
     }
   }

@@ -1,5 +1,7 @@
 import { getConfig } from '../config/aiAssistantConfig';
 import { aiApiRequest } from '../data/infrastructure/apiClient.js';
+import { dataFacade } from '../data/DataFacade.js';
+import { socketFacade } from '../data/SocketFacade.js';
 
 // Logger utility
 class Logger {
@@ -52,31 +54,62 @@ export class AIAssistantService {
     this.onSessionChange = null;
     this.onError = null;
     
+    // DataFacade and SocketFacade integration
+    this.dataFacade = dataFacade;
+    this.socketFacade = socketFacade;
+    
     Logger.log('info', 'AI Assistant Service initialized', { businessId, userId, locationId });
   }
 
   // Generate session ID for daily sessions
   generateSessionId() {
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    return `${this.businessId}:${this.userId}:${startOfDay.getTime()}`;
+    return this.dataFacade.generateAIAssistantSessionId(this.businessId, this.userId);
   }
 
   // Load today's session
   async loadTodaySession() {
     try {
-      const sessionId = this.generateSessionId();
-      this.currentSessionId = sessionId;
+      Logger.log('info', 'Loading today session');
       
-      Logger.log('info', 'Loading today session', { sessionId });
+      // First, try to get active session for user
+      const activeSession = await this.dataFacade.getActiveAIAssistantSessionForUser(this.businessId, this.userId);
       
-      // Load message history
-      await this.loadMessageHistory(sessionId);
-      
-      // Notify session change
-      this.onSessionChange?.(sessionId);
-      
-      return sessionId;
+      if (activeSession) {
+        // Use existing active session
+        this.currentSessionId = activeSession.sessionId;
+        Logger.log('info', 'Found active session', { sessionId: this.currentSessionId });
+        
+        // Load message history for existing session
+        await this.loadMessageHistory(this.currentSessionId);
+        
+        // Send session loaded event via SocketFacade
+        this.socketFacade.sendAIAssistantSessionLoaded(this.businessId, this.userId, this.currentSessionId, this.locationId);
+        
+        // Notify session change
+        this.onSessionChange?.(this.currentSessionId);
+        
+        return this.currentSessionId;
+      } else {
+        // No active session found, create new one
+        const sessionId = this.generateSessionId();
+        this.currentSessionId = sessionId;
+        
+        Logger.log('info', 'Creating new session', { sessionId });
+        
+        // Load session using DataFacade
+        const session = await this.dataFacade.loadTodayAIAssistantSession(this.businessId, this.userId, this.locationId);
+        
+        // Load message history
+        await this.loadMessageHistory(sessionId);
+        
+        // Send session loaded event via SocketFacade
+        this.socketFacade.sendAIAssistantSessionLoaded(this.businessId, this.userId, sessionId, this.locationId);
+        
+        // Notify session change
+        this.onSessionChange?.(sessionId);
+        
+        return sessionId;
+      }
     } catch (error) {
       Logger.log('error', 'Failed to load today session', error);
       this.onError?.(getConfig('ERRORS.SESSION_LOAD_FAILED'), error);
@@ -148,41 +181,17 @@ export class AIAssistantService {
     }
 
     try {
-      // In demo mode, return mock response
-      if (this.isDemoMode) {
-        const mockResponse = {
-          message: "Aceasta este o răspuns demo de la AI Assistant. În modul demo, toate funcționalitățile AI sunt simulate.",
-          timestamp: new Date().toISOString(),
-          sessionId: this.currentSessionId
-        };
-        
-        // Simulate async response
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({
-              status: 'success',
-              data: mockResponse
-            });
-          }, 1000);
-        });
-      }
+      Logger.log('debug', 'Sending message via DataFacade', { content, context });
 
-      const messageData = {
-        businessId: this.businessId,
-        locationId: this.locationId,
-        userId: this.userId,
-        message: content.trim(),
-        sessionId: this.currentSessionId,
-        timestamp: new Date().toISOString(),
-        context: context
-      };
-
-      Logger.log('debug', 'Sending message', messageData);
-
-      const result = await aiApiRequest(getConfig('API_ENDPOINTS.MESSAGES'), {
-        method: 'POST',
-        body: JSON.stringify(messageData),
-      });
+      // Use DataFacade to send message
+      const result = await this.dataFacade.sendAIAssistantRepositoryMessage(
+        this.currentSessionId,
+        content,
+        context,
+        this.businessId,
+        this.userId,
+        this.locationId
+      );
       
       if (result.status === 'success') {
         Logger.log('info', 'Message sent successfully', result);
@@ -215,33 +224,71 @@ export class AIAssistantService {
 
   // Get active sessions for business
   async getActiveSessions() {
-    // In demo mode, return mock data
-    if (this.isDemoMode) {
-      return {
-        activeSessions: [
-          {
-            sessionId: 'demo-session-1',
-            businessId: this.businessId,
-            userId: this.userId,
-            startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-            status: 'active'
-          }
-        ]
-      };
-    }
-
     try {
-      const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/active`;
-      const data = await aiApiRequest(endpoint);
-      Logger.log('info', 'Active sessions retrieved', { 
-        businessId: this.businessId, 
-        sessionCount: data.activeSessions?.length || 0 
-      });
-      
-      return data.activeSessions || [];
+      return await this.dataFacade.getActiveAIAssistantSessions(this.businessId);
     } catch (error) {
       Logger.log('error', 'Failed to get active sessions', error);
       this.onError?.('Failed to retrieve active sessions', error);
+      throw error;
+    }
+  }
+
+  // Get active session for current user
+  async getActiveSessionForUser() {
+    try {
+      return await this.dataFacade.getActiveAIAssistantSessionForUser(this.businessId, this.userId);
+    } catch (error) {
+      Logger.log('error', 'Failed to get active session for user', error);
+      this.onError?.('Failed to retrieve active session for user', error);
+      throw error;
+    }
+  }
+
+  // Get user session history
+  async getUserSessionHistory(limit = 20) {
+    try {
+      return await this.dataFacade.getUserAIAssistantSessionHistory(this.businessId, this.userId, limit);
+    } catch (error) {
+      Logger.log('error', 'Failed to get user session history', error);
+      this.onError?.('Failed to retrieve user session history', error);
+      throw error;
+    }
+  }
+
+  // Get session by ID
+  async getSessionById(sessionId) {
+    try {
+      return await this.dataFacade.getAIAssistantSessionById(sessionId);
+    } catch (error) {
+      Logger.log('error', 'Failed to get session by ID', error);
+      this.onError?.('Failed to retrieve session', error);
+      throw error;
+    }
+  }
+
+  // Load specific session
+  async loadSession(sessionId) {
+    try {
+      const sessionData = await this.dataFacade.loadAIAssistantSession(sessionId);
+      
+      if (sessionData) {
+        this.currentSessionId = sessionId;
+        this.messageHistory = sessionData.messages || [];
+        
+        // Send session loaded event via SocketFacade
+        this.socketFacade.sendAIAssistantSessionLoaded(this.businessId, this.userId, sessionId, this.locationId);
+        
+        // Notify session change
+        this.onSessionChange?.(sessionId);
+        
+        // Notify about loaded messages
+        this.onMessageReceived?.(this.messageHistory);
+      }
+      
+      return sessionData;
+    } catch (error) {
+      Logger.log('error', 'Failed to load session', error);
+      this.onError?.('Failed to load session', error);
       throw error;
     }
   }
@@ -254,24 +301,21 @@ export class AIAssistantService {
     }
 
     try {
-      const url = `${getConfig('API_ENDPOINTS.SESSIONS')}/${this.currentSessionId}`;
-      const result = await aiApiRequest(url, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      });
-
-      // aiApiRequest already handles errors
+      const result = await this.dataFacade.closeAIAssistantSession(this.currentSessionId, status);
 
       Logger.log('info', 'Session closed', { 
         sessionId: this.currentSessionId, 
         status 
       });
 
+      // Send session closed event via SocketFacade
+      this.socketFacade.sendAIAssistantSessionClosed(this.currentSessionId, status);
+
       // Clear current session
       this.currentSessionId = null;
       this.onSessionChange?.(null);
       
-      return true;
+      return result;
     } catch (error) {
       Logger.log('error', 'Failed to close session', error);
       this.onError?.('Failed to close session', error);
@@ -281,22 +325,13 @@ export class AIAssistantService {
 
   // Get session statistics
   async getSessionStats() {
-    // In demo mode, return mock data
-    if (this.isDemoMode) {
-      return {
-        totalSessions: 15,
-        activeSessions: 1,
-        messagesToday: 42,
-        averageResponseTime: 1.2
-      };
-    }
-
     try {
-      const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/stats`;
-      const data = await aiApiRequest(endpoint);
-      Logger.log('info', 'Session statistics retrieved', data);
+      const stats = await this.dataFacade.getAIAssistantSessionStats(this.businessId);
       
-      return data;
+      // Send stats event via SocketFacade
+      this.socketFacade.sendAIAssistantStats(this.businessId, stats);
+      
+      return stats;
     } catch (error) {
       Logger.log('error', 'Failed to get session statistics', error);
       this.onError?.('Failed to retrieve session statistics', error);
@@ -310,33 +345,18 @@ export class AIAssistantService {
       throw new Error('No active session');
     }
 
-    // In demo mode, return mock data
-    if (this.isDemoMode) {
-      console.log('Demo mode: Mock message search');
-      return {
-        messages: [
-          {
-            messageId: 'demo-msg-1',
-            content: 'Exemplu de mesaj găsit în căutare',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString()
-          }
-        ],
-        totalFound: 1
-      };
-    }
-
     try {
-      const url = new URL(`${getConfig('API_ENDPOINTS.SESSIONS')}/${this.currentSessionId}/search`);
-      url.searchParams.append('q', query);
-      url.searchParams.append('limit', limit);
+      const results = await this.dataFacade.searchAIAssistantMessages(this.currentSessionId, query, limit);
       
-      const data = await aiApiRequest(url.toString());
-      Logger.log('info', 'Message search completed', { 
+      // Send search event via SocketFacade
+      this.socketFacade.sendAIAssistantMessageSearch(
+        this.currentSessionId, 
         query, 
-        resultCount: data.messages?.length || 0 
-      });
+        limit, 
+        results?.length || 0
+      );
       
-      return data.messages || [];
+      return results;
     } catch (error) {
       Logger.log('error', 'Failed to search messages', error);
       this.onError?.('Failed to search messages', error);
@@ -351,17 +371,16 @@ export class AIAssistantService {
     }
 
     try {
-      const url = new URL(`${getConfig('API_ENDPOINTS.SESSIONS')}/${this.currentSessionId}/export`);
-      url.searchParams.append('format', format);
+      const exportData = await this.dataFacade.exportAIAssistantSession(this.currentSessionId, format);
       
-      const data = await aiApiRequest(url.toString());
+      // Send export event via SocketFacade
+      this.socketFacade.sendAIAssistantSessionExport(
+        this.currentSessionId, 
+        format, 
+        exportData?.length || 0
+      );
       
-      if (format === 'json') {
-        return data;
-      } else {
-        // For non-JSON formats, return the data as is
-        return data;
-      }
+      return exportData;
     } catch (error) {
       Logger.log('error', 'Failed to export session', error);
       this.onError?.('Failed to export session', error);

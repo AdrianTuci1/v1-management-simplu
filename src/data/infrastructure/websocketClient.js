@@ -31,6 +31,8 @@ function createWorker() {
         const { resolve, reject } = pendingMessages.get(id);
         pendingMessages.delete(id);
         
+        console.debug('Worker message response:', { id, type, data });
+        
         if (type === 'error') {
           reject(new Error(data));
         } else {
@@ -93,6 +95,11 @@ function createWorker() {
           console[logLevel](`[WebSocket Worker] ${data.msg}`, data);
           break;
           
+        case 'agent_request':
+          // Handle requests from AI Agent
+          handleAgentRequest(data);
+          break;
+          
         default:
           break;
       }
@@ -117,19 +124,22 @@ function sendToWorker(type, data) {
     const id = messageId++;
     pendingMessages.set(id, { resolve, reject });
     
+    console.debug('Sending message to worker:', { id, type, data });
+    
     worker.postMessage({
       id,
       type,
       data
     });
     
-    // Timeout for pending messages
+    // Timeout for pending messages - increased timeout for AI Assistant operations
     setTimeout(() => {
       if (pendingMessages.has(id)) {
         pendingMessages.delete(id);
-        reject(new Error('Worker message timeout'));
+        console.warn('Worker message timeout for type:', type, 'id:', id);
+        reject(new Error(`Worker message timeout after 10 seconds for operation: ${type}`));
       }
-    }, 5000);
+    }, 10000);
   });
 }
 
@@ -220,6 +230,59 @@ export function reconnectWithNewContext() {
         sendToWorker('connect', { url: worker.url, channelName });
       }
     }, 100);
+  }
+}
+
+// Handle requests from AI Agent
+async function handleAgentRequest(data) {
+  try {
+    const { type, payload } = data;
+    
+    // Lazy import DataFacade to avoid circular dependencies
+    const { dataFacade } = await import('../DataFacade.js');
+    
+    switch (type) {
+      case 'agent_resource_query':
+        await dataFacade.handleAgentResourceQuery(payload);
+        break;
+        
+      case 'agent_draft_creation':
+        await dataFacade.handleAgentDraftCreation(payload);
+        break;
+        
+      case 'agent_draft_update':
+        await dataFacade.handleAgentDraftUpdate(payload);
+        break;
+        
+      case 'agent_draft_commit':
+        await dataFacade.handleAgentDraftCommit(payload);
+        break;
+        
+      case 'agent_draft_cancel':
+        await dataFacade.handleAgentDraftCancel(payload);
+        break;
+        
+      case 'agent_draft_list':
+        await dataFacade.handleAgentDraftList(payload);
+        break;
+        
+      default:
+        console.warn('Unknown agent request type:', type);
+    }
+  } catch (error) {
+    console.error('Error handling agent request:', error);
+    
+    // Send error response back to agent
+    try {
+      const { dataFacade } = await import('../DataFacade.js');
+      dataFacade.sendWebSocketMessage('agent_request_error', {
+        type: data.type,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    } catch (importError) {
+      console.error('Failed to import DataFacade for error response:', importError);
+    }
   }
 }
 

@@ -130,25 +130,25 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     setIsLoading(true);
     setError(null);
 
-    try {
-      // Create user message with unique ID
-      const messageId = `user_${Date.now()}`;
-      const userMessage = {
-        messageId: messageId,
-        sessionId: currentSessionId,
-        businessId: finalBusinessId,
-        userId: finalUserId,
-        content: content.trim(),
-        type: 'user',
-        timestamp: new Date().toISOString(),
-        metadata: { source: 'api' }
-      };
+    // Create user message with unique ID - declare outside try block so it's accessible in catch
+    const messageId = `user_${Date.now()}`;
+    const userMessage = {
+      messageId: messageId,
+      sessionId: currentSessionId,
+      businessId: finalBusinessId,
+      userId: finalUserId,
+      content: content.trim(),
+      type: 'user',
+      timestamp: new Date().toISOString(),
+      metadata: { source: 'api' }
+    };
 
+    try {
       // Add user message to UI immediately
       setMessages(prev => [...prev, userMessage]);
 
       // Try WebSocket first (if not in demo mode), fallback to API
-      if (!isDemoMode && webSocketRef.current?.isConnected) {
+      if (!isDemoMode && webSocketRef.current && webSocketRef.current.isConnected) {
         await webSocketRef.current.sendMessage(content.trim(), context);
       } else if (aiServiceRef.current) {
         await aiServiceRef.current.sendMessage(content.trim(), context);
@@ -242,6 +242,69 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     }
   }, []);
 
+  // Get active session for current user
+  const getActiveSessionForUser = useCallback(async () => {
+    if (!aiServiceRef.current) {
+      throw new Error('AI Service not initialized');
+    }
+
+    try {
+      return await aiServiceRef.current.getActiveSessionForUser();
+    } catch (error) {
+      setError({ message: 'Failed to get active session for user', error });
+      throw error;
+    }
+  }, []);
+
+  // Get user session history
+  const getUserSessionHistory = useCallback(async (limit = 20) => {
+    if (!aiServiceRef.current) {
+      throw new Error('AI Service not initialized');
+    }
+
+    try {
+      return await aiServiceRef.current.getUserSessionHistory(limit);
+    } catch (error) {
+      setError({ message: 'Failed to get user session history', error });
+      throw error;
+    }
+  }, []);
+
+  // Get session by ID
+  const getSessionById = useCallback(async (sessionId) => {
+    if (!aiServiceRef.current) {
+      throw new Error('AI Service not initialized');
+    }
+
+    try {
+      return await aiServiceRef.current.getSessionById(sessionId);
+    } catch (error) {
+      setError({ message: 'Failed to get session by ID', error });
+      throw error;
+    }
+  }, []);
+
+  // Load specific session
+  const loadSession = useCallback(async (sessionId) => {
+    if (!aiServiceRef.current) {
+      throw new Error('AI Service not initialized');
+    }
+
+    try {
+      const sessionData = await aiServiceRef.current.loadSession(sessionId);
+      
+      if (sessionData) {
+        setCurrentSessionId(sessionId);
+        setMessages(sessionData.messages || []);
+      }
+      
+      return sessionData;
+    } catch (error) {
+      setError({ message: 'Failed to load session', error });
+      throw error;
+    }
+  }, []);
+
   // Clear error
   const clearError = useCallback(() => {
     setError(null);
@@ -291,6 +354,10 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     closeSession,
     getSessionStats,
     getActiveSessions,
+    getActiveSessionForUser,
+    getUserSessionHistory,
+    getSessionById,
+    loadSession,
     clearError,
     reconnect,
     
@@ -357,56 +424,123 @@ export const useAIAssistantConfig = () => {
 };
 
 // Hook for managing AI Assistant sessions
-export const useAIAssistantSessions = (businessId = null) => {
+export const useAIAssistantSessions = (businessId = null, userId = null) => {
   const [sessions, setSessions] = useState([]);
+  const [sessionHistory, setSessionHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const loadSessions = useCallback(async () => {
+  const loadActiveSessions = useCallback(async () => {
     if (!businessId) return;
     
     setIsLoading(true);
     setError(null);
     
     try {
-      const aiService = createAIAssistantService(businessId);
+      const aiService = createAIAssistantService(businessId, userId);
       const activeSessions = await aiService.getActiveSessions();
       setSessions(activeSessions);
       aiService.dispose();
     } catch (error) {
-      setError({ message: 'Failed to load sessions', error });
+      setError({ message: 'Failed to load active sessions', error });
     } finally {
       setIsLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, userId]);
+
+  const loadSessionHistory = useCallback(async (limit = 20) => {
+    if (!businessId || !userId) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const aiService = createAIAssistantService(businessId, userId);
+      const history = await aiService.getUserSessionHistory(limit);
+      setSessionHistory(history.sessions || []);
+      aiService.dispose();
+      
+      return history;
+    } catch (error) {
+      setError({ message: 'Failed to load session history', error });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [businessId, userId]);
+
+  const getActiveSessionForUser = useCallback(async () => {
+    if (!businessId || !userId) return null;
+    
+    try {
+      const aiService = createAIAssistantService(businessId, userId);
+      const activeSession = await aiService.getActiveSessionForUser();
+      aiService.dispose();
+      
+      return activeSession;
+    } catch (error) {
+      setError({ message: 'Failed to get active session for user', error });
+      throw error;
+    }
+  }, [businessId, userId]);
+
+  const loadSession = useCallback(async (sessionId) => {
+    if (!businessId || !userId) return null;
+    
+    try {
+      const aiService = createAIAssistantService(businessId, userId);
+      const sessionData = await aiService.loadSession(sessionId);
+      aiService.dispose();
+      
+      return sessionData;
+    } catch (error) {
+      setError({ message: 'Failed to load session', error });
+      throw error;
+    }
+  }, [businessId, userId]);
 
   const closeSession = useCallback(async (sessionId, status = 'resolved') => {
     if (!businessId) return;
     
     try {
-      const aiService = createAIAssistantService(businessId);
+      const aiService = createAIAssistantService(businessId, userId);
       await aiService.closeSession(status);
       aiService.dispose();
       
       // Remove from local state
       setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
+      setSessionHistory(prev => prev.filter(s => s.sessionId !== sessionId));
       
       return true;
     } catch (error) {
       setError({ message: 'Failed to close session', error });
       throw error;
     }
-  }, [businessId]);
+  }, [businessId, userId]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+    if (businessId) {
+      loadActiveSessions();
+    }
+  }, [loadActiveSessions]);
 
   return {
+    // State
     sessions,
+    sessionHistory,
     isLoading,
     error,
-    loadSessions,
-    closeSession
+    
+    // Actions
+    loadActiveSessions,
+    loadSessionHistory,
+    getActiveSessionForUser,
+    loadSession,
+    closeSession,
+    clearError
   };
 };

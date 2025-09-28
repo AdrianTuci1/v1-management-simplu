@@ -1,4 +1,6 @@
 import { getConfig } from '../config/aiAssistantConfig';
+import { dataFacade } from '../data/DataFacade.js';
+import { socketFacade } from '../data/SocketFacade.js';
 
 // Logger utility
 class Logger {
@@ -56,14 +58,45 @@ export class AIWebSocketService {
     this.onError = null;
     this.onReconnect = null;
     
+    // DataFacade and SocketFacade integration
+    this.dataFacade = dataFacade;
+    this.socketFacade = socketFacade;
+    this.aiAssistantInstance = null;
+    
     Logger.log('info', 'AI WebSocket Service initialized', { businessId, userId, locationId });
   }
 
   // Connect to WebSocket server
   async connect() {
     try {
-      Logger.log('info', 'Connecting to WebSocket server...');
-      await this.connectWithWorker();
+      Logger.log('info', 'Connecting to WebSocket server via SocketFacade...');
+      
+      // Connect using SocketFacade
+      const result = await this.socketFacade.connectAIAssistant(this.businessId, this.userId, this.locationId);
+      
+      // Get AI Assistant instance from SocketFacade
+      this.aiAssistantInstance = this.socketFacade.createAIAssistant(this.businessId, this.userId, this.locationId);
+      
+      // Set up event handlers
+      this.aiAssistantInstance.onMessageReceived = (messages) => {
+        this.onMessageReceived?.(messages);
+      };
+      
+      this.aiAssistantInstance.onConnectionChange = (isConnected) => {
+        this.isConnected = isConnected;
+        this.onConnectionChange?.(isConnected);
+      };
+      
+      this.aiAssistantInstance.onError = (error, details) => {
+        this.onError?.(error, details);
+      };
+      
+      this.aiAssistantInstance.onSessionUpdate = (payload) => {
+        this.onSessionUpdate?.(payload);
+      };
+      
+      this.isConnected = result.success;
+      Logger.log('info', 'Connected to WebSocket server via SocketFacade', result);
     } catch (error) {
       Logger.log('error', 'Failed to connect to WebSocket server', error);
       this.onError?.(getConfig('ERRORS.CONNECTION_FAILED'), error);
@@ -351,33 +384,24 @@ export class AIWebSocketService {
   }
 
   // Send message via WebSocket
-  sendMessage(content, context = {}) {
-    if (!this.isConnected || !this.worker) {
+  async sendMessage(content, context = {}) {
+    if (!this.isConnected || !this.aiAssistantInstance) {
       throw new Error('WebSocket not connected');
     }
 
     try {
-      const message = {
-        businessId: this.businessId,
-        locationId: this.locationId,
-        userId: this.userId,
-        message: content,
-        sessionId: this.currentSessionId,
-        timestamp: new Date().toISOString(),
-        context: context
-      };
+      // Use SocketFacade to send message
+      const result = await this.socketFacade.sendAIAssistantMessage(
+        this.businessId,
+        this.userId,
+        content,
+        context,
+        this.locationId
+      );
 
-      this.worker.postMessage({
-        type: 'send',
-        data: {
-          event: 'send_message',
-          payload: message
-        }
-      });
-
-      Logger.log('debug', 'Message sent via WebSocket', message);
+      Logger.log('debug', 'Message sent via SocketFacade WebSocket', { content, context });
       
-      return true;
+      return result.success;
     } catch (error) {
       Logger.log('error', 'Failed to send message via WebSocket', error);
       throw error;
@@ -389,47 +413,51 @@ export class AIWebSocketService {
   // Set current session ID
   setCurrentSessionId(sessionId) {
     this.currentSessionId = sessionId;
+    
+    // Also set session ID in the AI Assistant instance
+    if (this.aiAssistantInstance) {
+      this.aiAssistantInstance.setCurrentSessionId(sessionId);
+    }
+    
     Logger.log('debug', 'Session ID set for WebSocket service', sessionId);
   }
 
   // Disconnect from WebSocket
-  disconnect() {
-    Logger.log('info', 'Disconnecting from WebSocket server...');
+  async disconnect() {
+    Logger.log('info', 'Disconnecting from WebSocket server via SocketFacade...');
     
-    // Stop heartbeat
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
+    try {
+      // Use SocketFacade to disconnect
+      await this.socketFacade.disconnectAIAssistant(this.businessId, this.userId, this.locationId);
+      
+      // Clear local instance
+      if (this.aiAssistantInstance) {
+        this.aiAssistantInstance.disconnect();
+        this.aiAssistantInstance = null;
+      }
+      
+      this.isConnected = false;
+      this.onConnectionChange?.(false);
+      
+      Logger.log('info', 'WebSocket disconnected via SocketFacade');
+    } catch (error) {
+      Logger.log('error', 'Error during disconnect:', error);
+      // Still set disconnected state even if error occurs
+      this.isConnected = false;
+      this.onConnectionChange?.(false);
     }
-    
-    // Disconnect worker
-    if (this.worker) {
-      this.worker.postMessage({ type: 'disconnect' });
-      this.worker.terminate();
-      this.worker = null;
-    }
-    
-    this.isConnected = false;
-    this.onConnectionChange?.(false);
-    
-    Logger.log('info', 'WebSocket disconnected');
   }
 
   // Get connection status
   getConnectionStatus() {
-    return {
-      isConnected: this.isConnected,
-      reconnectAttempts: this.reconnectAttempts,
-      maxReconnectAttempts: this.maxReconnectAttempts,
-      hasWorker: !!this.worker
-    };
+    return this.socketFacade.getAIAssistantStatus(this.businessId, this.userId, this.locationId);
   }
 
   // Cleanup and dispose
-  dispose() {
+  async dispose() {
     Logger.log('info', 'AI WebSocket Service disposed');
     
-    this.disconnect();
+    await this.disconnect();
     
     // Clear callbacks
     this.onMessageReceived = null;
@@ -437,6 +465,9 @@ export class AIWebSocketService {
     this.onError = null;
     this.onReconnect = null;
     this.onSessionUpdate = null;
+    
+    // Clear AI Assistant instance
+    this.aiAssistantInstance = null;
   }
 }
 

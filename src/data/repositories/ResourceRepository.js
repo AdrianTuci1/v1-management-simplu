@@ -30,23 +30,44 @@ export class ResourceRepository {
 
   async request(path = "", options = {}) {
     // Verifică dacă sistemul poate face cereri
+    // Permite cererile dacă nu s-a făcut încă health check sau dacă este în demo mode
     const healthStatus = healthRepository.getCurrentStatus();
-    if (!healthStatus.canMakeRequests) {
-      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
-      if (!isDemoMode) {
-        console.warn('System is offline or server is down. Request blocked.');
-        throw new Error('System is offline or server is down');
-      }
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    
+    // Blochează cererile doar dacă:
+    // 1. Nu este în demo mode
+    // 2. Health check-ul a fost executat (lastCheck există)
+    // 3. Și sistemul confirmă că nu poate face cereri
+    if (!isDemoMode && healthStatus.lastCheck && !healthStatus.canMakeRequests) {
+      console.warn('System is offline or server is down. Request blocked.');
+      throw new Error('System is offline or server is down');
     }
 
     try {
       const resourcesEndpoint = buildResourcesEndpoint(path);
-      return await apiRequest(this.resourceType, resourcesEndpoint, options);
+      const response = await apiRequest(this.resourceType, resourcesEndpoint, options);
+      
+      // Dacă cererea a reușit, actualizează starea de sănătate la 'healthy'
+      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+      if (!isDemoMode) {
+        // Notifică health repository că serverul răspunde
+        healthRepository.markServerHealthy();
+      }
+      
+      return response;
     } catch (error) {
       // In demo mode, API calls are expected to fail - don't log as error
       const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
       if (!isDemoMode) {
         console.error('API request failed:', error);
+        // Notifică health repository că serverul nu răspunde
+        healthRepository.markServerUnhealthy(error.message);
+        
+        // Dacă aceasta este prima cerere și a eșuat, blochează cererile ulterioare
+        const healthStatus = healthRepository.getCurrentStatus();
+        if (!healthStatus.lastCheck || healthStatus.lastCheck === null) {
+          console.warn('First API request failed - blocking subsequent requests until server is healthy');
+        }
       }
       throw error;
     }

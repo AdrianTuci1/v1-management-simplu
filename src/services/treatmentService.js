@@ -1,25 +1,26 @@
 import { dataFacade } from '../data/DataFacade.js'
+import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js'
 import treatmentManager from '../business/treatmentManager.js'
 
 class TreatmentService {
   constructor() {
-    this.repository = new DraftAwareResourceRepository('treatments', 'treatments')
+    this.repository = new DraftAwareResourceRepository('treatments', 'treatment')
     this.dataFacade = dataFacade
+    this.socketFacade = socketFacade
   }
 
   // Obține toate tratamentele
   async getTreatments(params = {}) {
     try {
-      const treatments = await this.dataFacade.getAll('treatments', params)
+      const treatments = await this.dataFacade.getAll('treatment', params)
       
       // Transformăm fiecare tratament pentru UI
       return treatments.map(treatment => 
         treatmentManager.transformTreatmentForUI(treatment)
       )
     } catch (error) {
-      console.error('Error getting treatments:', error)
       return []
     }
   }
@@ -46,7 +47,7 @@ class TreatmentService {
     // Transformare pentru API
     const transformedData = treatmentManager.transformTreatmentForAPI(treatmentData)
     
-    return await this.dataFacade.create('treatments', transformedData)
+    return await this.dataFacade.create('treatment', transformedData)
   }
 
   // Actualizează un tratament existent
@@ -57,12 +58,12 @@ class TreatmentService {
     // Transformare pentru API
     const transformedData = treatmentManager.transformTreatmentForAPI(treatmentData)
     
-    return await this.dataFacade.update('treatments', id, transformedData)
+    return await this.dataFacade.update('treatment', id, transformedData)
   }
 
   // Șterge un tratament
   async deleteTreatment(id) {
-    return await this.dataFacade.delete('treatments', id)
+    return await this.dataFacade.delete('treatment', id)
   }
 
   // Obține un tratament după ID
@@ -106,6 +107,7 @@ class TreatmentService {
     try {
       // Folosește ResourceSearchRepository pentru căutare eficientă
       const treatments = await resourceSearchRepository.searchWithFallback(
+        'treatment',
         'treatmentType',
         query,
         limit,
@@ -116,10 +118,9 @@ class TreatmentService {
               search: searchTerm,
               limit: fallbackFilters.limit || limit
             }
-            const treatments = await this.dataFacade.getAll('treatments', searchFilters)
+            const treatments = await this.dataFacade.getAll('treatment', searchFilters)
             return Array.isArray(treatments) ? treatments : []
           } catch (fallbackError) {
-            console.error('Fallback search also failed:', fallbackError)
             return []
           }
         }
@@ -130,7 +131,6 @@ class TreatmentService {
         treatmentManager.transformTreatmentForUI(treatment)
       );
     } catch (error) {
-      console.error('Error searching treatments by name:', error);
       return [];
     }
   }
@@ -152,7 +152,7 @@ class TreatmentService {
     // Transformare pentru API
     const transformedData = treatmentManager.transformTreatmentForAPI(treatmentData)
     
-    return await this.dataFacade.createDraft('treatments', transformedData, sessionId)
+    return await this.dataFacade.createDraft('treatment', transformedData, sessionId)
   }
 
   /**
@@ -198,7 +198,7 @@ class TreatmentService {
     if (sessionId) {
       return await this.dataFacade.getDraftsBySession(sessionId)
     }
-    return await this.dataFacade.getDraftsByResourceType('treatments')
+    return await this.dataFacade.getDraftsByResourceType('treatment')
   }
 
   /**
@@ -214,7 +214,6 @@ class TreatmentService {
         treatmentManager.transformTreatmentForUI(treatment)
       )
     } catch (error) {
-      console.error('Error getting treatments with drafts:', error)
       return []
     }
   }
@@ -256,7 +255,6 @@ class TreatmentService {
         treatmentManager.transformTreatmentForUI(treatment)
       )
     } catch (error) {
-      console.error('Error getting treatments for session:', error)
       return []
     }
   }

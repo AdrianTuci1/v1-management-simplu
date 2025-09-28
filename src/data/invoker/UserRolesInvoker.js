@@ -1,4 +1,5 @@
 import { apiRequest } from '../infrastructure/apiClient.js'
+import { healthRepository } from '../repositories/HealthRepository.js'
 
 class UserRolesInvoker {
   constructor() {
@@ -23,7 +24,16 @@ class UserRolesInvoker {
       const response = await apiRequest('user-roles', url)
       return response
     } catch (error) {
-      console.error('Error fetching user roles:', error)
+      // Nu afișa erori dacă sistemul este offline
+      const healthStatus = healthRepository.getCurrentStatus();
+      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+      
+      if (!isDemoMode && healthStatus.lastCheck && !healthStatus.canMakeRequests) {
+        // Sistemul este offline - nu afișa eroarea
+        console.log('User roles request skipped - system is offline');
+      } else {
+        console.error('Error fetching user roles:', error);
+      }
       throw error
     }
   }

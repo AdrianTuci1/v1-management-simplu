@@ -123,7 +123,7 @@ export const usePatients = () => {
     // Dacă query-ul este gol, încarcă toți pacienții
     if (!query || query.trim().length === 0) {
       try {
-        const data = await patientService.getPatients({ limit })
+        const data = await patientService.getPatients({ limit:'5' })
         sharedPatients = data
         setPatients([...data])
         notifySubscribers()

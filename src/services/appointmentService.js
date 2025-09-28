@@ -1,4 +1,5 @@
 import { dataFacade } from '../data/DataFacade.js'
+import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import appointmentManager from '../business/appointmentManager.js'
 
@@ -7,6 +8,7 @@ class AppointmentService {
   constructor() {
     this.repository = new DraftAwareResourceRepository('appointments', 'appointments')
     this.dataFacade = dataFacade
+    this.socketFacade = socketFacade
   }
 
   // Funcție utilitară pentru formatarea datelor în format yyyy-mm-dd
@@ -20,14 +22,13 @@ class AppointmentService {
   // Obține programările pentru o perioadă specifică
   async getAppointments(params = {}) {
     try {
-      const appointments = await this.dataFacade.getAll('appointments', params)
+      const appointments = await this.dataFacade.getAll('appointment', params)
       
       // Transformăm fiecare programare pentru UI
       return appointments.map(appointment => 
         appointmentManager.transformAppointmentForUI(appointment)
       )
     } catch (error) {
-      console.error('Error getting appointments:', error)
       return []
     }
   }
@@ -103,7 +104,7 @@ class AppointmentService {
       throw new Error('Există o programare conflictuală pentru această dată și oră')
     }
     
-    const result = await this.dataFacade.create('appointments', transformedData)
+    const result = await this.dataFacade.create('appointment', transformedData)
     
     // Transformăm rezultatul pentru UI înainte de returnare
     return appointmentManager.transformAppointmentForUI(result)
@@ -123,7 +124,7 @@ class AppointmentService {
       throw new Error('Există o programare conflictuală pentru această dată și oră')
     }
     
-    const result = await this.dataFacade.update('appointments', id, transformedData)
+    const result = await this.dataFacade.update('appointment', id, transformedData)
     
     // Transformăm rezultatul pentru UI înainte de returnare
     return appointmentManager.transformAppointmentForUI(result)
@@ -131,12 +132,12 @@ class AppointmentService {
 
   // Șterge o programare
   async deleteAppointment(id) {
-    return await this.dataFacade.delete('appointments', id)
+    return await this.dataFacade.delete('appointment', id)
   }
 
   // Obține o programare după ID
   async getAppointmentById(id) {
-    const appointment = await this.dataFacade.getById('appointments', id)
+    const appointment = await this.dataFacade.getById('appointment', id)
     return appointment ? appointmentManager.transformAppointmentForUI(appointment) : null
   }
 
@@ -217,7 +218,6 @@ class AppointmentService {
         appointmentManager.transformAppointmentForUI(appointment)
       );
     } catch (error) {
-      console.error('Error fetching appointments by patient ID:', error);
       return [];
     }
   }
@@ -260,7 +260,6 @@ class AppointmentService {
         appointmentManager.transformAppointmentForUI(appointment)
       );
     } catch (error) {
-      console.error('Error fetching appointments by medic ID:', error);
       return [];
     }
   }
@@ -282,7 +281,23 @@ class AppointmentService {
     // Transformare pentru API
     const transformedData = appointmentManager.transformAppointmentForAPI(appointmentData)
     
-    return await this.dataFacade.createDraft('appointments', transformedData, sessionId)
+    const draft = await this.dataFacade.createDraft('appointment', transformedData, sessionId)
+    
+    // Trimite notificare prin SocketFacade
+    if (sessionId && draft.draftId) {
+      this.socketFacade.sendAgentDraftCreated(
+        sessionId,
+        'appointments',
+        'create',
+        draft.draftId,
+        transformedData,
+        appointmentData.businessId || 'unknown',
+        appointmentData.locationId || 'unknown',
+        appointmentData.userId || 'unknown'
+      )
+    }
+    
+    return draft
   }
 
   /**
@@ -298,7 +313,21 @@ class AppointmentService {
     // Transformare pentru API
     const transformedData = appointmentManager.transformAppointmentForAPI(appointmentData)
     
-    return await this.dataFacade.updateDraft(draftId, transformedData)
+    const result = await this.dataFacade.updateDraft(draftId, transformedData)
+    
+    // Trimite notificare prin SocketFacade
+    if (result && result.sessionId) {
+      this.socketFacade.sendAgentDraftUpdated(
+        result.sessionId,
+        draftId,
+        transformedData,
+        appointmentData.businessId || 'unknown',
+        appointmentData.locationId || 'unknown',
+        appointmentData.userId || 'unknown'
+      )
+    }
+    
+    return result
   }
 
   /**
@@ -307,7 +336,21 @@ class AppointmentService {
    * @returns {Promise<Object>} Rezultatul confirmării
    */
   async commitAppointmentDraft(draftId) {
-    return await this.dataFacade.commitDraft(draftId)
+    const result = await this.dataFacade.commitDraft(draftId)
+    
+    // Trimite notificare prin SocketFacade
+    if (result && result.sessionId) {
+      this.socketFacade.sendAgentDraftCommitted(
+        result.sessionId,
+        draftId,
+        result,
+        result.businessId || 'unknown',
+        result.locationId || 'unknown',
+        result.userId || 'unknown'
+      )
+    }
+    
+    return result
   }
 
   /**
@@ -316,7 +359,21 @@ class AppointmentService {
    * @returns {Promise<Object>} Rezultatul anulării
    */
   async cancelAppointmentDraft(draftId) {
-    return await this.dataFacade.cancelDraft(draftId)
+    const result = await this.dataFacade.cancelDraft(draftId)
+    
+    // Trimite notificare prin SocketFacade
+    if (result && result.sessionId) {
+      this.socketFacade.sendAgentDraftCancelled(
+        result.sessionId,
+        draftId,
+        result,
+        result.businessId || 'unknown',
+        result.locationId || 'unknown',
+        result.userId || 'unknown'
+      )
+    }
+    
+    return result
   }
 
   /**
@@ -325,10 +382,28 @@ class AppointmentService {
    * @returns {Promise<Array>} Lista de draft-uri
    */
   async getAppointmentDrafts(sessionId = null) {
+    let drafts;
+    
     if (sessionId) {
-      return await this.dataFacade.getDraftsBySession(sessionId)
+      drafts = await this.dataFacade.getDraftsBySession(sessionId)
+      
+      // Trimite notificare prin SocketFacade
+      if (drafts && drafts.length > 0) {
+        this.socketFacade.sendAgentDraftsListed(
+          sessionId,
+          'appointments',
+          drafts,
+          drafts.length,
+          'unknown', // businessId - ar trebui să vină din context
+          'unknown', // locationId - ar trebui să vină din context
+          'unknown'  // userId - ar trebui să vină din context
+        )
+      }
+    } else {
+      drafts = await this.dataFacade.getDraftsByResourceType('appointment')
     }
-    return await this.dataFacade.getDraftsByResourceType('appointments')
+    
+    return drafts
   }
 
   /**
@@ -345,7 +420,6 @@ class AppointmentService {
         appointmentManager.transformAppointmentForUI(appointment)
       )
     } catch (error) {
-      console.error('Error getting appointments with drafts:', error)
       return []
     }
   }
@@ -388,7 +462,6 @@ class AppointmentService {
         appointmentManager.transformAppointmentForUI(appointment)
       )
     } catch (error) {
-      console.error('Error getting appointments for session:', error)
       return []
     }
   }

@@ -19,7 +19,7 @@ class HealthMonitor {
       isHealthy: false,
       lastCheck: null,
       consecutiveFailures: 0,
-      canMakeRequests: false
+      canMakeRequests: true // Permite cererile până când nu se confirmă că serverul este offline
     };
     this.checkInterval = 30000; // 30 secunde
     this.maxConsecutiveFailures = 3;

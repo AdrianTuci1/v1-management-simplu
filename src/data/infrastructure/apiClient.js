@@ -1,7 +1,20 @@
 // Simplified API client for unified resources endpoint
+import { healthRepository } from '../repositories/HealthRepository.js';
 
 export async function apiRequest(resourceType, endpoint = "", options = {}) {
+  // Verifică dacă sistemul poate face cereri
+  const healthStatus = healthRepository.getCurrentStatus();
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
   
+  // Blochează cererile doar dacă:
+  // 1. Nu este în demo mode
+  // 2. Health check-ul a fost executat (lastCheck există)
+  // 3. Și sistemul confirmă că nu poate face cereri
+  if (!isDemoMode && healthStatus.lastCheck && !healthStatus.canMakeRequests) {
+    console.warn('System is offline or server is down. Request blocked.');
+    throw new Error('System is offline or server is down');
+  }
+
   const base = import.meta.env.VITE_API_URL || "";
   const url = `${base}${endpoint}`;
 
@@ -39,24 +52,44 @@ export async function apiRequest(resourceType, endpoint = "", options = {}) {
     ...(processedOptions.headers || {}),
   };
 
-  const response = await fetch(url, {
-    ...processedOptions,
-    headers,
-  });
+  try {
+    const response = await fetch(url, {
+      ...processedOptions,
+      headers,
+    });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    const error = new Error(`API error ${response.status}`);
-    error.status = response.status;
-    error.body = text;
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      const error = new Error(`API error ${response.status}`);
+      error.status = response.status;
+      error.body = text;
+      throw error;
+    }
+
+    // Dacă cererea a reușit, actualizează starea de sănătate la 'healthy'
+    if (!isDemoMode) {
+      healthRepository.markServerHealthy();
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      return await response.json();
+    }
+    return await response.text();
+  } catch (error) {
+    // Dacă cererea a eșuat, actualizează starea de sănătate la 'unhealthy'
+    if (!isDemoMode) {
+      console.error('API request failed:', error);
+      healthRepository.markServerUnhealthy(error.message);
+      
+      // Dacă aceasta este prima cerere și a eșuat, blochează cererile ulterioare
+      const healthStatus = healthRepository.getCurrentStatus();
+      if (!healthStatus.lastCheck || healthStatus.lastCheck === null) {
+        console.warn('First API request failed - blocking subsequent requests until server is healthy');
+      }
+    }
     throw error;
   }
-
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    return await response.json();
-  }
-  return await response.text();
 }
 
 export function buildResourcesEndpoint(path = "") {
@@ -66,15 +99,34 @@ export function buildResourcesEndpoint(path = "") {
   if (!businessId || !locationId) {
     throw new Error("Business ID and Location ID must be set before accessing resources.");
   }
-  const basePath = `/api/resources/${businessId}-${locationId}`;
+  const basePath = `/resources/${businessId}-${locationId}`;
   return `${basePath}${path}`;
 }
 
 // Separate API client for AI Assistant endpoints (no data wrapping)
 export async function aiApiRequest(endpoint, options = {}) {
+  // Verifică dacă sistemul poate face cereri
+  const healthStatus = healthRepository.getCurrentStatus();
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
   
-  const base = import.meta.env.VITE_API_URL || "";
-  const url = `${base}${endpoint}`;
+  // Blochează cererile doar dacă:
+  // 1. Nu este în demo mode
+  // 2. Health check-ul a fost executat (lastCheck există)
+  // 3. Și sistemul confirmă că nu poate face cereri
+  if (!isDemoMode && healthStatus.lastCheck && !healthStatus.canMakeRequests) {
+    console.warn('System is offline or server is down. AI API request blocked.');
+    throw new Error('System is offline or server is down');
+  }
+
+  // Check if endpoint is already a full URL (starts with http:// or https://)
+  // If it is, use it as-is. Otherwise, prepend the base URL.
+  let url;
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+    url = endpoint;
+  } else {
+    const base = import.meta.env.VITE_API_URL || "";
+    url = `${base}${endpoint}`;
+  }
 
   // Get auth token
   let authToken = null;
@@ -90,22 +142,42 @@ export async function aiApiRequest(endpoint, options = {}) {
     ...(options.headers || {}),
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    const error = new Error(`API error ${response.status}`);
-    error.status = response.status;
-    error.body = text;
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      const error = new Error(`API error ${response.status}`);
+      error.status = response.status;
+      error.body = text;
+      throw error;
+    }
+
+    // Dacă cererea a reușit, actualizează starea de sănătate la 'healthy'
+    if (!isDemoMode) {
+      healthRepository.markServerHealthy();
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      return await response.json();
+    }
+    return await response.text();
+  } catch (error) {
+    // Dacă cererea a eșuat, actualizează starea de sănătate la 'unhealthy'
+    if (!isDemoMode) {
+      console.error('AI API request failed:', error);
+      healthRepository.markServerUnhealthy(error.message);
+      
+      // Dacă aceasta este prima cerere și a eșuat, blochează cererile ulterioare
+      const healthStatus = healthRepository.getCurrentStatus();
+      if (!healthStatus.lastCheck || healthStatus.lastCheck === null) {
+        console.warn('First AI API request failed - blocking subsequent requests until server is healthy');
+      }
+    }
     throw error;
   }
-
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    return await response.json();
-  }
-  return await response.text();
 }

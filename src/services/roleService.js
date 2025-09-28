@@ -1,4 +1,5 @@
 import { dataFacade } from '../data/DataFacade.js'
+import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { roleManager } from '../business/roleManager.js'
 
@@ -6,12 +7,13 @@ class RoleService {
   constructor() {
     this.repository = new DraftAwareResourceRepository('roles', 'role')
     this.dataFacade = dataFacade
+    this.socketFacade = socketFacade
   }
 
   // Obține toate rolurile
   async getRoles(filters = {}) {
     try {
-      const roles = await this.dataFacade.getAll('roles', filters)
+      const roles = await this.dataFacade.getAll('role', filters)
       
       // Transformă datele pentru UI
       return roles.map(role => roleManager.transformRoleForUI(role));
@@ -33,7 +35,7 @@ class RoleService {
       // Transformare pentru API
       const apiData = roleManager.transformRoleForAPI(roleData)
       
-      const result = await this.dataFacade.create('roles', apiData)
+      const result = await this.dataFacade.create('role', apiData)
       
       return roleManager.transformRoleForUI(result)
     } catch (error) {
@@ -54,7 +56,7 @@ class RoleService {
       // Transformare pentru API
       const apiData = roleManager.transformRoleForAPI(roleData)
       
-      const result = await this.dataFacade.update('roles', id, apiData)
+      const result = await this.dataFacade.update('role', id, apiData)
       
       return roleManager.transformRoleForUI(result)
     } catch (error) {
@@ -66,7 +68,7 @@ class RoleService {
   // Șterge un rol
   async deleteRole(id) {
     try {
-      await this.dataFacade.delete('roles', id)
+      await this.dataFacade.delete('role', id)
       return true
     } catch (error) {
       console.error('Error deleting role:', error)

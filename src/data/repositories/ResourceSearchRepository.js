@@ -24,7 +24,7 @@ export class ResourceSearchRepository {
    * @param {Object} additionalFilters - Filtre suplimentare
    * @returns {Promise<Array>} Rezultatele căutării
    */
-  async searchByCustomField(resourceType, searchField, searchTerm, limit = 50, additionalFilters = {}) {
+  async searchByCustomField(resourceType, searchField, searchTerm, limit = 5, additionalFilters = {}) {
     try {
       const businessId = localStorage.getItem("businessId") || 'B0100001';
       const locationId = localStorage.getItem("locationId") || 'L0100001';
@@ -37,7 +37,7 @@ export class ResourceSearchRepository {
         ...additionalFilters
       });
       
-      const endpoint = `${this.baseUrl}/api/resources/${businessId}-${locationId}?${queryParams.toString()}`;
+      const endpoint = `${this.baseUrl}/resources/${businessId}-${locationId}?${queryParams.toString()}`;
       
       console.log(`${resourceType} search endpoint:`, endpoint);
       
@@ -103,7 +103,7 @@ export class ResourceSearchRepository {
         }
       });
       
-      const endpoint = `${this.baseUrl}/api/resources/${businessId}-${locationId}?${queryParams.toString()}`;
+      const endpoint = `${this.baseUrl}/resources/${businessId}-${locationId}?${queryParams.toString()}`;
       
       console.log(`${resourceType} multi-field search endpoint:`, endpoint);
       
@@ -113,7 +113,7 @@ export class ResourceSearchRepository {
           "Content-Type": "application/json",
           "X-Resource-Type": resourceType,
           ...(localStorage.getItem('cognito-data') && {
-            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
+            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token}`
           })
         }
       });

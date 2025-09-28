@@ -1,8 +1,9 @@
 import { apiRequest } from '../infrastructure/apiClient.js'
+import { healthRepository } from '../repositories/HealthRepository.js'
 
 class AuthInvoker {
   constructor() {
-    this.basePath = '/api/auth/me'
+    this.basePath = '/auth/me'
   }
 
   async getCurrentUser() {
@@ -14,7 +15,16 @@ class AuthInvoker {
       
       return response
     } catch (error) {
-      console.error('Error fetching current user data:', error)
+      // Nu afișa erori dacă sistemul este offline
+      const healthStatus = healthRepository.getCurrentStatus();
+      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+      
+      if (!isDemoMode && healthStatus.lastCheck && !healthStatus.canMakeRequests) {
+        // Sistemul este offline - nu afișa eroarea
+        console.log('Auth request skipped - system is offline');
+      } else {
+        console.error('Error fetching current user data:', error);
+      }
       throw error
     }
   }

@@ -1,4 +1,5 @@
 import businessInfoInvoker from '../invoker/BusinessInfoInvoker.js'
+import { healthRepository } from './HealthRepository.js'
 
 class BusinessInfoRepository {
   constructor() {
@@ -28,7 +29,16 @@ class BusinessInfoRepository {
       
       return businessInfo
     } catch (error) {
-      console.error('Error in BusinessInfoRepository:', error)
+      // Nu afișa erori dacă sistemul este offline
+      const healthStatus = healthRepository.getCurrentStatus();
+      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+      
+      if (!isDemoMode && healthStatus.lastCheck && !healthStatus.canMakeRequests) {
+        // Sistemul este offline - nu afișa eroarea
+        console.log('Business info request skipped - system is offline');
+      } else {
+        console.error('Error in BusinessInfoRepository:', error);
+      }
       
       // Return cached data if available
       const cachedData = this.getStoredBusinessInfo()

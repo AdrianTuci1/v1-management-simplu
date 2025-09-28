@@ -92,11 +92,19 @@ export class HealthRepository {
    * @returns {Object} Starea curentă
    */
   getCurrentStatus() {
+    // Permite cererile dacă:
+    // 1. Este online
+    // 2. Și (serverul este healthy SAU nu s-a făcut încă primul health check)
+    // 3. Dar NU dacă serverul este confirmat unhealthy
+    const canMakeRequests = this.isOnline && 
+      (this.serverHealth === 'healthy' || 
+       (this.serverHealth === 'unknown' && !this.lastHealthCheck));
+    
     return {
       isOnline: this.isOnline,
       serverHealth: this.serverHealth,
       lastCheck: this.lastHealthCheck,
-      canMakeRequests: this.isOnline && this.serverHealth === 'healthy',
+      canMakeRequests: canMakeRequests,
       isHealthy: this.isOnline && this.serverHealth === 'healthy',
       isOffline: !this.isOnline,
       isServerDown: this.isOnline && this.serverHealth === 'unhealthy'
@@ -150,6 +158,29 @@ export class HealthRepository {
       timeout: this.timeout,
       ...healthClient.getConfig()
     };
+  }
+
+  /**
+   * Marchează serverul ca fiind healthy (când o cerere API reușește)
+   */
+  markServerHealthy() {
+    if (this.serverHealth !== 'healthy') {
+      console.log('Server marked as healthy via API request');
+      this.serverHealth = 'healthy';
+      this.lastHealthCheck = new Date();
+    }
+  }
+
+  /**
+   * Marchează serverul ca fiind unhealthy (când o cerere API eșuează)
+   * @param {string} errorMessage - Mesajul de eroare
+   */
+  markServerUnhealthy(errorMessage) {
+    if (this.serverHealth !== 'unhealthy') {
+      console.warn('Server marked as unhealthy via API request failure:', errorMessage);
+      this.serverHealth = 'unhealthy';
+      this.lastHealthCheck = new Date();
+    }
   }
 }
 

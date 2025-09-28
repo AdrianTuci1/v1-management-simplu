@@ -1,22 +1,23 @@
 import { dataFacade } from '../data/DataFacade.js'
+import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js'
 import { userManager } from '../business/userManager.js'
 
 class UserService {
   constructor() {
-    this.repository = new DraftAwareResourceRepository('users', 'users')
+    this.repository = new DraftAwareResourceRepository('users', 'medic')
     this.dataFacade = dataFacade
+    this.socketFacade = socketFacade
   }
 
   // Obține toți utilizatorii
   async getUsers(filters = {}) {
     try {
-      const users = await this.dataFacade.getAll('users', filters)
+      const users = await this.dataFacade.getAll('medic', filters)
       
       return userManager.transformUsersForUI(users)
     } catch (error) {
-      console.error('Error getting users:', error)
       return []
     }
   }
@@ -35,11 +36,10 @@ class UserService {
       // Transformare pentru API
       const apiData = userManager.transformUserForAPI(userData)
       
-      const result = await this.dataFacade.create('users', apiData)
+      const result = await this.dataFacade.create('medic', apiData)
       
       return userManager.transformUserForUI(result)
     } catch (error) {
-      console.error('Error adding user:', error)
       throw error
     }
   }
@@ -56,11 +56,10 @@ class UserService {
       // Transformare pentru API
       const apiData = userManager.transformUserForAPI(userData)
       
-      const result = await this.dataFacade.update('users', id, apiData)
+      const result = await this.dataFacade.update('medic', id, apiData)
       
       return userManager.transformUserForUI(result)
     } catch (error) {
-      console.error('Error updating user:', error)
       throw error
     }
   }
@@ -68,10 +67,9 @@ class UserService {
   // Șterge un utilizator
   async deleteUser(id) {
     try {
-      await this.dataFacade.delete('users', id)
+      await this.dataFacade.delete('medic', id)
       return true
     } catch (error) {
-      console.error('Error deleting user:', error)
       throw error
     }
   }
@@ -81,6 +79,7 @@ class UserService {
     try {
       // Încearcă mai întâi resource query pentru căutare eficientă
       const users = await resourceSearchRepository.searchWithFallback(
+        'medic',
         'medicName',
         query,
         limit,
@@ -91,10 +90,9 @@ class UserService {
               ...fallbackFilters,
               search: searchTerm
             }
-            const users = await this.dataFacade.getAll('users', searchFilters)
+            const users = await this.dataFacade.getAll('medic', searchFilters)
             return Array.isArray(users) ? users : []
           } catch (error) {
-            console.error('Fallback search failed:', error)
             // Fallback la IndexedDB
             try {
               const { indexedDb } = await import('../data/infrastructure/db.js');
@@ -102,7 +100,6 @@ class UserService {
               console.log(`Found ${cachedUsers.length} users matching "${searchTerm}" from IndexedDB cache`);
               return cachedUsers;
             } catch (cacheError) {
-              console.error('Error searching users from IndexedDB:', cacheError);
               return [];
             }
           }
@@ -113,7 +110,6 @@ class UserService {
       // Transformăm fiecare utilizator pentru UI
       return userManager.transformUsersForUI(users);
     } catch (error) {
-      console.error('Error searching users:', error);
       return [];
     }
   }
@@ -124,7 +120,6 @@ class UserService {
       const users = await this.getUsers()
       return userManager.getUserStats(users)
     } catch (error) {
-      console.error('Error getting user stats:', error)
       throw error
     }
   }
@@ -135,7 +130,6 @@ class UserService {
       const users = await this.getUsers()
       return userManager.exportUsers(users, format)
     } catch (error) {
-      console.error('Error exporting users:', error)
       throw error
     }
   }
@@ -160,7 +154,7 @@ class UserService {
     // Transformare pentru API
     const apiData = userManager.transformUserForAPI(userData)
     
-    return await this.dataFacade.createDraft('users', apiData, sessionId)
+    return await this.dataFacade.createDraft('medic', apiData, sessionId)
   }
 
   /**
@@ -209,7 +203,7 @@ class UserService {
     if (sessionId) {
       return await this.dataFacade.getDraftsBySession(sessionId)
     }
-    return await this.dataFacade.getDraftsByResourceType('users')
+    return await this.dataFacade.getDraftsByResourceType('medic')
   }
 
   /**
@@ -223,7 +217,6 @@ class UserService {
       
       return userManager.transformUsersForUI(users)
     } catch (error) {
-      console.error('Error getting users with drafts:', error)
       return []
     }
   }
@@ -263,7 +256,6 @@ class UserService {
       
       return userManager.transformUsersForUI(users)
     } catch (error) {
-      console.error('Error getting users for session:', error)
       return []
     }
   }

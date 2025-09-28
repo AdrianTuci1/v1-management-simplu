@@ -59,7 +59,7 @@ function connectWebSocket(url, channelName) {
         sendToMain('status', { status: 'timeout' });
       });
     
-    // Listen for AI message events
+    // Listen for AI message events (keep existing communication with agent)
     channel.on("new_message", (payload) => {
       sendToMain('log', { kind: 'info', msg: 'Received new_message event', data: payload });
       sendToMain('message', { type: 'new_message', data: payload });
@@ -73,6 +73,83 @@ function connectWebSocket(url, channelName) {
     channel.on("session_update", (payload) => {
       sendToMain('log', { kind: 'info', msg: 'Received session_update event', data: payload });
       sendToMain('message', { type: 'session_update', data: payload });
+    });
+    
+    // Listen for new AI Assistant DataFacade events
+    channel.on("ai_assistant_connected", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received ai_assistant_connected event', data: payload });
+      sendToMain('message', { type: 'ai_assistant_connected', data: payload });
+    });
+    
+    channel.on("ai_assistant_disconnected", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received ai_assistant_disconnected event', data: payload });
+      sendToMain('message', { type: 'ai_assistant_disconnected', data: payload });
+    });
+    
+    channel.on("ai_assistant_session_loaded", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received ai_assistant_session_loaded event', data: payload });
+      sendToMain('message', { type: 'ai_assistant_session_loaded', data: payload });
+    });
+    
+    channel.on("ai_assistant_session_closed", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received ai_assistant_session_closed event', data: payload });
+      sendToMain('message', { type: 'ai_assistant_session_closed', data: payload });
+    });
+    
+    channel.on("ai_assistant_messages_searched", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received ai_assistant_messages_searched event', data: payload });
+      sendToMain('message', { type: 'ai_assistant_messages_searched', data: payload });
+    });
+    
+    channel.on("ai_assistant_session_exported", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received ai_assistant_session_exported event', data: payload });
+      sendToMain('message', { type: 'ai_assistant_session_exported', data: payload });
+    });
+    
+    channel.on("ai_assistant_stats_retrieved", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received ai_assistant_stats_retrieved event', data: payload });
+      sendToMain('message', { type: 'ai_assistant_stats_retrieved', data: payload });
+    });
+    
+    // Listen for AI Agent resource and draft events
+    channel.on("agent_resource_query_result", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received agent_resource_query_result event', data: payload });
+      sendToMain('message', { type: 'agent_resource_query_result', data: payload });
+    });
+    
+    channel.on("agent_resource_query_error", (payload) => {
+      sendToMain('log', { kind: 'error', msg: 'Received agent_resource_query_error event', data: payload });
+      sendToMain('message', { type: 'agent_resource_query_error', data: payload });
+    });
+    
+    channel.on("agent_draft_created", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received agent_draft_created event', data: payload });
+      sendToMain('message', { type: 'agent_draft_created', data: payload });
+    });
+    
+    channel.on("agent_draft_updated", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received agent_draft_updated event', data: payload });
+      sendToMain('message', { type: 'agent_draft_updated', data: payload });
+    });
+    
+    channel.on("agent_draft_committed", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received agent_draft_committed event', data: payload });
+      sendToMain('message', { type: 'agent_draft_committed', data: payload });
+    });
+    
+    channel.on("agent_draft_cancelled", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received agent_draft_cancelled event', data: payload });
+      sendToMain('message', { type: 'agent_draft_cancelled', data: payload });
+    });
+    
+    channel.on("agent_drafts_listed", (payload) => {
+      sendToMain('log', { kind: 'info', msg: 'Received agent_drafts_listed event', data: payload });
+      sendToMain('message', { type: 'agent_drafts_listed', data: payload });
+    });
+    
+    channel.on("agent_request_error", (payload) => {
+      sendToMain('log', { kind: 'error', msg: 'Received agent_request_error event', data: payload });
+      sendToMain('message', { type: 'agent_request_error', data: payload });
     });
     
 
@@ -122,9 +199,13 @@ function sendMessage(event, payload) {
   if (channel && connectionStatus === 'connected') {
     // Handle different event types
     if (event === 'send_message') {
-      // Send message to AI channel
+      // Send message to AI channel (keep existing agent communication)
       channel.push('send_message', payload);
       sendToMain('log', { kind: 'info', msg: 'AI message sent successfully', data: { event, payload } });
+    } else if (event.startsWith('ai_assistant_')) {
+      // Handle new AI Assistant DataFacade events
+      channel.push(event, payload);
+      sendToMain('log', { kind: 'info', msg: 'AI Assistant event sent successfully', data: { event, payload } });
     } else {
       // Send other events as-is
       channel.push(event, payload);
