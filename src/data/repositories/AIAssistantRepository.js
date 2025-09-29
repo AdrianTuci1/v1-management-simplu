@@ -29,10 +29,9 @@ export class AIAssistantRepository {
    */
   async loadTodaySession(businessId, userId, locationId = null) {
     try {
-      const sessionId = this.generateSessionId(businessId, userId);
-      
       if (this.isDemoMode) {
-        // În modul demo, returnează date mock
+        // În modul demo, generează un sessionId mock
+        const sessionId = this.generateSessionId(businessId, userId);
         const mockSession = {
           sessionId,
           businessId,
@@ -47,10 +46,20 @@ export class AIAssistantRepository {
         return mockSession;
       }
 
-      // Încarcă istoricul mesajelor
-      await this.loadMessageHistory(sessionId);
-      
-      return { sessionId };
+      // Check if there's an active session first
+      try {
+        const activeSession = await this.getActiveSessionForUser(businessId, userId);
+        if (activeSession) {
+          // Found active session, return it
+          return activeSession;
+        }
+      } catch (error) {
+        console.warn('Failed to check for active session:', error);
+      }
+
+      // No active session found, but we can't create new sessions without proper endpoint
+      // For now, throw a more helpful error
+      throw new Error(`No active session found for user ${userId} in business ${businessId}. Server needs to implement session creation endpoint (POST /api/sessions) or ensure users have active sessions.`);
     } catch (error) {
       console.error('Failed to load today session:', error);
       throw error;
@@ -185,7 +194,8 @@ export class AIAssistantRepository {
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${businessId}/user/${userId}/active`;
       const data = await aiApiRequest(endpoint);
       
-      return data.session || null;
+      // Server returns session object directly, not wrapped
+      return data || null;
     } catch (error) {
       console.error('Failed to get active session for user:', error);
       throw error;
@@ -198,35 +208,42 @@ export class AIAssistantRepository {
   async getUserSessionHistory(businessId, userId, limit = 20) {
     try {
       if (this.isDemoMode) {
+        const sessions = [
+          {
+            sessionId: 'demo-session-1',
+            businessId: businessId,
+            userId: userId,
+            startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+            endTime: null,
+            status: 'active',
+            messageCount: 5
+          },
+          {
+            sessionId: 'demo-session-2',
+            businessId: businessId,
+            userId: userId,
+            startTime: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+            endTime: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+            status: 'resolved',
+            messageCount: 12
+          }
+        ];
+        
         return {
-          sessions: [
-            {
-              sessionId: 'demo-session-1',
-              businessId: businessId,
-              userId: userId,
-              startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-              endTime: null,
-              status: 'active',
-              messageCount: 5
-            },
-            {
-              sessionId: 'demo-session-2',
-              businessId: businessId,
-              userId: userId,
-              startTime: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-              endTime: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-              status: 'resolved',
-              messageCount: 12
-            }
-          ],
-          total: 2
+          sessions,
+          total: sessions.length
         };
       }
 
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${businessId}/user/${userId}/history?limit=${limit}`;
       const data = await aiApiRequest(endpoint);
       
-      return data;
+      // Server returns array directly, wrap it for consistency
+      const sessions = Array.isArray(data) ? data : [];
+      return {
+        sessions,
+        total: sessions.length
+      };
     } catch (error) {
       console.error('Failed to get user session history:', error);
       throw error;
@@ -239,23 +256,22 @@ export class AIAssistantRepository {
   async getActiveSessions(businessId) {
     try {
       if (this.isDemoMode) {
-        return {
-          activeSessions: [
-            {
-              sessionId: 'demo-session-1',
-              businessId: businessId,
-              userId: 'demo-user',
-              startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-              status: 'active'
-            }
-          ]
-        };
+        return [
+          {
+            sessionId: 'demo-session-1',
+            businessId: businessId,
+            userId: 'demo-user',
+            startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+            status: 'active'
+          }
+        ];
       }
 
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${businessId}/active`;
       const data = await aiApiRequest(endpoint);
       
-      return data.activeSessions || [];
+      // Server returns array directly, not wrapped in object
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Failed to get active sessions:', error);
       throw error;
@@ -282,7 +298,8 @@ export class AIAssistantRepository {
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/${sessionId}`;
       const data = await aiApiRequest(endpoint);
       
-      return data.session || null;
+      // Server returns session object directly, not wrapped
+      return data || null;
     } catch (error) {
       console.error('Failed to get session by ID:', error);
       throw error;

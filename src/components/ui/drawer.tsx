@@ -5,7 +5,7 @@ import { X } from "lucide-react"
 import { useDrawerStackStore } from "../../stores/drawerStackStore"
 
 const drawerVariants = cva(
-  "flex flex-col bg-white shadow-xl transition-all duration-300 ease-in-out",
+  "flex flex-col bg-white shadow-xl border border-gray-200 transition-all duration-300 rounded-lg",
   {
     variants: {
       size: {
@@ -29,7 +29,7 @@ const drawerVariants = cva(
 )
 
 const drawerHeaderVariants = cva(
-  "flex items-center justify-between border-b border-gray-200 p-4 flex-shrink-0",
+  "flex items-center justify-between border-b border-gray-200 p-4 flex-shrink-0 rounded-t-lg",
   {
     variants: {
       variant: {
@@ -75,7 +75,7 @@ const drawerContentVariants = cva(
 )
 
 const drawerFooterVariants = cva(
-  "flex items-center justify-between border-t border-gray-200 p-4 flex-shrink-0",
+  "flex items-center justify-between border-t border-gray-200 p-4 flex-shrink-0 rounded-b-lg",
   {
     variants: {
       variant: {

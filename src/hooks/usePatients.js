@@ -40,7 +40,7 @@ export const usePatients = () => {
       // Încearcă să încarce din cache local
       try {
         console.warn('Patients API failed, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('patients')
+        const cachedData = await indexedDb.getAll('patient')
         
         if (cachedData.length > 0) {
           // Transformăm datele din cache pentru UI
@@ -76,7 +76,7 @@ export const usePatients = () => {
       // Încearcă să încarce din cache local cu filtrare
       try {
         console.warn('Patients by page API failed, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('patients')
+        const cachedData = await indexedDb.getAll('patient')
         
         // Aplică filtrele local
         let filteredData = cachedData
@@ -131,7 +131,7 @@ export const usePatients = () => {
         // Încearcă să încarce din cache local
         try {
           console.warn('Load patients API failed, trying local cache:', err.message)
-          const cachedData = await indexedDb.getAll('patients')
+          const cachedData = await indexedDb.getAll('patient')
           
           if (cachedData.length > 0) {
             // Transformăm datele din cache pentru UI

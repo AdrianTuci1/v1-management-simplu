@@ -5,62 +5,40 @@ class AppDatabase extends Dexie {
   constructor() {
     super('AppDB');
     
-    // Versiunea bazei de date
-    this.version(3).stores({
-      appointments: 'resourceId, date, doctor, patient, status', // Store pentru programări
-      appointmentCounts: 'date, count', // Cache pentru numărul de programări
-      patients: 'resourceId, name, email, phone, status, city, county', // Store pentru pacienți
-      products: 'resourceId, name, category, price, stock, reorderLevel', // Store pentru produse
-      productCounts: 'category, count', // Cache pentru numărul de produse per categorie
-      users: 'resourceId, email, licenseNumber, specialization, status, role', // Store pentru utilizatori (medici)
-      sales: 'resourceId, date, amount, status, customerId', // Store pentru vânzări
-      role: 'resourceId, name, description, status', // Store pentru roluri
-      permissions: 'resourceId, resource, action, description', // Store pentru permisiuni
-      treatments: 'resourceId, treatmentType, category, duration, price', // Store pentru tratamente
-      statistics: 'id, timestamp', // Store pentru statistici și activități recente
-      outbox: '++id, tempId, resourceType, operation, createdAt, status', // Outbox pentru operații trimise spre procesare
-      // noi store-uri pentru migrarea arhitecturii (idMap, queue, meta)
-      idMap: 'tempId, permId, resourceType',
-      queue: '++seq, createdAt, status, resourceType, action, tempId',
-      meta: 'key'
-    });
-    
-    // Versiunea 4 - Agent Support & Draft System
-    this.version(4).stores({
-      // ... stores existente (appointments, patients, etc.)
-      appointments: 'resourceId, date, doctor, patient, status',
-      appointmentCounts: 'date, count',
-      patients: 'resourceId, name, email, phone, status, city, county',
-      products: 'resourceId, name, category, price, stock, reorderLevel',
-      productCounts: 'category, count',
-      users: 'resourceId, email, licenseNumber, specialization, status, role',
-      sales: 'resourceId, date, amount, status, customerId',
+    // Current database version - Clean schema with only essential stores
+    this.version(1).stores({
+      // Keep core business stores
+      appointment: 'resourceId, date, doctor, patient, status',
+      patient: 'resourceId, patientName, email, phone, status, city, county',
+      product: 'resourceId, name, category, price, stock, reorderLevel',
+      user: 'resourceId, email, licenseNumber, specialization, status, role, medicName',
+      sale: 'resourceId, date, amount, status, customerId',
       role: 'resourceId, name, description, status',
-      permissions: 'resourceId, resource, action, description',
-      treatments: 'resourceId, treatmentType, category, duration, price',
-      statistics: 'id, timestamp',
+      permission: 'resourceId, resource, action, description',
+      treatment: 'resourceId, treatmentType, category, duration, price',
+      statistic: 'id, timestamp',
+
+      // Keep technical stores
+      appointmentCounts: 'date, count',
+      productCounts: 'category, count',
       outbox: '++id, tempId, resourceType, operation, createdAt, status',
       idMap: 'tempId, permId, resourceType',
       queue: '++seq, createdAt, status, resourceType, action, tempId',
       meta: 'key',
+
+      // Keep only drafts, remove all other deprecated collections
+      drafts: '++id, sessionId, resourceType, data, timestamp, status, parentId'
       
-      // Draft/Session System
-      drafts: '++id, sessionId, resourceType, data, timestamp, status, parentId',
-      sessions: '++id, sessionId, type, data, timestamp, status, parentId',
-      sessionOperations: '++id, sessionId, operation, data, timestamp, status',
-      
-      // Agent Communication
-      agentSessions: '++id, sessionId, agentId, permissions, createdAt, lastActivity',
-      agentCommands: '++id, sessionId, commandId, repositoryType, operation, data, timestamp, status',
-      agentQueryModifications: '++id, sessionId, repositoryType, modifications, timestamp, status',
-      
-      // Remote Versions (pentru sincronizare cu server)
-      remoteVersions: '++id, resourceType, resourceId, remoteData, timestamp, source, status',
-      pendingApprovals: '++id, resourceType, resourceId, operation, data, timestamp, source, status',
-      
-      // Management & Audit
-      managementLog: '++id, resourceType, resourceId, operation, oldData, newData, timestamp, approvedBy, status',
-      auditTrail: '++id, sessionId, action, data, timestamp, source'
+      // REMOVED COLLECTIONS:
+      // - sessions (removed)
+      // - sessionOperations (removed)
+      // - agentSessions (removed)
+      // - agentCommands (removed)
+      // - agentQueryModifications (removed)
+      // - remoteVersions (removed)
+      // - pendingApprovals (removed)
+      // - managementLog (removed)
+      // - auditTrail (removed)
     });
   }
 }
@@ -154,14 +132,14 @@ export const indexedDb = {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
     
-    return db.appointments
+    return db.appointment
       .where('date')
       .between(startOfDay.toISOString(), endOfDay.toISOString())
       .toArray();
   },
   
   async getAppointmentsByDateRange(startDate, endDate) {
-    return db.appointments
+    return db.appointment
       .where('date')
       .between(startDate.toISOString(), endDate.toISOString())
       .toArray();
@@ -184,7 +162,7 @@ export const indexedDb = {
   
   // Metode specifice pentru pacienți
   async getPatientsByStatus(status) {
-    return db.patients
+    return db.patient
       .where('status')
       .equals(status)
       .toArray();
@@ -192,7 +170,7 @@ export const indexedDb = {
   
   async searchPatients(searchTerm) {
     const term = searchTerm.toLowerCase();
-    return db.patients
+    return db.patient
       .filter(patient => 
         (patient.name && patient.name.toLowerCase().includes(term)) ||
         (patient.patientName && patient.patientName.toLowerCase().includes(term)) ||
@@ -204,7 +182,7 @@ export const indexedDb = {
   },
   
   async getPatientsByCity(city) {
-    return db.patients
+    return db.patient
       .where('city')
       .equals(city)
       .toArray();
@@ -216,21 +194,21 @@ export const indexedDb = {
   
   // Metode specifice pentru produse
   async getProductsByCategory(category) {
-    return db.products
+    return db.product
       .where('category')
       .equals(category)
       .toArray();
   },
   
   async getLowStockProducts() {
-    return db.products
+    return db.product
       .filter(product => product.stock <= product.reorderLevel)
       .toArray();
   },
   
   async searchProducts(searchTerm) {
     const term = searchTerm.toLowerCase();
-    return db.products
+    return db.product
       .filter(product => 
         product.name.toLowerCase().includes(term) ||
         product.category.toLowerCase().includes(term)
@@ -253,14 +231,14 @@ export const indexedDb = {
   
   // Metode specifice pentru utilizatori (medici)
   async getUsersByStatus(status) {
-    return db.users
+    return db.user
       .where('status')
       .equals(status)
       .toArray();
   },
   
   async getUsersBySpecialization(specialization) {
-    return db.users
+    return db.user
       .where('specialization')
       .equals(specialization)
       .toArray();
@@ -268,7 +246,7 @@ export const indexedDb = {
   
   async searchUsers(searchTerm) {
     const term = searchTerm.toLowerCase();
-    return db.users
+    return db.user
       .filter(user => 
         user.firstName?.toLowerCase().includes(term) ||
         user.lastName?.toLowerCase().includes(term) ||
@@ -280,7 +258,7 @@ export const indexedDb = {
   },
   
   async getUserByEmail(email) {
-    return db.users
+    return db.user
       .where('email')
       .equals(email.toLowerCase())
       .first();
@@ -289,7 +267,7 @@ export const indexedDb = {
 
   
   async getUsersByRole(role) {
-    return db.users
+    return db.user
       .where('role')
       .equals(role)
       .toArray();
@@ -297,7 +275,7 @@ export const indexedDb = {
   
   // Metode specifice pentru roluri
   async getRolesByStatus(status) {
-    return db.roles
+    return db.role
       .where('status')
       .equals(status)
       .toArray();
@@ -305,7 +283,7 @@ export const indexedDb = {
   
   async searchRoles(searchTerm) {
     const term = searchTerm.toLowerCase();
-    return db.roles
+    return db.role
       .filter(role => 
         role.name.toLowerCase().includes(term) ||
         role.description.toLowerCase().includes(term)
@@ -314,7 +292,7 @@ export const indexedDb = {
   },
   
   async getRoleByName(name) {
-    return db.roles
+    return db.role
       .where('name')
       .equals(name)
       .first();
@@ -322,14 +300,14 @@ export const indexedDb = {
   
   // Metode specifice pentru permisiuni
   async getPermissionsByResource(resource) {
-    return db.permissions
+    return db.permission
       .where('resource')
       .equals(resource)
       .toArray();
   },
   
   async getPermissionsByAction(action) {
-    return db.permissions
+    return db.permission
       .where('action')
       .equals(action)
       .toArray();
@@ -337,7 +315,7 @@ export const indexedDb = {
   
   async searchPermissions(searchTerm) {
     const term = searchTerm.toLowerCase();
-    return db.permissions
+    return db.permission
       .filter(permission => 
         permission.resource.toLowerCase().includes(term) ||
         permission.action.toLowerCase().includes(term) ||
@@ -347,7 +325,7 @@ export const indexedDb = {
   },
   
   async getPermissionByResourceAndAction(resource, action) {
-    return db.permissions
+    return db.permission
       .filter(permission => 
         permission.resource === resource && permission.action === action
       )
@@ -356,14 +334,14 @@ export const indexedDb = {
   
   // Metode specifice pentru tratamente
   async getTreatmentsByCategory(category) {
-    return db.treatments
+    return db.treatment
       .where('category')
       .equals(category)
       .toArray();
   },
   
   async getTreatmentsByType(treatmentType) {
-    return db.treatments
+    return db.treatment
       .where('treatmentType')
       .equals(treatmentType)
       .toArray();
@@ -371,7 +349,7 @@ export const indexedDb = {
   
   async searchTreatments(searchTerm) {
     const term = searchTerm.toLowerCase();
-    return db.treatments
+    return db.treatment
       .filter(treatment => 
         treatment.treatmentType.toLowerCase().includes(term) ||
         treatment.category.toLowerCase().includes(term) ||
@@ -381,7 +359,7 @@ export const indexedDb = {
   },
   
   async getTreatmentsByDurationRange(minDuration, maxDuration) {
-    return db.treatments
+    return db.treatment
       .filter(treatment => 
         treatment.duration >= minDuration && treatment.duration <= maxDuration
       )
@@ -389,7 +367,7 @@ export const indexedDb = {
   },
   
   async getTreatmentsByPriceRange(minPrice, maxPrice) {
-    return db.treatments
+    return db.treatment
       .filter(treatment => 
         treatment.price >= minPrice && treatment.price <= maxPrice
       )

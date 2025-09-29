@@ -9,7 +9,7 @@ export const populateTestData = async (count = 5) => {
     const testRoles = roleManager.generateTestRoles(count)
     
     // Adaugă rolurile în IndexedDB
-    await db.roles.bulkPut(testRoles)
+    await db.role.bulkPut(testRoles)
     
     console.log(`S-au adăugat ${testRoles.length} roluri de test`)
     return testRoles.length
@@ -25,7 +25,7 @@ export const clearAllData = async () => {
     console.log('Curățare toate datele...')
     
     // Șterge toate rolurile
-    await db.roles.clear()
+    await db.role.clear()
     
     console.log('Toate datele au fost șterse')
     return true
@@ -38,8 +38,8 @@ export const clearAllData = async () => {
 // Verifică starea cache-ului
 export const checkCacheStatus = async () => {
   try {
-    const rolesCount = await db.roles.count()
-    const roles = await db.roles.toArray()
+    const rolesCount = await db.role.count()
+    const roles = await db.role.toArray()
     
     const status = {
       rolesCount,
@@ -62,7 +62,7 @@ export const checkCacheStatus = async () => {
 // Export date din cache
 export const exportCacheData = async (format = 'json') => {
   try {
-    const roles = await db.roles.toArray()
+    const roles = await db.role.toArray()
     
     switch (format.toLowerCase()) {
       case 'json':
@@ -98,7 +98,7 @@ export const importCacheData = async (data, format = 'json') => {
     const validRoles = roles.map(role => roleManager.transformRoleForAPI(role))
     
     // Adaugă în IndexedDB
-    await db.roles.bulkPut(validRoles)
+    await db.role.bulkPut(validRoles)
     
     console.log(`S-au importat ${validRoles.length} roluri`)
     return validRoles.length
@@ -111,7 +111,7 @@ export const importCacheData = async (data, format = 'json') => {
 // Verifică integritatea datelor
 export const checkDataIntegrity = async () => {
   try {
-    const roles = await db.roles.toArray()
+    const roles = await db.role.toArray()
     const issues = []
     
     roles.forEach((role, index) => {
@@ -152,7 +152,7 @@ export const checkDataIntegrity = async () => {
 // Repară datele corupte
 export const repairData = async () => {
   try {
-    const roles = await db.roles.toArray()
+    const roles = await db.role.toArray()
     const repairedRoles = []
     
     roles.forEach(role => {
@@ -175,7 +175,7 @@ export const repairData = async () => {
     })
     
     // Actualizează în IndexedDB
-    await db.roles.bulkPut(repairedRoles)
+    await db.role.bulkPut(repairedRoles)
     
     console.log(`S-au reparat ${repairedRoles.length} roluri`)
     return repairedRoles.length
@@ -188,7 +188,7 @@ export const repairData = async () => {
 // Obține statistici detaliate
 export const getDetailedStats = async () => {
   try {
-    const roles = await db.roles.toArray()
+    const roles = await db.role.toArray()
     
     // Statistici de bază
     const total = roles.length
@@ -246,7 +246,7 @@ export const getDetailedStats = async () => {
 // Backup și restore
 export const createBackup = async () => {
   try {
-    const roles = await db.roles.toArray()
+    const roles = await db.role.toArray()
     const backup = {
       timestamp: new Date().toISOString(),
       version: '1.0',
@@ -267,10 +267,10 @@ export const restoreBackup = async (backup) => {
     }
     
     // Curăță datele existente
-    await db.roles.clear()
+    await db.role.clear()
     
     // Restore datele
-    await db.roles.bulkPut(backup.roles)
+    await db.role.bulkPut(backup.roles)
     
     console.log(`S-au restaurat ${backup.roles.length} roluri`)
     return backup.roles.length

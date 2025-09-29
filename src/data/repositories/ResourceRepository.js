@@ -75,7 +75,7 @@ export class ResourceRepository {
 
   async query(params) {
     const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
-    
+
     // In demo mode, get data from IndexedDB instead of API
     if (isDemoMode) {
       console.log(`Demo mode: Getting ${this.resourceType} data from IndexedDB`);
@@ -88,9 +88,29 @@ export class ResourceRepository {
         return [];
       }
     }
-    
+
+    // Offline fallback: if requests are blocked, read from IndexedDB
+    try {
+      const healthStatus = healthRepository.getCurrentStatus();
+      if (healthStatus.lastCheck && !healthStatus.canMakeRequests) {
+        const local = await db.table(this.store).toArray();
+        return local;
+      }
+    } catch (_) {}
+
     const query = params ? "?" + new URLSearchParams(params).toString() : "";
-    const response = await this.request(query, { method: "GET" });
+    let response;
+    try {
+      response = await this.request(query, { method: "GET" });
+    } catch (error) {
+      // Network/API error: fallback to local cache
+      try {
+        const local = await db.table(this.store).toArray();
+        return local;
+      } catch (_) {
+        throw error;
+      }
+    }
     
     // Extract data from API response structure
     let data = response;
@@ -184,7 +204,26 @@ export class ResourceRepository {
       }
     }
     
-    const response = await this.request(`/${id}`, { method: "GET" });
+    // Offline fallback: if requests are blocked, read from IndexedDB
+    try {
+      const healthStatus = healthRepository.getCurrentStatus();
+      if (healthStatus.lastCheck && !healthStatus.canMakeRequests) {
+        const local = await db.table(this.store).get(id);
+        return local || null;
+      }
+    } catch (_) {}
+
+    let response;
+    try {
+      response = await this.request(`/${id}`, { method: "GET" });
+    } catch (error) {
+      try {
+        const local = await db.table(this.store).get(id);
+        return local || null;
+      } catch (_) {
+        throw error;
+      }
+    }
     
     // Extract data from API response structure
     let data = response;

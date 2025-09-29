@@ -9,9 +9,9 @@ export const populateTestData = async (count = 10) => {
     const testUsers = userManager.generateTestUsers(count)
     
     // Adaugă în IndexedDB
-    await db.transaction('rw', db.users, async () => {
+    await db.transaction('rw', db.user, async () => {
       for (const user of testUsers) {
-        await db.users.put(user)
+        await db.user.put(user)
       }
     })
     
@@ -28,8 +28,8 @@ export const clearAllData = async () => {
   try {
     console.log('Curățare cache utilizatori...')
     
-    await db.transaction('rw', db.users, async () => {
-      await db.users.clear()
+    await db.transaction('rw', db.user, async () => {
+      await db.user.clear()
     })
     
     console.log('✅ Cache utilizatori curățat')
@@ -43,8 +43,8 @@ export const clearAllData = async () => {
 // Verifică starea cache-ului
 export const checkCacheStatus = async () => {
   try {
-    const userCount = await db.users.count()
-    const specializations = await db.users.toArray()
+    const userCount = await db.user.count()
+    const specializations = await db.user.toArray()
     
     const specStats = {}
     specializations.forEach(user => {
@@ -73,7 +73,7 @@ export const checkCacheStatus = async () => {
 // Export date din cache
 export const exportCacheData = async (format = 'json') => {
   try {
-    const users = await db.users.toArray()
+    const users = await db.user.toArray()
     
     switch (format.toLowerCase()) {
       case 'json':
@@ -109,9 +109,9 @@ export const importCacheData = async (data, format = 'json') => {
     const validUsers = users.map(user => userManager.transformUserForAPI(user))
     
     // Adaugă în cache
-    await db.transaction('rw', db.users, async () => {
+    await db.transaction('rw', db.user, async () => {
       for (const user of validUsers) {
-        await db.users.put(user)
+        await db.user.put(user)
       }
     })
     
@@ -144,7 +144,7 @@ export const syncCacheWithAPI = async () => {
 // Verifică dacă un email există deja
 export const checkEmailExists = async (email, excludeId = null) => {
   try {
-    const existingUser = await db.users
+    const existingUser = await db.user
       .where('email')
       .equals(email.toLowerCase())
       .first()
@@ -166,7 +166,7 @@ export const checkEmailExists = async (email, excludeId = null) => {
 // Verifică dacă un număr de licență există deja
 export const checkLicenseExists = async (licenseNumber, excludeId = null) => {
   try {
-    const existingUser = await db.users
+    const existingUser = await db.user
       .where('licenseNumber')
       .equals(licenseNumber)
       .first()
@@ -188,7 +188,7 @@ export const checkLicenseExists = async (licenseNumber, excludeId = null) => {
 // Obține utilizatorii după specializare
 export const getUsersBySpecialization = async (specialization) => {
   try {
-    const users = await db.users
+    const users = await db.user
       .where('specialization')
       .equals(specialization)
       .toArray()
@@ -203,7 +203,7 @@ export const getUsersBySpecialization = async (specialization) => {
 // Obține utilizatorii după status
 export const getUsersByStatus = async (status) => {
   try {
-    const users = await db.users
+    const users = await db.user
       .where('status')
       .equals(status)
       .toArray()
@@ -218,7 +218,7 @@ export const getUsersByStatus = async (status) => {
 // Căutare avansată în cache
 export const searchUsersInCache = async (query, filters = {}) => {
   try {
-    let users = await db.users.toArray()
+    let users = await db.user.toArray()
     
     // Aplică filtrele
     if (filters.status) {
@@ -253,7 +253,7 @@ export const searchUsersInCache = async (query, filters = {}) => {
 // Backup cache
 export const backupCache = async () => {
   try {
-    const users = await db.users.toArray()
+    const users = await db.user.toArray()
     const backup = {
       timestamp: new Date().toISOString(),
       version: '1.0',
@@ -293,12 +293,12 @@ export const restoreCache = async (backupData) => {
     }
     
     // Curăță cache-ul existent
-    await db.users.clear()
+    await db.user.clear()
     
     // Restore datele
-    await db.transaction('rw', db.users, async () => {
+    await db.transaction('rw', db.user, async () => {
       for (const user of backup.data) {
-        await db.users.put(user)
+        await db.user.put(user)
       }
     })
     

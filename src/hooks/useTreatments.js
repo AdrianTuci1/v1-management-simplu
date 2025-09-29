@@ -145,13 +145,13 @@ export const useTreatments = () => {
       // Încearcă să încarce din cache local dacă API-ul eșuează
       try {
         console.warn('API failed, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('treatments')
+        const cachedData = await indexedDb.getAll('treatment')
         
         // Dacă cache-ul este gol, populează cu date de test
         if (cachedData.length === 0) {
           console.log('Cache is empty, populating with test data...')
           await populateTestData()
-          const testData = await indexedDb.getAll('treatments')
+          const testData = await indexedDb.getAll('treatment')
           sharedTreatments = testData
           setTreatments(testData)
           setTreatmentCount(testData.length)
@@ -279,7 +279,7 @@ export const useTreatments = () => {
       // Încearcă să caute în cache local
       try {
         console.warn('Search API failed, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('treatments')
+        const cachedData = await indexedDb.getAll('treatment')
         
         // Filtrează local după termenul de căutare
         const filteredData = cachedData.filter(treatment => 
@@ -319,7 +319,7 @@ export const useTreatments = () => {
       // Încearcă să filtreze din cache local
       try {
         console.warn('Category API failed, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('treatments')
+        const cachedData = await indexedDb.getAll('treatment')
         
         // Filtrează local după categorie
         const filteredData = cachedData.filter(treatment => 

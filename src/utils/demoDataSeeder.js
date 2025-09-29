@@ -395,12 +395,12 @@ export const demoDataSeeder = {
 
       console.log('[demoSeeder] Checking existing data counts...')
       const [patientsCount, usersCount, treatmentsCount, productsCount, appointmentsCount, salesCount, rolesCount] = await Promise.all([
-        indexedDb.count('patients').catch(e => { console.warn('[demoSeeder] Error counting patients:', e); return 0; }),
-        indexedDb.count('users').catch(e => { console.warn('[demoSeeder] Error counting users:', e); return 0; }),
-        indexedDb.count('treatments').catch(e => { console.warn('[demoSeeder] Error counting treatments:', e); return 0; }),
-        indexedDb.count('products').catch(e => { console.warn('[demoSeeder] Error counting products:', e); return 0; }),
-        indexedDb.count('appointments').catch(e => { console.warn('[demoSeeder] Error counting appointments:', e); return 0; }),
-        indexedDb.count('sales').catch(e => { console.warn('[demoSeeder] Error counting sales:', e); return 0; }),
+        indexedDb.count('patient').catch(e => { console.warn('[demoSeeder] Error counting patients:', e); return 0; }),
+        indexedDb.count('user').catch(e => { console.warn('[demoSeeder] Error counting users:', e); return 0; }),
+        indexedDb.count('treatment').catch(e => { console.warn('[demoSeeder] Error counting treatments:', e); return 0; }),
+        indexedDb.count('product').catch(e => { console.warn('[demoSeeder] Error counting products:', e); return 0; }),
+        indexedDb.count('appointment').catch(e => { console.warn('[demoSeeder] Error counting appointments:', e); return 0; }),
+        indexedDb.count('sale').catch(e => { console.warn('[demoSeeder] Error counting sales:', e); return 0; }),
         indexedDb.count('role').catch(e => { console.warn('[demoSeeder] Error counting roles:', e); return 0; })
       ])
       
@@ -430,20 +430,20 @@ export const demoDataSeeder = {
       }
 
       // Generate base datasets
-      const patients = needPatients ? generatePatients(60) : await indexedDb.getAll('patients')
-      const users = needUsers ? generateUsers(12) : await indexedDb.getAll('users')
-      const treatments = needTreatments ? generateTreatments() : await indexedDb.getAll('treatments')
-      const products = needProducts ? generateProducts() : await indexedDb.getAll('products')
+      const patients = needPatients ? generatePatients(60) : await indexedDb.getAll('patient')
+      const users = needUsers ? generateUsers(12) : await indexedDb.getAll('user')
+      const treatments = needTreatments ? generateTreatments() : await indexedDb.getAll('treatment')
+      const products = needProducts ? generateProducts() : await indexedDb.getAll('product')
 
-      const appointments = needAppointments ? generateAppointments(patients, users, treatments, 120) : await indexedDb.getAll('appointments')
-      const sales = needSales ? generateSales(products, 80) : await indexedDb.getAll('sales')
+      const appointments = needAppointments ? generateAppointments(patients, users, treatments, 120) : await indexedDb.getAll('appointment')
+      const sales = needSales ? generateSales(products, 80) : await indexedDb.getAll('sale')
       const roles = needRoles ? generateRoles() : await indexedDb.getAll('role')
 
       // Persist data
       console.log('[demoSeeder] Starting data persistence...')
       try {
         if (needPatients) { 
-          await indexedDb.bulkPut('patients', patients); 
+          await indexedDb.bulkPut('patient', patients); 
           console.log('[demoSeeder] patients seeded successfully:', patients.length) 
         }
       } catch (e) { 
@@ -453,7 +453,7 @@ export const demoDataSeeder = {
       
       try {
         if (needUsers) { 
-          await indexedDb.bulkPut('users', users); 
+          await indexedDb.bulkPut('user', users); 
           console.log('[demoSeeder] users seeded successfully:', users.length) 
         }
       } catch (e) { 
@@ -463,7 +463,7 @@ export const demoDataSeeder = {
       
       try {
         if (needTreatments) { 
-          await indexedDb.bulkPut('treatments', treatments); 
+          await indexedDb.bulkPut('treatment', treatments); 
           console.log('[demoSeeder] treatments seeded successfully:', treatments.length) 
         }
       } catch (e) { 
@@ -473,7 +473,7 @@ export const demoDataSeeder = {
       
       try {
         if (needProducts) { 
-          await indexedDb.bulkPut('products', products); 
+          await indexedDb.bulkPut('product', products); 
           console.log('[demoSeeder] products seeded successfully:', products.length) 
         }
       } catch (e) { 
@@ -483,7 +483,7 @@ export const demoDataSeeder = {
       
       try {
         if (needAppointments) { 
-          await indexedDb.bulkPut('appointments', appointments); 
+          await indexedDb.bulkPut('appointment', appointments); 
           console.log('[demoSeeder] appointments seeded successfully:', appointments.length) 
         }
       } catch (e) { 
@@ -493,7 +493,7 @@ export const demoDataSeeder = {
       
       try {
         if (needSales) { 
-          await indexedDb.bulkPut('sales', sales); 
+          await indexedDb.bulkPut('sale', sales); 
           console.log('[demoSeeder] sales seeded successfully:', sales.length) 
         }
       } catch (e) { 
@@ -524,7 +524,7 @@ export const demoDataSeeder = {
             .reduce((sum, s) => sum + (s.total || 0), 0),
           lowStockProducts: products.filter(p => p.stock <= p.reorderLevel).length
         }
-        await indexedDb.put('statistics', { id: 'business-statistics', data: stats, timestamp: new Date().toISOString() })
+        await indexedDb.put('statistic', { id: 'business-statistics', data: stats, timestamp: new Date().toISOString() })
 
         const activities = appointments.slice(0, 15).map(a => ({
           type: 'appointment',
@@ -532,7 +532,7 @@ export const demoDataSeeder = {
           subtitle: `${a.date} ${a.time} cu ${a.doctor.name}`,
           createdAt: a.createdAt
         }))
-        await indexedDb.put('statistics', { id: 'recent-activities', data: activities, timestamp: new Date().toISOString() })
+        await indexedDb.put('statistic', { id: 'recent-activities', data: activities, timestamp: new Date().toISOString() })
       } catch (_) {}
 
       try { 
@@ -546,12 +546,12 @@ export const demoDataSeeder = {
       console.log('[demoSeeder] Verifying final counts...')
       try {
         const [pc, uc, tc, prc, ac, sc, rc] = await Promise.all([
-          indexedDb.count('patients').catch(e => { console.warn('[demoSeeder] Error verifying patients count:', e); return 0; }),
-          indexedDb.count('users').catch(e => { console.warn('[demoSeeder] Error verifying users count:', e); return 0; }),
-          indexedDb.count('treatments').catch(e => { console.warn('[demoSeeder] Error verifying treatments count:', e); return 0; }),
-          indexedDb.count('products').catch(e => { console.warn('[demoSeeder] Error verifying products count:', e); return 0; }),
-          indexedDb.count('appointments').catch(e => { console.warn('[demoSeeder] Error verifying appointments count:', e); return 0; }),
-          indexedDb.count('sales').catch(e => { console.warn('[demoSeeder] Error verifying sales count:', e); return 0; }),
+          indexedDb.count('patient').catch(e => { console.warn('[demoSeeder] Error verifying patients count:', e); return 0; }),
+          indexedDb.count('user').catch(e => { console.warn('[demoSeeder] Error verifying users count:', e); return 0; }),
+          indexedDb.count('treatment').catch(e => { console.warn('[demoSeeder] Error verifying treatments count:', e); return 0; }),
+          indexedDb.count('product').catch(e => { console.warn('[demoSeeder] Error verifying products count:', e); return 0; }),
+          indexedDb.count('appointment').catch(e => { console.warn('[demoSeeder] Error verifying appointments count:', e); return 0; }),
+          indexedDb.count('sale').catch(e => { console.warn('[demoSeeder] Error verifying sales count:', e); return 0; }),
           indexedDb.count('role').catch(e => { console.warn('[demoSeeder] Error verifying roles count:', e); return 0; })
         ])
         console.log('[demoSeeder] Final verification counts:', { 
@@ -582,7 +582,7 @@ export const demoDataSeeder = {
     try {
       // Patients
       try {
-        const patients = await indexedDb.getAll('patients')
+        const patients = await indexedDb.getAll('patient')
         if (patients && patients.length) {
           const normalized = patients.map(p => ({
             ...p,
@@ -591,13 +591,13 @@ export const demoDataSeeder = {
             name: p.name || p.patientName || 'Pacient',
             status: p.status || 'active'
           }))
-          await indexedDb.bulkPut('patients', normalized)
+          await indexedDb.bulkPut('patient', normalized)
         }
       } catch (_) {}
 
       // Users (medici)
       try {
-        const users = await indexedDb.getAll('users')
+        const users = await indexedDb.getAll('user')
         if (users && users.length) {
           const normalized = users.map(u => ({
             ...u,
@@ -606,13 +606,13 @@ export const demoDataSeeder = {
             medicName: u.medicName || u.fullName || 'Medic',
             status: u.status || 'active'
           }))
-          await indexedDb.bulkPut('users', normalized)
+          await indexedDb.bulkPut('user', normalized)
         }
       } catch (_) {}
 
       // Products
       try {
-        const products = await indexedDb.getAll('products')
+        const products = await indexedDb.getAll('product')
         if (products && products.length) {
           const normalized = products.map(pr => ({
             ...pr,
@@ -622,13 +622,13 @@ export const demoDataSeeder = {
             stock: typeof pr.stock === 'string' ? parseInt(pr.stock, 10) : (pr.stock || 0),
             reorderLevel: typeof pr.reorderLevel === 'string' ? parseInt(pr.reorderLevel, 10) : (pr.reorderLevel || 0)
           }))
-          await indexedDb.bulkPut('products', normalized)
+          await indexedDb.bulkPut('product', normalized)
         }
       } catch (_) {}
 
       // Treatments
       try {
-        const treatments = await indexedDb.getAll('treatments')
+        const treatments = await indexedDb.getAll('treatment')
         if (treatments && treatments.length) {
           const normalized = treatments.map(t => ({
             ...t,
@@ -638,13 +638,13 @@ export const demoDataSeeder = {
             price: typeof t.price === 'string' ? parseFloat(t.price) : (t.price || 0),
             duration: typeof t.duration === 'string' ? parseInt(t.duration, 10) : (t.duration || 0)
           }))
-          await indexedDb.bulkPut('treatments', normalized)
+          await indexedDb.bulkPut('treatment', normalized)
         }
       } catch (_) {}
 
       // Appointments
       try {
-        const appointments = await indexedDb.getAll('appointments')
+        const appointments = await indexedDb.getAll('appointment')
         if (appointments && appointments.length) {
           const normalized = appointments.map(a => ({
             ...a,
@@ -655,13 +655,13 @@ export const demoDataSeeder = {
             service: typeof a.service === 'object' ? a.service : { id: a.service || null, name: a.serviceName || 'Serviciu' },
             status: a.status || 'scheduled'
           }))
-          await indexedDb.bulkPut('appointments', normalized)
+          await indexedDb.bulkPut('appointment', normalized)
         }
       } catch (_) {}
 
       // Sales
       try {
-        const sales = await indexedDb.getAll('sales')
+        const sales = await indexedDb.getAll('sale')
         if (sales && sales.length) {
           const normalized = sales.map(s => ({
             ...s,
@@ -671,7 +671,7 @@ export const demoDataSeeder = {
             subtotal: typeof s.subtotal === 'string' ? parseFloat(s.subtotal) : (s.subtotal || 0),
             tax: typeof s.tax === 'string' ? parseFloat(s.tax) : (s.tax || 0)
           }))
-          await indexedDb.bulkPut('sales', normalized)
+          await indexedDb.bulkPut('sale', normalized)
         }
       } catch (_) {}
 

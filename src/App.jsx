@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from "react-oidc-context"
 import Navbar from './components/Navbar'
-import Sidebar from './components/Sidebar'
+import NewSidebar from './components/NewSidebar'
 import { MainDrawer as MainDrawer } from './components/drawers'
 import { Drawer } from './components/ui/drawer'
 import Dashboard from './components/Dashboard'
@@ -236,38 +236,40 @@ function AppContent() {
   }
 
   return (
-    <div className="flex h-screen bg-background w-full flex-col">
-        {/* Navbar */}
+    <div className="h-screen bg-background w-full relative">
+        {/* Floating Navbar */}
         <Navbar 
           currentView={currentView}
           currentLocation={selectedLocation}
         />
       
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <Sidebar 
-          collapsed={sidebarCollapsed}
-          currentView={currentView}
-          onViewChange={handleViewChange}
-          onToggle={handleSidebarToggle}
-          currentLocation={selectedLocation}
-          onLocationChange={handleLocationChange}
-        />
-
+      <div className="h-full flex overflow-hidden">
+        {/* Sidebar with padding */}
+        <div className="p-2">
+          <NewSidebar 
+            collapsed={sidebarCollapsed}
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            onToggle={handleSidebarToggle}
+            currentLocation={selectedLocation}
+            onLocationChange={handleLocationChange}
+          />
+        </div>
         
         {/* Content Area */}
         <main className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 overflow-auto p-6 pt-20">
             <Dashboard 
               currentView={currentView}
               currentLocation={selectedLocation}
             />
           </div>
-          
-          
-          {/* Drawer as Side Panel */}
-          {drawerOpen && (
+        </main>
+        
+        {/* Floating Drawer */}
+        {drawerOpen && (
+          <div className="absolute top-0 right-0 z-30 h-full pt-18 p-2">
             <Drawer 
               onClose={closeDrawer}
               position="side"
@@ -279,9 +281,8 @@ function AppContent() {
                 onClose={closeDrawer}
               />
             </Drawer>
-          )}
-
-        </main>
+          </div>
+        )}
 
       </div>
       

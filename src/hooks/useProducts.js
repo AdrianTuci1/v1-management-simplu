@@ -104,7 +104,7 @@ export const useProducts = () => {
         result = await productService.loadProducts(filters);
       } catch (apiError) {
         console.warn('API not available, loading from cache:', apiError);
-        result = await indexedDb.getAll('products');
+        result = await indexedDb.getAll('product');
       }
       sharedProducts = result;
       notifySubscribers();
@@ -198,7 +198,7 @@ export const useProducts = () => {
           result = await productService.loadProducts();
         } catch (apiError) {
           console.warn('API not available, loading from cache:', apiError);
-          result = await indexedDb.getAll('products');
+          result = await indexedDb.getAll('product');
         }
         sharedProducts = result
         notifySubscribers()

@@ -1,4 +1,4 @@
-import { Bell, User, Search, Menu, MapPin, Bot, Plus, LogOut } from 'lucide-react'
+import { Bell, User, Search, Menu, MapPin, Bot, Plus } from 'lucide-react'
 import { useAuth } from "react-oidc-context"
 import { useDrawer } from '../contexts/DrawerContext'
 import { useQuickActionsStore } from '../stores/quickActionsStore'
@@ -37,138 +37,32 @@ const Navbar = ({ currentView, currentLocation }) => {
     return titles[view] || 'Dashboard'
   }
 
-  const handleSignOut = () => {
-    const clientId = "ar2m2qg3gp4a0b4cld09aegdb";
-    const logoutUri = window.location.href;
-    const cognitoDomain = "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_KUaE0MTcQ";
-    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
-  }
 
   const userEmail = auth.user?.profile?.email || localStorage.getItem('user-email') || 'Demo User'
 
   return (
-    <header className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-full items-center justify-between px-6">
-        {/* Left side - Menu toggle and title */}
-        <div className="flex items-center gap-4">
+    <header className="absolute top-4 right-4 z-20">
+      {/* Floating circles: AI Agent and User */}
+      <div className="flex items-center gap-3">
+        {/* AI Agent circle */}
+        {!isDemoMode && (
           <button
-            onClick={openMenuDrawer}
-            className="btn btn-ghost btn-sm lg:hidden"
+            onClick={openAIAssistantDrawer}
+            className="h-12 w-12 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-200 flex items-center justify-center transition-all duration-200"
+            title="Deschide AI Assistant"
           >
-            <Menu className="h-5 w-5" />
+            <Bot className="h-5 w-5 text-blue-600" />
           </button>
-          
-          <div className="hidden lg:block">
-            <h1 className="text-lg font-semibold flex items-center gap-2">
-              <div className="relative">
-                <BusinessIcon className="h-5 w-5" />
-                {/* Health indicator dot */}
-                <div 
-                  className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                    isHealthy 
-                      ? 'bg-green-500' 
-                      : isOffline 
-                        ? 'bg-gray-400' 
-                        : isServerDown 
-                          ? 'bg-red-500' 
-                          : 'bg-yellow-500'
-                  }`}
-                  title={
-                    isHealthy 
-                      ? 'Sistem online și funcțional' 
-                      : isOffline 
-                        ? 'Fără conexiune la internet' 
-                        : isServerDown 
-                          ? 'Server indisponibil' 
-                          : 'Verificare în curs...'
-                  }
-                />
-              </div>
-              {isDemoMode && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-                  DEMO
-                </span>
-              )}
-            </h1>
-          </div>
-          
-          <div className="lg:hidden">
-            <h1 className="text-lg font-semibold flex items-center gap-2">
-              <div className="relative">
-                <span>{getViewTitle(currentView)}</span>
-                {/* Health indicator dot for mobile */}
-                <div 
-                  className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                    isHealthy 
-                      ? 'bg-green-500' 
-                      : isOffline 
-                        ? 'bg-gray-400' 
-                        : isServerDown 
-                          ? 'bg-red-500' 
-                          : 'bg-yellow-500'
-                  }`}
-                  title={
-                    isHealthy 
-                      ? 'Sistem online și funcțional' 
-                      : isOffline 
-                        ? 'Fără conexiune la internet' 
-                        : isServerDown 
-                          ? 'Server indisponibil' 
-                          : 'Verificare în curs...'
-                  }
-                />
-              </div>
-              {isDemoMode && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-                  DEMO
-                </span>
-              )}
-            </h1>
-          </div>
-        </div>
+        )}
 
-        {/* Right side - Robot, Notifications and user */}
-        <div className="flex items-center gap-2">
-          {/* Robot AI Assistant - Hidden in demo mode */}
-          {!isDemoMode && (
-            <button
-              onClick={openAIAssistantDrawer}
-              className="btn btn-ghost btn-sm"
-              title="Deschide AI Assistant"
-            >
-              <Bot className="h-5 w-5" />
-            </button>
-          )}
-
-          <button
-            onClick={toggleQuickActions}
-            className="btn btn-ghost btn-sm"
-            title="Acțiuni Rapide"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-
-
-          {/* User menu */}
-          <button
-            onClick={openUserDrawer}
-            className="btn btn-ghost btn-sm flex items-center gap-2"
-          >
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-              <User className="h-4 w-4 text-primary-foreground" />
-            </div>
-          </button>
-
-          {/* Sign Out Button */}
-          <button
-            onClick={handleSignOut}
-            className="btn btn-ghost btn-sm"
-            title="Deconectare"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
-
-        </div>
+        {/* User circle */}
+        <button
+          onClick={openUserDrawer}
+          className="h-12 w-12 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 flex items-center justify-center transition-all duration-200"
+          title="Utilizator"
+        >
+          <User className="h-5 w-5 text-gray-600" />
+        </button>
       </div>
     </header>
   )
