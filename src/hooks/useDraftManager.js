@@ -9,8 +9,8 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { dataFacade } from '../data/DataFacade.js';
 import { draftManager } from '../data/infrastructure/draftManager.js';
-import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js';
 
 export function useDraftManager(resourceType, options = {}) {
   const {
@@ -29,14 +29,81 @@ export function useDraftManager(resourceType, options = {}) {
   const [statistics, setStatistics] = useState(null);
 
   // Refs
-  const repositoryRef = useRef(null);
   const autoSaveTimerRef = useRef(null);
   const draftListenersRef = useRef(new Set());
 
-  // Initialize repository
-  useEffect(() => {
-    if (resourceType) {
-      repositoryRef.current = new DraftAwareResourceRepository(resourceType);
+  // ========================================
+  // DATA LOADING FUNCTIONS (defined early to avoid hoisting issues)
+  // ========================================
+
+  /**
+   * Încarcă draft-urile din IndexedDB local
+   */
+  const loadDrafts = useCallback(async () => {
+    try {
+      if (!resourceType) return;
+
+      // Accesează direct IndexedDB-ul local pentru draft-uri
+      // Nu folosim dataFacade pentru a evita health check-ul
+      const { db } = await import('../data/infrastructure/db.js');
+      const allDrafts = await db.drafts.toArray() || [];
+      
+      // Filtrează draft-urile după resourceType
+      const filteredDrafts = allDrafts.filter(draft => draft.resourceType === resourceType);
+      setDrafts(filteredDrafts);
+    } catch (err) {
+      console.error('Error loading drafts:', err);
+      // Don't set error for normal "no data" cases
+      if (err.message && 
+          !err.message.includes('not found') && 
+          !err.message.includes('empty')) {
+        setError(err.message);
+      }
+    }
+  }, [resourceType]);
+
+  /**
+   * Încarcă sesiunile din IndexedDB local
+   */
+  const loadSessions = useCallback(async () => {
+    try {
+      // Sesiunile nu sunt stocate în IndexedDB în această versiune
+      // Setează array gol pentru compatibilitate
+      setSessions([]);
+    } catch (err) {
+      console.error('Error loading sessions:', err);
+      // Don't set error for normal "no data" cases
+      if (err.message && 
+          !err.message.includes('not found') && 
+          !err.message.includes('empty')) {
+        setError(err.message);
+      }
+    }
+  }, []);
+
+  /**
+   * Încarcă statisticile
+   */
+  const loadStatistics = useCallback(async () => {
+    try {
+      if (!resourceType) return;
+
+      const repository = dataFacade.getRepository(resourceType);
+      if (repository && repository.getDraftStatistics) {
+        const stats = await repository.getDraftStatistics();
+        setStatistics(stats);
+      }
+    } catch (err) {
+      console.error('Error loading statistics:', err);
+      // Don't set error for normal "no data" cases or health check errors
+      if (err.message && 
+          !err.message.includes('not found') && 
+          !err.message.includes('empty') &&
+          !err.message.includes('offline') &&
+          !err.message.includes('server is down') &&
+          !err.message.includes('not available')) {
+        setError(err.message);
+      }
     }
   }, [resourceType]);
 
@@ -45,7 +112,7 @@ export function useDraftManager(resourceType, options = {}) {
     loadDrafts();
     loadSessions();
     loadStatistics();
-  }, [resourceType]);
+  }, [loadDrafts, loadSessions, loadStatistics]);
 
   // Auto-save setup
   useEffect(() => {
@@ -87,11 +154,7 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
-      }
-
-      const draft = await repositoryRef.current.createDraft(data, sessionId || activeSession?.sessionId);
+      const draft = await dataFacade.createDraft(resourceType, data, sessionId || activeSession?.sessionId);
       
       // Reload drafts
       await loadDrafts();
@@ -108,7 +171,7 @@ export function useDraftManager(resourceType, options = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [activeSession, onDraftChange]);
+  }, [resourceType, activeSession, onDraftChange]);
 
   /**
    * Actualizează un draft existent
@@ -121,11 +184,7 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
-      }
-
-      const updatedDraft = await repositoryRef.current.updateDraft(draftId, data);
+      const updatedDraft = await dataFacade.updateDraft(draftId, data);
       
       // Update local state
       setDrafts(prev => prev.map(draft => 
@@ -156,11 +215,7 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
-      }
-
-      const result = await repositoryRef.current.commitDraft(draftId);
+      const result = await dataFacade.commitDraft(draftId);
       
       // Reload drafts
       await loadDrafts();
@@ -189,11 +244,7 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
-      }
-
-      const result = await repositoryRef.current.cancelDraft(draftId);
+      const result = await dataFacade.cancelDraft(draftId);
       
       // Reload drafts
       await loadDrafts();
@@ -222,11 +273,7 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
-      }
-
-      const result = await repositoryRef.current.deleteDraft(draftId);
+      const result = await dataFacade.delete('draft', draftId);
       
       // Reload drafts
       await loadDrafts();
@@ -260,11 +307,7 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
-      }
-
-      const session = await repositoryRef.current.createSession(type, data);
+      const session = await dataFacade.createSession(type, data);
       
       // Set as active session
       setActiveSession(session);
@@ -284,7 +327,7 @@ export function useDraftManager(resourceType, options = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [onSessionChange]);
+  }, [onSessionChange, loadSessions]);
 
   /**
    * Salvează o sesiune
@@ -297,11 +340,7 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
-      }
-
-      const session = await repositoryRef.current.saveSession(sessionId, sessionData);
+      const session = await dataFacade.saveSession(sessionId, sessionData);
       
       // Update active session if it's the same
       if (activeSession && activeSession.sessionId === sessionId) {
@@ -323,7 +362,7 @@ export function useDraftManager(resourceType, options = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [activeSession, onSessionChange]);
+  }, [activeSession, onSessionChange, loadSessions]);
 
   /**
    * Închide o sesiune
@@ -335,11 +374,7 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
-      }
-
-      const session = await repositoryRef.current.closeSession(sessionId);
+      const session = await dataFacade.closeSession(sessionId);
       
       // Clear active session if it's the same
       if (activeSession && activeSession.sessionId === sessionId) {
@@ -361,7 +396,7 @@ export function useDraftManager(resourceType, options = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [activeSession, onSessionChange]);
+  }, [activeSession, onSessionChange, loadSessions]);
 
   // ========================================
   // BATCH OPERATIONS
@@ -377,11 +412,12 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
+      const repository = dataFacade.getRepository(resourceType);
+      if (!repository || !repository.commitAllDraftsForSession) {
+        throw new Error('Repository does not support batch operations');
       }
 
-      const result = await repositoryRef.current.commitAllDraftsForSession(sessionId);
+      const result = await repository.commitAllDraftsForSession(sessionId);
       
       // Reload drafts
       await loadDrafts();
@@ -398,7 +434,7 @@ export function useDraftManager(resourceType, options = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [onDraftChange]);
+  }, [resourceType, onDraftChange]);
 
   /**
    * Anulează toate draft-urile pentru o sesiune
@@ -410,11 +446,12 @@ export function useDraftManager(resourceType, options = {}) {
       setIsLoading(true);
       setError(null);
 
-      if (!repositoryRef.current) {
-        throw new Error('Repository not initialized');
+      const repository = dataFacade.getRepository(resourceType);
+      if (!repository || !repository.cancelAllDraftsForSession) {
+        throw new Error('Repository does not support batch operations');
       }
 
-      const result = await repositoryRef.current.cancelAllDraftsForSession(sessionId);
+      const result = await repository.cancelAllDraftsForSession(sessionId);
       
       // Reload drafts
       await loadDrafts();
@@ -431,56 +468,11 @@ export function useDraftManager(resourceType, options = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [onDraftChange]);
+  }, [resourceType, onDraftChange]);
 
   // ========================================
   // DATA LOADING
   // ========================================
-
-  /**
-   * Încarcă draft-urile
-   */
-  const loadDrafts = useCallback(async () => {
-    try {
-      if (!repositoryRef.current) return;
-
-      const drafts = await repositoryRef.current.getAllDrafts();
-      setDrafts(drafts);
-    } catch (err) {
-      console.error('Error loading drafts:', err);
-      setError(err.message);
-    }
-  }, []);
-
-  /**
-   * Încarcă sesiunile
-   */
-  const loadSessions = useCallback(async () => {
-    try {
-      if (!repositoryRef.current) return;
-
-      const sessions = await repositoryRef.current.draftManager.getAllSessions();
-      setSessions(sessions);
-    } catch (err) {
-      console.error('Error loading sessions:', err);
-      setError(err.message);
-    }
-  }, []);
-
-  /**
-   * Încarcă statisticile
-   */
-  const loadStatistics = useCallback(async () => {
-    try {
-      if (!repositoryRef.current) return;
-
-      const stats = await repositoryRef.current.getDraftStatistics();
-      setStatistics(stats);
-    } catch (err) {
-      console.error('Error loading statistics:', err);
-      setError(err.message);
-    }
-  }, []);
 
   // ========================================
   // AUTO-SAVE
@@ -563,9 +555,14 @@ export function useDraftManager(resourceType, options = {}) {
    */
   const cleanupOldDrafts = useCallback(async (daysOld = 30) => {
     try {
-      if (!repositoryRef.current) return 0;
+      if (!resourceType) return 0;
 
-      const count = await repositoryRef.current.cleanupOldDrafts(daysOld);
+      const repository = dataFacade.getRepository(resourceType);
+      if (!repository || !repository.cleanupOldDrafts) {
+        return 0;
+      }
+
+      const count = await repository.cleanupOldDrafts(daysOld);
       
       // Reload drafts
       await loadDrafts();
@@ -575,7 +572,7 @@ export function useDraftManager(resourceType, options = {}) {
       console.error('Error cleaning up old drafts:', err);
       throw err;
     }
-  }, [loadDrafts]);
+  }, [resourceType]);
 
   // ========================================
   // RETURN HOOK INTERFACE
@@ -615,10 +612,7 @@ export function useDraftManager(resourceType, options = {}) {
     getDraftsForSession,
     getActiveDrafts,
     getDraftsByOperation,
-    cleanupOldDrafts,
-    
-    // Repository access
-    repository: repositoryRef.current
+    cleanupOldDrafts
   };
 }
 

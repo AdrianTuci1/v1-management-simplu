@@ -331,8 +331,6 @@ export class SocketFacade {
     // Trimite mesajul
     const success = aiAssistant.sendMessage(content, context);
     
-    Logger.log('info', 'AI Assistant message sent', { businessId, userId, content });
-    
     return {
       success,
       message: content,

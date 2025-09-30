@@ -115,6 +115,10 @@ export const DrawerProvider = ({ children }) => {
     openDrawer({ type: 'ai-assistant' })
   }
 
+  const openUserProfileDrawer = () => {
+    openDrawer({ type: 'user-profile' })
+  }
+
   // Funcții pentru gestionarea stivei
   const getStackInfo = () => {
     return {
@@ -141,6 +145,7 @@ export const DrawerProvider = ({ children }) => {
     openDataDownloadDrawer,
     openStripePaymentDrawer,
     openAIAssistantDrawer,
+    openUserProfileDrawer,
     // Funcții pentru stiva de drawere
     getStackInfo,
     getStackSize,

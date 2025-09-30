@@ -11,11 +11,54 @@
 import { ResourceRepository } from './ResourceRepository.js';
 import { draftManager } from '../infrastructure/draftManager.js';
 import { db } from '../infrastructure/db.js';
+import { healthRepository } from './HealthRepository.js';
 
 export class DraftAwareResourceRepository extends ResourceRepository {
   constructor(resourceType, store = "resources") {
     super(resourceType, store);
     this.draftManager = draftManager;
+  }
+
+  // ========================================
+  // HEALTH CHECK HELPERS
+  // ========================================
+
+  /**
+   * Verifică dacă sistemul poate face cereri către server
+   * @returns {boolean} True dacă poate face cereri
+   */
+  canMakeServerRequests() {
+    const healthStatus = healthRepository.getCurrentStatus();
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    
+    // În demo mode, permite întotdeauna cererile
+    if (isDemoMode) return true;
+    
+    // Dacă health check-ul nu a fost executat încă, permite cererile
+    if (!healthStatus.lastCheck) return true;
+    
+    // Verifică dacă poate face cereri
+    return healthStatus.canMakeRequests;
+  }
+
+  /**
+   * Verifică health status-ul înainte de operațiuni
+   * @param {string} operation - Numele operațiunii
+   * @throws {Error} Dacă sistemul nu poate face cereri
+   */
+  checkHealthBeforeOperation(operation = 'operation') {
+    if (!this.canMakeServerRequests()) {
+      const healthStatus = healthRepository.getCurrentStatus();
+      console.warn(`System is offline or server is down. ${operation} blocked.`);
+      
+      if (healthStatus.isOffline) {
+        throw new Error('System is offline. Please check your internet connection.');
+      } else if (healthStatus.isServerDown) {
+        throw new Error('Server is down. Please try again later.');
+      } else {
+        throw new Error('System is not available. Please try again later.');
+      }
+    }
   }
 
   // ========================================
@@ -30,6 +73,9 @@ export class DraftAwareResourceRepository extends ResourceRepository {
    */
   async createDraft(data, sessionId = null) {
     try {
+      // Verifică health status-ul înainte de a crea draft-ul
+      this.checkHealthBeforeOperation('Create draft');
+      
       const draft = await this.draftManager.createDraft(
         this.resourceType,
         data,
@@ -55,6 +101,9 @@ export class DraftAwareResourceRepository extends ResourceRepository {
    */
   async updateDraft(draftId, data) {
     try {
+      // Verifică health status-ul înainte de a actualiza draft-ul
+      this.checkHealthBeforeOperation('Update draft');
+      
       const updatedDraft = await this.draftManager.updateDraft(draftId, data);
       
       // Actualizează draft-ul în store-ul local
@@ -105,6 +154,9 @@ export class DraftAwareResourceRepository extends ResourceRepository {
    */
   async commitDraft(draftId) {
     try {
+      // Verifică health status-ul înainte de a confirma draft-ul
+      this.checkHealthBeforeOperation('Commit draft');
+      
       const draft = await this.draftManager.getDraft(draftId);
       if (!draft) {
         throw new Error(`Draft with ID ${draftId} not found`);
@@ -200,6 +252,9 @@ export class DraftAwareResourceRepository extends ResourceRepository {
    */
   async createSession(type, data = {}) {
     try {
+      // Verifică health status-ul înainte de a crea sesiunea
+      this.checkHealthBeforeOperation('Create session');
+      
       return await this.draftManager.createSession(type, data);
     } catch (error) {
       console.error('Error creating session:', error);
@@ -215,6 +270,9 @@ export class DraftAwareResourceRepository extends ResourceRepository {
    */
   async saveSession(sessionId, sessionData) {
     try {
+      // Verifică health status-ul înainte de a salva sesiunea
+      this.checkHealthBeforeOperation('Save session');
+      
       return await this.draftManager.saveSession(sessionId, sessionData);
     } catch (error) {
       console.error('Error saving session:', error);
@@ -418,6 +476,9 @@ export class DraftAwareResourceRepository extends ResourceRepository {
    */
   async commitAllDraftsForSession(sessionId) {
     try {
+      // Verifică health status-ul înainte de a confirma toate draft-urile
+      this.checkHealthBeforeOperation('Commit all drafts for session');
+      
       const drafts = await this.draftManager.getDraftsBySession(sessionId);
       const results = [];
       

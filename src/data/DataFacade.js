@@ -20,6 +20,9 @@ import {
   aiAssistantRepository,
 } from './repositories/index.js';
 
+// Import DraftAwareResourceRepository
+import { DraftAwareResourceRepository } from './repositories/DraftAwareResourceRepository.js';
+
 // Import commands
 import { AddCommand } from './commands/AddCommand.js';
 import { UpdateCommand } from './commands/UpdateCommand.js';
@@ -27,9 +30,7 @@ import { DeleteCommand } from './commands/DeleteCommand.js';
 import { GetCommand } from './commands/GetCommand.js';
 
 
-// Import infrastructure
-import { db } from './infrastructure/db.js';
-import { enqueue, processQueue } from './queue/offlineQueue.js';
+
 import { healthMonitor } from './infrastructure/healthMonitor.js';
 import { draftManager } from './infrastructure/draftManager.js';
 import { agentWebSocketHandler } from './infrastructure/agentWebSocketHandler.js';
@@ -71,15 +72,19 @@ export class DataFacade {
     this.repositories.set('userRoles', UserRolesRepository);
     this.repositories.set('aiAssistant', aiAssistantRepository);
     
-    // Repository-uri pentru resurse (singular API și IndexedDB)
-    this.repositories.set('appointment', new ResourceRepository('appointment', 'appointment'));
-    this.repositories.set('patient', new ResourceRepository('patient', 'patient'));
-    this.repositories.set('product', new ResourceRepository('product', 'product'));
-    this.repositories.set('medic', new ResourceRepository('medic', 'user'));
-    this.repositories.set('treatment', new ResourceRepository('treatment', 'treatment'));
-    this.repositories.set('sales', new ResourceRepository('sales', 'sale'));
-    this.repositories.set('role', new ResourceRepository('role', 'role'));
-    this.repositories.set('permission', new ResourceRepository('permission', 'permission'));
+    // Repository-uri pentru resurse cu suport draft (DraftAwareResourceRepository)
+    this.repositories.set('appointment', new DraftAwareResourceRepository('appointment', 'appointment'));
+    this.repositories.set('patient', new DraftAwareResourceRepository('patient', 'patient'));
+    this.repositories.set('product', new DraftAwareResourceRepository('product', 'product'));
+    this.repositories.set('medic', new DraftAwareResourceRepository('medic', 'user'));
+    this.repositories.set('treatment', new DraftAwareResourceRepository('treatment', 'treatment'));
+    this.repositories.set('sales', new DraftAwareResourceRepository('sales', 'sale'));
+    this.repositories.set('role', new DraftAwareResourceRepository('role', 'role'));
+    this.repositories.set('permission', new DraftAwareResourceRepository('permission', 'permission'));
+    
+    // Repository-uri speciale pentru draft-uri și sesiuni
+    this.repositories.set('draft', new DraftAwareResourceRepository('draft', 'drafts'));
+    this.repositories.set('session', new DraftAwareResourceRepository('session', 'sessions'));
   }
 
   initializeInvokers() {
@@ -312,6 +317,10 @@ export class DataFacade {
    * @returns {Promise<Object>} Draft-ul creat
    */
   async createDraft(resourceType, data, sessionId = null) {
+    const repository = this.getRepository(resourceType);
+    if (repository && repository.createDraft) {
+      return await repository.createDraft(data, sessionId);
+    }
     return await draftManager.createDraft(resourceType, data, 'create', sessionId);
   }
 
@@ -322,6 +331,17 @@ export class DataFacade {
    * @returns {Promise<Object>} Draft-ul actualizat
    */
   async updateDraft(draftId, data) {
+    // Try to find the repository that has this draft
+    for (const [resourceType, repository] of this.repositories) {
+      if (repository && repository.updateDraft) {
+        try {
+          return await repository.updateDraft(draftId, data);
+        } catch (error) {
+          // Continue to next repository if this one doesn't have the draft
+          continue;
+        }
+      }
+    }
     return await draftManager.updateDraft(draftId, data);
   }
 
@@ -331,6 +351,17 @@ export class DataFacade {
    * @returns {Promise<Object>} Rezultatul confirmării
    */
   async commitDraft(draftId) {
+    // Try to find the repository that has this draft
+    for (const [resourceType, repository] of this.repositories) {
+      if (repository && repository.commitDraft) {
+        try {
+          return await repository.commitDraft(draftId);
+        } catch (error) {
+          // Continue to next repository if this one doesn't have the draft
+          continue;
+        }
+      }
+    }
     return await draftManager.commitDraft(draftId);
   }
 
@@ -340,6 +371,17 @@ export class DataFacade {
    * @returns {Promise<Object>} Rezultatul anulării
    */
   async cancelDraft(draftId) {
+    // Try to find the repository that has this draft
+    for (const [resourceType, repository] of this.repositories) {
+      if (repository && repository.cancelDraft) {
+        try {
+          return await repository.cancelDraft(draftId);
+        } catch (error) {
+          // Continue to next repository if this one doesn't have the draft
+          continue;
+        }
+      }
+    }
     return await draftManager.cancelDraft(draftId);
   }
 
@@ -349,6 +391,17 @@ export class DataFacade {
    * @returns {Promise<Object>} Draft-ul găsit
    */
   async getDraft(draftId) {
+    // Try to find the repository that has this draft
+    for (const [resourceType, repository] of this.repositories) {
+      if (repository && repository.getDraft) {
+        try {
+          return await repository.getDraft(draftId);
+        } catch (error) {
+          // Continue to next repository if this one doesn't have the draft
+          continue;
+        }
+      }
+    }
     return await draftManager.getDraft(draftId);
   }
 
@@ -358,6 +411,10 @@ export class DataFacade {
    * @returns {Promise<Array>} Lista de draft-uri
    */
   async getDraftsByResourceType(resourceType) {
+    const repository = this.getRepository(resourceType);
+    if (repository && repository.getAllDrafts) {
+      return await repository.getAllDrafts();
+    }
     return await draftManager.getDraftsByResourceType(resourceType);
   }
 

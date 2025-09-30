@@ -106,13 +106,13 @@ function createWorker() {
     };
     
     worker.onerror = function(error) {
-      console.error('WebSocket Worker error:', error);
+      // WebSocket Worker error
       connectionStatus = 'error';
       listeners.forEach((cb) => cb({ type: 'connection', status: 'error', data: error }));
     };
     
   } catch (error) {
-    console.error('Error creating WebSocket Worker:', error);
+    // Error creating WebSocket Worker
     throw error;
   }
   
@@ -136,7 +136,6 @@ function sendToWorker(type, data) {
     setTimeout(() => {
       if (pendingMessages.has(id)) {
         pendingMessages.delete(id);
-        console.warn('Worker message timeout for type:', type, 'id:', id);
         reject(new Error(`Worker message timeout after 10 seconds for operation: ${type}`));
       }
     }, 10000);
@@ -195,7 +194,7 @@ export function sendMessage(event, payload) {
   if (worker && connectionStatus === 'connected') {
     sendToWorker('send', { event, payload });
   } else {
-    console.warn("Cannot send message: WebSocket not connected");
+    // Cannot send message: WebSocket not connected
   }
 }
 
@@ -214,7 +213,7 @@ export function getCurrentChannelName() {
   try {
     return buildResourcesChannel();
   } catch (error) {
-    console.error("Error getting channel name:", error);
+    // Error getting channel name
     return null;
   }
 }
@@ -267,10 +266,10 @@ async function handleAgentRequest(data) {
         break;
         
       default:
-        console.warn('Unknown agent request type:', type);
+        // Unknown agent request type
     }
   } catch (error) {
-    console.error('Error handling agent request:', error);
+    // Error handling agent request
     
     // Send error response back to agent
     try {
@@ -281,7 +280,7 @@ async function handleAgentRequest(data) {
         timestamp: new Date().toISOString()
       });
     } catch (importError) {
-      console.error('Failed to import DataFacade for error response:', importError);
+      // Failed to import DataFacade for error response
     }
   }
 }

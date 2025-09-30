@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from "react-oidc-context"
+import { Calendar, FileText, Image, User, Pill } from 'lucide-react'
 import Navbar from './components/Navbar'
 import NewSidebar from './components/NewSidebar'
-import { MainDrawer as MainDrawer } from './components/drawers'
-import { Drawer } from './components/ui/drawer'
+import DraftMainDrawer from './components/drawers/DraftMainDrawer'
+import { Drawer, DrawerExternalNavigation } from './components/ui/drawer'
 import Dashboard from './components/Dashboard'
 import AuthScreen from './components/AuthScreen'
 import LoadingScreen from './components/LoadingScreen'
@@ -23,6 +24,13 @@ function AppContent() {
   const [userData, setUserData] = useState(null)
   const [accessDenied, setAccessDenied] = useState(false)
   const { drawerOpen, drawerContent, closeDrawer } = useDrawer()
+  
+  // State pentru navigația externă
+  const [externalNavigationState, setExternalNavigationState] = useState({
+    appointment: 1,
+    'new-person': 1,
+    'edit-person': 1
+  })
 
   // Check if demo mode is enabled
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
@@ -205,6 +213,38 @@ function AppContent() {
     localStorage.setItem('selected-location', JSON.stringify(location))
   }
 
+  // Funcții pentru navigația externă
+  const getExternalNavigationItems = (drawerType) => {
+    switch (drawerType) {
+      case 'appointment':
+        return [
+          { id: 1, label: 'Detalii', icon: Calendar },
+          { id: 2, label: 'Note', icon: FileText },
+          { id: 3, label: 'Galerie', icon: Image }
+        ]
+      case 'new-person':
+      case 'edit-person':
+        return [
+          { id: 1, label: 'Detalii pacient', icon: User },
+          { id: 2, label: 'Note dentare', icon: Pill },
+          { id: 3, label: 'Programări', icon: Calendar }
+        ]
+      default:
+        return []
+    }
+  }
+
+  const getCurrentNavigationItem = (drawerType) => {
+    return externalNavigationState[drawerType] || 1
+  }
+
+  const handleNavigationChange = (id, drawerType) => {
+    setExternalNavigationState(prev => ({
+      ...prev,
+      [drawerType]: id
+    }))
+  }
+
   // Show loading screen while auth is loading
   if (auth.isLoading) {
     return <LoadingScreen message="Se încarcă autentificarea..." />
@@ -267,18 +307,33 @@ function AppContent() {
           </div>
         </main>
         
-        {/* Floating Drawer */}
+        {/* Floating Drawer with External Navigation */}
         {drawerOpen && (
           <div className="absolute top-0 right-0 z-30 h-full pt-18 p-2">
+            {/* External Navigation - positioned at top */}
+            {(drawerContent?.type === 'appointment' || drawerContent?.type === 'new-person' || drawerContent?.type === 'edit-person') && (
+              <div className="absolute top-20 -left-10 z-40">
+                <DrawerExternalNavigation
+                  items={getExternalNavigationItems(drawerContent?.type)}
+                  activeItem={getCurrentNavigationItem(drawerContent?.type)}
+                  onItemChange={(id) => handleNavigationChange(id, drawerContent?.type)}
+                  position="top"
+                  className="flex-shrink-0"
+                />
+              </div>
+            )}
+            
             <Drawer 
               onClose={closeDrawer}
               position="side"
               size="md"
             >
-              <MainDrawer 
+              <DraftMainDrawer 
                 open={drawerOpen}
                 content={drawerContent}
                 onClose={closeDrawer}
+                externalNavigationState={externalNavigationState}
+                onExternalNavigationChange={handleNavigationChange}
               />
             </Drawer>
           </div>

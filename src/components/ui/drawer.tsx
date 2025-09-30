@@ -109,6 +109,43 @@ const navigationItemVariants = cva(
   }
 )
 
+const externalNavigationVariants = cva(
+  "flex gap-2",
+  {
+    variants: {
+      position: {
+        top: "justify-center flex-col",
+        bottom: "justify-center mt-2 flex-column",
+        left: "flex-col justify-center min-h-[200px]",
+        right: "flex-col justify-center ml-2 min-h-[200px]",
+      },
+    },
+    defaultVariants: {
+      position: "top",
+    },
+  }
+)
+
+const externalNavigationItemVariants = cva(
+  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer backdrop-blur-sm",
+  {
+    variants: {
+      active: {
+        true: "bg-primary text-white shadow-md scale-110",
+        false: "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 hover:scale-105",
+      },
+      disabled: {
+        true: "bg-gray-50 text-gray-400 cursor-not-allowed opacity-50",
+        false: "",
+      },
+    },
+    defaultVariants: {
+      active: false,
+      disabled: false,
+    },
+  }
+)
+
 export interface DrawerProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof drawerVariants> {
@@ -127,6 +164,19 @@ export interface DrawerHeaderProps
 export interface DrawerNavigationProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof drawerNavigationVariants> {
+  items: Array<{
+    id: number | string
+    label: string
+    icon?: React.ComponentType<{ className?: string }>
+    disabled?: boolean
+  }>
+  activeItem: number | string
+  onItemChange: (id: number | string) => void
+}
+
+export interface DrawerExternalNavigationProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof externalNavigationVariants> {
   items: Array<{
     id: number | string
     label: string
@@ -270,6 +320,38 @@ const DrawerNavigation = React.forwardRef<HTMLDivElement, DrawerNavigationProps>
 )
 DrawerNavigation.displayName = "DrawerNavigation"
 
+const DrawerExternalNavigation = React.forwardRef<HTMLDivElement, DrawerExternalNavigationProps>(
+  ({ className, position = "left", items, activeItem, onItemChange, ...props }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={cn(externalNavigationVariants({ position }), className)}
+        {...props}
+      >
+        {items.map((item) => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.id}
+              onClick={() => !item.disabled && onItemChange(item.id)}
+              className={cn(
+                externalNavigationItemVariants({
+                  active: activeItem === item.id,
+                  disabled: item.disabled,
+                })
+              )}
+              title={item.label}
+            >
+              {Icon && <Icon className="h-5 w-5" />}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+)
+DrawerExternalNavigation.displayName = "DrawerExternalNavigation"
+
 const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps>(
   ({ className, padding, children, ...props }, ref) => {
     return (
@@ -304,11 +386,14 @@ export {
   Drawer,
   DrawerHeader,
   DrawerNavigation,
+  DrawerExternalNavigation,
   DrawerContent,
   DrawerFooter,
   drawerVariants,
   drawerHeaderVariants,
   drawerNavigationVariants,
+  externalNavigationVariants,
+  externalNavigationItemVariants,
   drawerContentVariants,
   drawerFooterVariants,
   navigationItemVariants,

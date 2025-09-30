@@ -3,6 +3,7 @@ import {
   Drawer, 
   DrawerHeader, 
   DrawerNavigation, 
+  DrawerExternalNavigation,
   DrawerContent, 
   DrawerFooter 
 } from './drawer'
@@ -63,26 +64,37 @@ const DrawerExample = () => {
   }
 
   return (
-    <div className="p-4">
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="btn btn-primary"
-      >
-        Deschide Drawer Exemplu
-      </button>
+    <div className="p-4 space-y-4">
+      <div className="flex gap-2">
+        <button 
+          onClick={() => setIsOpen(true)}
+          className="btn btn-primary"
+        >
+          Deschide Drawer Normal
+        </button>
+        
+        <button 
+          onClick={() => setIsOpen(true)}
+          className="btn btn-secondary"
+        >
+          Deschide Drawer cu Navigație Externă
+        </button>
+      </div>
 
       {isOpen && (
-        <Drawer onClose={() => setIsOpen(false)}>
+        <Drawer 
+          onClose={() => setIsOpen(false)}
+          externalNavigation={{
+            items: navigationItems,
+            activeItem: currentMenu,
+            onItemChange: setCurrentMenu,
+            position: "left"
+          }}
+        >
           <DrawerHeader
-            title="Drawer Exemplu"
-            subtitle="Demonstrație componentă standardizată"
+            title="Drawer cu Navigație Externă"
+            subtitle="Navigația este în exteriorul drawer-ului"
             onClose={() => setIsOpen(false)}
-          />
-          
-          <DrawerNavigation
-            items={navigationItems}
-            activeItem={currentMenu}
-            onItemChange={setCurrentMenu}
           />
           
           <DrawerContent>

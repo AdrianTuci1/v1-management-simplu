@@ -25,8 +25,22 @@ import {
 } from '../ui/drawer'
 import TeethChartTab from '../dental-chart/TeethChartTab'
 
-const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, position = "side" }) => {
+const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, position = "side", externalCurrentMenu, onExternalMenuChange }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
+  
+  // Sincronizează cu navigația externă dacă este disponibilă
+  useEffect(() => {
+    if (externalCurrentMenu !== undefined && onExternalMenuChange) {
+      setCurrentMenu(externalCurrentMenu)
+    }
+  }, [externalCurrentMenu, onExternalMenuChange])
+  
+  const handleMenuChange = (id) => {
+    setCurrentMenu(id)
+    if (onExternalMenuChange) {
+      onExternalMenuChange(id)
+    }
+  }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [newTag, setNewTag] = useState('')
@@ -412,12 +426,6 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
         title={isNewPatient ? 'Pacient nou' : 'Editare pacient'}
         subtitle={isNewPatient ? 'Adaugă un pacient nou în sistem' : 'Modifică informațiile pacientului'}
         onClose={onClose}
-      />
-      
-      <DrawerNavigation
-        items={navigationItems}
-        activeItem={currentMenu}
-        onItemChange={setCurrentMenu}
       />
       
       <DrawerContent>

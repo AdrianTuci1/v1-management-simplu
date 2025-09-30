@@ -15,14 +15,8 @@ import {
   AlertCircle,
   Play,
   Pause,
-  RotateCcw,
-  RotateCw,
-  MoreHorizontal,
   Info,
-  Zap,
-  Phone,
   Mail as MailIcon,
-  ExternalLink
 } from 'lucide-react'
 import { 
   Drawer, 

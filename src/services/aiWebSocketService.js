@@ -79,19 +79,28 @@ export class AIWebSocketService {
       
       // Set up event handlers
       this.aiAssistantInstance.onMessageReceived = (messages) => {
-        this.onMessageReceived?.(messages);
+        Logger.log('info', '🎯 AIWebSocketService received messages', {
+          messageCount: messages?.length || 0,
+          hasCallback: !!this.onMessageReceived
+        });
+        if (this.onMessageReceived) {
+          this.onMessageReceived(messages);
+        }
       };
       
       this.aiAssistantInstance.onConnectionChange = (isConnected) => {
+        Logger.log('info', 'AI Assistant instance connection changed', { isConnected });
         this.isConnected = isConnected;
         this.onConnectionChange?.(isConnected);
       };
       
       this.aiAssistantInstance.onError = (error, details) => {
+        Logger.log('error', 'AI Assistant instance error', { error, details });
         this.onError?.(error, details);
       };
       
       this.aiAssistantInstance.onSessionUpdate = (payload) => {
+        Logger.log('info', 'AI Assistant instance session update', payload);
         this.onSessionUpdate?.(payload);
       };
       
@@ -200,18 +209,35 @@ export class AIWebSocketService {
 
   // Handle worker messages
   handleWorkerMessage(data) {
+    Logger.log('info', 'Received message from WebSocket worker', { 
+      dataType: typeof data, 
+      data: data,
+      hasType: !!data?.type,
+      hasPayload: !!data?.data
+    });
+    
     const { type, data: payload } = data;
+    
+    Logger.log('info', 'Processing worker message', { 
+      type, 
+      payloadType: typeof payload,
+      payloadKeys: payload ? Object.keys(payload) : 'no payload',
+      payload: payload
+    });
     
     switch (type) {
       case 'new_message':
+        Logger.log('info', 'Handling new_message type');
         this.handleNewMessage(payload);
         break;
         
       case 'ai_response':
+        Logger.log('info', 'Handling ai_response type');
         this.handleAIResponse(payload);
         break;
         
       case 'session_update':
+        Logger.log('info', 'Handling session_update type');
         this.handleSessionUpdate(payload);
         break;
         
@@ -230,23 +256,74 @@ export class AIWebSocketService {
 
   // Handle new message from WebSocket
   handleNewMessage(payload) {
+    Logger.log('debug', 'Processing new message payload', payload);
+    
     // Handle both direct payload and payload from event structure
     const messageData = payload.payload || payload;
-    const { message: content, responseId, timestamp, sessionId } = messageData;
+    
+    // Try different field names for content (message, content)
+    const content = messageData.content || messageData.message;
+    const responseId = messageData.responseId || messageData.message_id;
+    const timestamp = messageData.timestamp;
+    const sessionId = messageData.sessionId || messageData.session_id;
+    
+    Logger.log('info', 'Extracted message data', {
+      content: content ? content.substring(0, 100) + '...' : 'NO CONTENT',
+      responseId,
+      timestamp,
+      sessionId,
+      currentSessionId: this.currentSessionId,
+      hasContent: !!content
+    });
     
     if (content) {
+      // Use current session ID if not provided in payload
+      const finalSessionId = sessionId || this.currentSessionId;
+      
       const aiMessage = {
         messageId: responseId || `ai_${Date.now()}`,
-        sessionId: sessionId,
+        sessionId: finalSessionId,
         businessId: this.businessId,
         userId: 'agent',
         content: content,
         type: 'agent',
         timestamp: timestamp || new Date().toISOString(),
-        metadata: { source: 'websocket', responseId }
+        metadata: { 
+          source: 'websocket', 
+          responseId: responseId,
+          context: messageData.context,
+          originalType: messageData.type
+        }
       };
       
-      this.onMessageReceived?.([aiMessage]);
+      Logger.log('info', 'Created new message object', {
+        messageId: aiMessage.messageId,
+        sessionId: aiMessage.sessionId,
+        contentLength: aiMessage.content.length,
+        timestamp: aiMessage.timestamp
+      });
+      
+      // Update session ID if we received a new one
+      if (sessionId && sessionId !== this.currentSessionId) {
+        Logger.log('info', 'Updating session ID from new message', { 
+          oldSessionId: this.currentSessionId, 
+          newSessionId: sessionId 
+        });
+        this.currentSessionId = sessionId;
+      }
+      
+      if (this.onMessageReceived) {
+        Logger.log('info', 'Calling onMessageReceived callback for new message', { 
+          messageCount: 1,
+          sessionId: finalSessionId,
+          messageId: aiMessage.messageId
+        });
+        this.onMessageReceived([aiMessage]);
+      } else {
+        Logger.log('warn', 'onMessageReceived callback not set for new message');
+      }
+    } else {
+      Logger.log('warn', 'No content found in new message payload', payload);
     }
   }
 
@@ -265,24 +342,60 @@ export class AIWebSocketService {
   handleAIResponse(payload) {
     Logger.log('debug', 'Processing AI response payload', payload);
     
-    const { content, messageId, sessionId, timestamp } = payload;
+    // Extract data from the actual payload structure
+    const { content, message_id, session_id, timestamp, context, type } = payload;
+    
+    Logger.log('info', 'Extracted AI response data', {
+      content: content ? content.substring(0, 100) + '...' : 'NO CONTENT',
+      message_id,
+      session_id,
+      timestamp,
+      currentSessionId: this.currentSessionId,
+      hasContent: !!content
+    });
     
     if (content) {
+      // Use current session ID if not provided in payload
+      const finalSessionId = session_id || this.currentSessionId;
+      
       const aiMessage = {
-        messageId: messageId || `ai_${Date.now()}`,
-        sessionId: sessionId,
+        messageId: message_id || `ai_${Date.now()}`,
+        sessionId: finalSessionId,
         businessId: this.businessId,
         userId: 'agent',
         content: content,
         type: 'agent',
         timestamp: timestamp || new Date().toISOString(),
-        metadata: { source: 'websocket' }
+        metadata: { 
+          source: 'websocket', 
+          responseId: message_id,
+          context: context,
+          originalType: type
+        }
       };
       
-      Logger.log('debug', 'Created AI response message object', aiMessage);
+      Logger.log('info', 'Created AI response message object', {
+        messageId: aiMessage.messageId,
+        sessionId: aiMessage.sessionId,
+        contentLength: aiMessage.content.length,
+        timestamp: aiMessage.timestamp
+      });
+      
+      // Update session ID if we received a new one
+      if (session_id && session_id !== this.currentSessionId) {
+        Logger.log('info', 'Updating session ID from AI response', { 
+          oldSessionId: this.currentSessionId, 
+          newSessionId: session_id 
+        });
+        this.currentSessionId = session_id;
+      }
       
       if (this.onMessageReceived) {
-        Logger.log('debug', 'Calling onMessageReceived callback for AI response', [aiMessage]);
+        Logger.log('info', 'Calling onMessageReceived callback for AI response', { 
+          messageCount: 1,
+          sessionId: finalSessionId,
+          messageId: aiMessage.messageId
+        });
         this.onMessageReceived([aiMessage]);
       } else {
         Logger.log('warn', 'onMessageReceived callback not set for AI response');
@@ -398,8 +511,6 @@ export class AIWebSocketService {
         context,
         this.locationId
       );
-
-      Logger.log('debug', 'Message sent via SocketFacade WebSocket', { content, context });
       
       return result.success;
     } catch (error) {
@@ -412,14 +523,19 @@ export class AIWebSocketService {
 
   // Set current session ID
   setCurrentSessionId(sessionId) {
-    this.currentSessionId = sessionId;
-    
-    // Also set session ID in the AI Assistant instance
-    if (this.aiAssistantInstance) {
-      this.aiAssistantInstance.setCurrentSessionId(sessionId);
+    if (sessionId !== this.currentSessionId) {
+      Logger.log('info', 'Session ID updated in WebSocket service', { 
+        oldSessionId: this.currentSessionId, 
+        newSessionId: sessionId 
+      });
+      
+      this.currentSessionId = sessionId;
+      
+      // Also set session ID in the AI Assistant instance
+      if (this.aiAssistantInstance) {
+        this.aiAssistantInstance.setCurrentSessionId(sessionId);
+      }
     }
-    
-    Logger.log('debug', 'Session ID set for WebSocket service', sessionId);
   }
 
   // Disconnect from WebSocket

@@ -22,6 +22,7 @@ const DashboardHome = () => {
     refresh 
   } = useStatistics()
 
+
   // Get current month name in Romanian
   const getCurrentMonthName = () => {
     const months = [
@@ -293,7 +294,6 @@ const DashboardHome = () => {
           </div>
         </div>
       </div>
-
 
     </div>
   )

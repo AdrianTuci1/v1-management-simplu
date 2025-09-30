@@ -30,8 +30,22 @@ import {
 import { TimePicker } from '../ui/time-picker'
 
 
-const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null, position = "overlay" }) => {
+const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData = null, position = "overlay", externalCurrentMenu, onExternalMenuChange }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
+  
+  // Sincronizează cu navigația externă dacă este disponibilă
+  useEffect(() => {
+    if (externalCurrentMenu !== undefined && onExternalMenuChange) {
+      setCurrentMenu(externalCurrentMenu)
+    }
+  }, [externalCurrentMenu, onExternalMenuChange])
+  
+  const handleMenuChange = (id) => {
+    setCurrentMenu(id)
+    if (onExternalMenuChange) {
+      onExternalMenuChange(id)
+    }
+  }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -522,12 +536,6 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         title="Programare"
         subtitle={isNewAppointment ? 'Programare nouă' : 'Editează programarea'}
         onClose={onClose}
-      />
-      
-      <DrawerNavigation
-        items={navigationItems}
-        activeItem={currentMenu}
-        onItemChange={setCurrentMenu}
       />
       
       <DrawerContent>

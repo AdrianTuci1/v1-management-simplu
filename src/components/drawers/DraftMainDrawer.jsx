@@ -1,7 +1,15 @@
-
+import { X, Bell, User, Settings, Calendar, Loader2 } from 'lucide-react'
 import { getDrawerComponent } from './DrawerRegistry.jsx'
 
-const Drawer = ({ open, content, onClose, position = "side" }) => {
+// Draft-urile sunt create doar de AI, nu automat pentru drawerele noi
+
+/**
+ * DraftMainDrawer - Versiunea cu suport pentru draft-uri a MainDrawer-ului
+ * 
+ * Această componentă este identică cu MainDrawer-ul original.
+ * Draft-urile sunt create doar de AI, nu automat când se deschid drawerele.
+ */
+const DraftMainDrawer = ({ open, content, onClose, position = "side", externalNavigationState, onExternalNavigationChange }) => {
   if (!open) return null
 
   const renderContent = () => {
@@ -11,13 +19,19 @@ const Drawer = ({ open, content, onClose, position = "side" }) => {
     const getDrawerProps = () => {
       const baseProps = { onClose, position }
       
+      // Props pentru navigația externă
+      const externalNavProps = {
+        externalCurrentMenu: externalNavigationState?.[content?.type],
+        onExternalMenuChange: (id) => onExternalNavigationChange?.(id, content?.type)
+      }
+      
       switch (content?.type) {
         case 'appointment':
-          return { ...baseProps, isNewAppointment: content?.isNew, appointmentData: content?.data }
+          return { ...baseProps, ...externalNavProps, isNewAppointment: content?.isNew, appointmentData: content?.data }
         case 'new-person':
-          return { ...baseProps, isNewPatient: true }
+          return { ...baseProps, ...externalNavProps, isNewPatient: true }
         case 'edit-person':
-          return { ...baseProps, isNewPatient: false, patientData: content?.data }
+          return { ...baseProps, ...externalNavProps, isNewPatient: false, patientData: content?.data }
         case 'product':
           return { ...baseProps, isOpen: open, product: content?.data }
         case 'medic':
@@ -38,6 +52,8 @@ const Drawer = ({ open, content, onClose, position = "side" }) => {
       }
     }
 
+    // Draft-urile sunt create doar de AI, nu automat pentru drawerele noi
+    // Returnează drawerele normale fără wrapper DraftAwareDrawer
     return <DrawerComponent {...getDrawerProps()} />
   }
 
@@ -48,6 +64,4 @@ const Drawer = ({ open, content, onClose, position = "side" }) => {
   )
 }
 
-
-
-export default Drawer
+export default DraftMainDrawer

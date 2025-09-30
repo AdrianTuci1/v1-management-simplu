@@ -236,6 +236,7 @@ export class WebSocketAIAssistant {
         break;
         
       case 'session_update':
+        Logger.log('info', 'WebSocketAIAssistant handling session_update type');
         this.handleSessionUpdate(payload);
         break;
         
@@ -329,7 +330,26 @@ export class WebSocketAIAssistant {
         metadata: { source: 'websocket', responseId }
       };
       
-      this.onMessageReceived?.([aiMessage]);
+      Logger.log('info', '🎯 WebSocketAIAssistant calling onMessageReceived (new_message)', {
+        sessionId: aiMessage.sessionId,
+        messageId: aiMessage.messageId,
+        hasCallback: !!this.onMessageReceived,
+        callbackType: typeof this.onMessageReceived
+      });
+      
+      if (this.onMessageReceived) {
+        Logger.log('info', '🎯 WebSocketAIAssistant executing callback');
+        try {
+          this.onMessageReceived([aiMessage]);
+          Logger.log('info', '🎯 WebSocketAIAssistant callback executed successfully');
+        } catch (error) {
+          Logger.log('error', '❌ WebSocketAIAssistant callback error', error);
+        }
+      } else {
+        Logger.log('warn', '❌ WebSocketAIAssistant callback is null/undefined');
+      }
+    } else {
+      Logger.log('warn', 'WebSocketAIAssistant no content in new message', payload);
     }
   }
 
@@ -337,32 +357,46 @@ export class WebSocketAIAssistant {
    * Gestionează răspunsurile AI de la WebSocket
    */
   handleAIResponse(payload) {
-    Logger.log('debug', 'Processing AI response payload', payload);
-    
-    const { content, messageId, sessionId, timestamp } = payload;
+    // Extract data from the actual payload structure
+    const { content, message_id, session_id, timestamp, context, type } = payload;
     
     if (content) {
       const aiMessage = {
-        messageId: messageId || `ai_${Date.now()}`,
-        sessionId: sessionId,
+        messageId: message_id || `ai_${Date.now()}`,
+        sessionId: session_id,
         businessId: this.businessId,
         userId: 'agent',
         content: content,
         type: 'agent',
         timestamp: timestamp || new Date().toISOString(),
-        metadata: { source: 'websocket' }
+        metadata: { 
+          source: 'websocket', 
+          responseId: message_id,
+          context: context,
+          originalType: type
+        }
       };
       
-      Logger.log('debug', 'Created AI response message object', aiMessage);
+      Logger.log('info', '🎯 WebSocketAIAssistant calling onMessageReceived (ai_response)', {
+        sessionId: aiMessage.sessionId,
+        messageId: aiMessage.messageId,
+        hasCallback: !!this.onMessageReceived,
+        callbackType: typeof this.onMessageReceived
+      });
       
       if (this.onMessageReceived) {
-        Logger.log('debug', 'Calling onMessageReceived callback for AI response', [aiMessage]);
-        this.onMessageReceived([aiMessage]);
+        Logger.log('info', '🎯 WebSocketAIAssistant executing callback (ai_response)');
+        try {
+          this.onMessageReceived([aiMessage]);
+          Logger.log('info', '🎯 WebSocketAIAssistant callback executed successfully (ai_response)');
+        } catch (error) {
+          Logger.log('error', '❌ WebSocketAIAssistant callback error (ai_response)', error);
+        }
       } else {
-        Logger.log('warn', 'onMessageReceived callback not set for AI response');
+        Logger.log('warn', '❌ WebSocketAIAssistant callback is null/undefined (ai_response)');
       }
     } else {
-      Logger.log('warn', 'No content found in AI response payload', payload);
+      Logger.log('warn', 'WebSocketAIAssistant no content found in AI response payload', payload);
     }
   }
 

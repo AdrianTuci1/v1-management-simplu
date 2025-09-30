@@ -47,6 +47,13 @@ const BusinessProcesses = () => {
   // Loading state for checking all services
   const [checkingStatus, setCheckingStatus] = useState(false);
 
+  // SMS options state
+  const [smsOptions, setSmsOptions] = useState({
+    sendToAllAppointments: false,
+    sendDayBefore: false,
+    sendViaAgent: false
+  });
+
   // Check service status on component mount
   useEffect(() => {
     checkAllServicesStatus();
@@ -110,6 +117,14 @@ const BusinessProcesses = () => {
         }
       };
     });
+  };
+
+  // Handle SMS option toggle
+  const toggleSmsOption = (option) => {
+    setSmsOptions(prev => ({
+      ...prev,
+      [option]: !prev[option]
+    }));
   };
 
   // Handle authorization
@@ -280,6 +295,79 @@ const BusinessProcesses = () => {
           );
         })}
       </div>
+
+      {/* SMS Options Section */}
+      {services.sms.active && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Opțiuni SMS</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Configurează notificările SMS pentru programări
+            </p>
+          </div>
+          
+          <div className="card">
+            <div className="card-content p-4">
+              <div className="space-y-4">
+                {/* SMS Option 1 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="sendToAllAppointments"
+                      checked={smsOptions.sendToAllAppointments}
+                      onChange={() => toggleSmsOption('sendToAllAppointments')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="sendToAllAppointments" className="text-sm font-medium">
+                      Trimite SMS la toate programările create
+                    </label>
+                  </div>
+                </div>
+
+                {/* SMS Option 2 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="sendDayBefore"
+                      checked={smsOptions.sendDayBefore}
+                      onChange={() => toggleSmsOption('sendDayBefore')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="sendDayBefore" className="text-sm font-medium">
+                      Trimite SMS cu o zi înainte de programare
+                    </label>
+                  </div>
+                </div>
+
+                {/* SMS Option 3 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="sendViaAgent"
+                      checked={smsOptions.sendViaAgent}
+                      onChange={() => toggleSmsOption('sendViaAgent')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="sendViaAgent" className="text-sm font-medium">
+                      Trimite SMS prin agent
+                    </label>
+                  </div>
+                </div>
+
+                {/* Manual SMS Note */}
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-700">
+                    <strong>Notă:</strong> Poți trimite SMS-uri manual din secțiunea de programări.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

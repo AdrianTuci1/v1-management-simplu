@@ -1,6 +1,7 @@
 import { QuickActionsDrawer, AppointmentDrawer, PatientDrawer, ProductDrawer, UserDrawer, TreatmentDrawer, RoleDrawer, SalesDrawer, WorkingHoursDrawer, CurrencyTaxDrawer, LanguageDrawer, CashRegisterDrawer } from './index.js'
 import DataDownloadDrawer from './DataDownloadDrawer'
 import StripePaymentDrawer from './StripePaymentDrawer'
+import UserProfileDrawer from './UserProfileDrawer'
 import AIAssistantComponent from '../AIAssistant'
 import { useState, useEffect } from 'react'
 import appointmentService from '../../services/appointmentService.js'
@@ -73,6 +74,10 @@ export const DRAWER_REGISTRY = {
   },
   'ai-assistant': {
     component: 'AIAssistantComponent',
+    requiresData: false
+  },
+  'user-profile': {
+    component: 'UserProfileDrawer',
     requiresData: false
   }
 }
@@ -272,6 +277,8 @@ export const getDrawerComponent = (type) => {
       return StripePaymentDrawer
     case 'AIAssistantComponent':
       return AIAssistantComponent
+    case 'UserProfileDrawer':
+      return UserProfileDrawer
     default:
       return DefaultContent
   }

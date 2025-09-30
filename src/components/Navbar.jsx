@@ -7,7 +7,7 @@ import { useHealthRepository } from '../hooks/useHealthRepository'
 
 const Navbar = ({ currentView, currentLocation }) => {
   const auth = useAuth()
-  const { openMenuDrawer, openUserDrawer, openAIAssistantDrawer } = useDrawer()
+  const { openMenuDrawer, openUserProfileDrawer, openAIAssistantDrawer } = useDrawer()
   const { toggleQuickActions } = useQuickActionsStore()
   const { businessName, BusinessIcon } = useBusinessConfig()
   
@@ -57,9 +57,9 @@ const Navbar = ({ currentView, currentLocation }) => {
 
         {/* User circle */}
         <button
-          onClick={openUserDrawer}
+          onClick={openUserProfileDrawer}
           className="h-12 w-12 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 flex items-center justify-center transition-all duration-200"
-          title="Utilizator"
+          title="Profil Utilizator"
         >
           <User className="h-5 w-5 text-gray-600" />
         </button>

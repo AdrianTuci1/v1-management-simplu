@@ -209,12 +209,6 @@ const BusinessSales = () => {
 
       {/* Sales List */}
       <div className="card">
-        <div className="card-header">
-          <div className="flex items-center justify-between">
-            <h3 className="card-title">Lista Vânzări</h3>
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-          </div>
-        </div>
         
         <div className="card-content">
           {loading ? (

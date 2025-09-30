@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, Send, User, X, Wifi, WifiOff, Settings, Download, Search } from 'lucide-react';
+import { Bot, Send, User, X, Wifi, WifiOff, Settings, Download, Search, Plus, History, Calendar } from 'lucide-react';
 import { useAIAssistantStore } from '../stores/aiAssistantStore';
 import { AIAssistant, AIAssistantHeader, AIAssistantBody, AIAssistantFooter } from './ui/ai-assistant';
 import { Button } from './ui/button';
@@ -13,6 +13,9 @@ const AIAssistantComponent = ({ onClose }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showSessionHistory, setShowSessionHistory] = useState(false);
+  const [sessionHistory, setSessionHistory] = useState([]);
+  const [sessionHistoryLoading, setSessionHistoryLoading] = useState(false);
   
   const messagesEndRef = useRef(null);
 
@@ -32,6 +35,9 @@ const AIAssistantComponent = ({ onClose }) => {
     searchMessages,
     exportSession,
     closeSession,
+    startNewSession,
+    switchToSession,
+    loadSessionHistory,
     clearError
   } = useAIAssistant(BUSINESS_ID, USER_ID, LOCATION_ID);
 
@@ -91,9 +97,25 @@ const AIAssistantComponent = ({ onClose }) => {
   const getSessionInfo = () => {
     if (!currentSessionId) return 'Încărcare sesiune...';
     
+    // Handle different session ID formats
     try {
-      const sessionDate = new Date(parseInt(currentSessionId.split(':')[2]));
-      return `Sesiune: ${sessionDate.toLocaleDateString('ro-RO')} - ${messages.length} mesaje`;
+      // Check if it's a temporary session ID
+      if (currentSessionId.startsWith('temp_')) {
+        return `Sesiune nouă - ${messages.length} mesaje`;
+      }
+      
+      // Check if it's in old format (businessId:userId:timestamp)
+      if (currentSessionId.includes(':') && currentSessionId.split(':').length === 3) {
+        const parts = currentSessionId.split(':');
+        const timestamp = parseInt(parts[2]);
+        if (!isNaN(timestamp)) {
+          const sessionDate = new Date(timestamp);
+          return `Sesiune: ${sessionDate.toLocaleDateString('ro-RO')} - ${messages.length} mesaje`;
+        }
+      }
+      
+      // For new format session IDs, just show session info
+      return `Sesiune activă - ${messages.length} mesaje`;
     } catch {
       return `Sesiune activă - ${messages.length} mesaje`;
     }
@@ -138,6 +160,56 @@ const AIAssistantComponent = ({ onClose }) => {
     }
   };
 
+  const handleStartNewSession = async () => {
+    try {
+      await startNewSession();
+      setShowSessionHistory(false);
+    } catch (error) {
+      console.error('Failed to start new session:', error);
+    }
+  };
+
+  const handleSwitchSession = async (sessionId) => {
+    try {
+      await switchToSession(sessionId);
+      setShowSessionHistory(false);
+    } catch (error) {
+      console.error('Failed to switch session:', error);
+    }
+  };
+
+  const handleLoadSessionHistory = async () => {
+    if (showSessionHistory) {
+      setShowSessionHistory(false);
+      return;
+    }
+
+    try {
+      setSessionHistoryLoading(true);
+      const history = await loadSessionHistory(20);
+      setSessionHistory(history);
+      setShowSessionHistory(true);
+    } catch (error) {
+      console.error('Failed to load session history:', error);
+    } finally {
+      setSessionHistoryLoading(false);
+    }
+  };
+
+  const formatSessionDate = (timestamp) => {
+    try {
+      return new Date(timestamp).toLocaleDateString('ro-RO', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'Data necunoscută';
+    }
+  };
+
   return (
     <AIAssistant
       position="side"
@@ -162,20 +234,46 @@ const AIAssistantComponent = ({ onClose }) => {
           </div>
           
           <div className="flex items-center gap-1">
+            {/* New Session Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleStartNewSession}
+              className="h-6 w-6 p-0"
+              title="Sesiune nouă"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+            
+            {/* Session History Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLoadSessionHistory}
+              className="h-6 w-6 p-0"
+              title="Istoric sesiuni"
+            >
+              <History className="h-3 w-3" />
+            </Button>
+            
+            {/* Settings Button */}
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowSettings(!showSettings)}
               className="h-6 w-6 p-0"
+              title="Setări"
             >
               <Settings className="h-3 w-3" />
             </Button>
             
+            {/* Close Button */}
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
               className="h-6 w-6 p-0"
+              title="Închide"
             >
               <X className="h-3 w-3" />
             </Button>
@@ -189,6 +287,62 @@ const AIAssistantComponent = ({ onClose }) => {
           {getSessionInfo()}
         </p>
       </div>
+
+      {/* Session History Panel */}
+      {showSessionHistory && (
+        <div className="px-3 py-2 bg-muted/20 border-b max-h-40 overflow-y-auto">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-medium text-foreground">Istoric Sesiuni</h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSessionHistory(false)}
+              className="h-4 w-4 p-0"
+            >
+              <X className="h-2 w-2" />
+            </Button>
+          </div>
+          
+          {sessionHistoryLoading ? (
+            <div className="text-xs text-muted-foreground text-center py-2">
+              Se încarcă...
+            </div>
+          ) : sessionHistory.length > 0 ? (
+            <div className="space-y-1">
+              {sessionHistory.map((session) => (
+                <div 
+                  key={session.sessionId}
+                  className={`p-2 rounded text-xs cursor-pointer transition-colors ${
+                    currentSessionId === session.sessionId 
+                      ? 'bg-primary/10 border border-primary/20' 
+                      : 'bg-background border border-border hover:bg-muted/50'
+                  }`}
+                  onClick={() => handleSwitchSession(session.sessionId)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <span className="font-medium truncate">
+                        {session.sessionId.substring(0, 8)}...
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {session.status}
+                    </div>
+                  </div>
+                  <div className="text-muted-foreground mt-1">
+                    {formatSessionDate(session.lastMessageAt || session.createdAt)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground text-center py-2">
+              Nu există sesiuni anterioare
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search Bar */}
       {showSearch && (
@@ -212,14 +366,33 @@ const AIAssistantComponent = ({ onClose }) => {
       {/* Settings Panel */}
       {showSettings && (
         <div className="px-3 py-1 bg-muted/20 border-b">
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             <Button 
               size="sm" 
               variant="ghost" 
               onClick={() => setShowSearch(!showSearch)}
               className="h-6 text-xs"
             >
+              <Search className="h-3 w-3 mr-1" />
               {showSearch ? 'Ascunde' : 'Căutare'}
+            </Button>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={handleLoadSessionHistory}
+              className="h-6 text-xs"
+            >
+              <History className="h-3 w-3 mr-1" />
+              Istoric
+            </Button>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={handleStartNewSession}
+              className="h-6 text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Nou
             </Button>
             <Button size="sm" variant="ghost" onClick={handleExport} className="h-6 text-xs">
               <Download className="h-3 w-3 mr-1" />
