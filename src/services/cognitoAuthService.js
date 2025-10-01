@@ -28,6 +28,126 @@ console.log('   Client ID:', poolData.ClientId)
 class CognitoAuthService {
   constructor() {
     this.currentUser = null
+    this.refreshInterval = null
+    this.isRefreshing = false
+  }
+
+  /**
+   * Decode JWT token and get expiration time
+   * @param {string} token - JWT token
+   * @returns {number|null} Expiration timestamp in milliseconds, or null if invalid
+   */
+  getTokenExpiration(token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      return payload.exp * 1000 // Convert to milliseconds
+    } catch (error) {
+      console.error('Error decoding token:', error)
+      return null
+    }
+  }
+
+  /**
+   * Check if token is expired or will expire soon (within 5 minutes)
+   * @param {string} token - JWT token
+   * @returns {boolean} True if token is expired or will expire soon
+   */
+  isTokenExpiringSoon(token) {
+    const expiration = this.getTokenExpiration(token)
+    if (!expiration) return true
+    
+    // Check if token expires within 5 minutes (300000 ms)
+    const timeUntilExpiry = expiration - Date.now()
+    return timeUntilExpiry < 300000 // 5 minutes
+  }
+
+  /**
+   * Start automatic token refresh monitoring
+   */
+  startTokenRefreshMonitoring() {
+    // Clear any existing interval
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval)
+    }
+
+    // Check token every 1 minute
+    this.refreshInterval = setInterval(async () => {
+      try {
+        await this.checkAndRefreshToken()
+      } catch (error) {
+        console.error('Token refresh check failed:', error)
+      }
+    }, 60000) // Check every minute
+
+    // Also check immediately
+    this.checkAndRefreshToken().catch(err => {
+      console.error('Initial token check failed:', err)
+    })
+
+    console.log('✅ Token refresh monitoring started')
+  }
+
+  /**
+   * Stop automatic token refresh monitoring
+   */
+  stopTokenRefreshMonitoring() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval)
+      this.refreshInterval = null
+      console.log('🛑 Token refresh monitoring stopped')
+    }
+  }
+
+  /**
+   * Check token and refresh if needed
+   * Works for both direct Cognito auth and federated identity (Google OAuth through Cognito)
+   */
+  async checkAndRefreshToken() {
+    // Skip if already refreshing to prevent multiple simultaneous refresh attempts
+    if (this.isRefreshing) {
+      return
+    }
+
+    // Try to get current Cognito user (works for both email/password and Google OAuth through Cognito)
+    const cognitoUser = userPool.getCurrentUser()
+    if (!cognitoUser) {
+      // No Cognito user found, nothing to refresh
+      return
+    }
+
+    try {
+      // Get current session - this works for both direct auth and federated identity
+      const session = await new Promise((resolve, reject) => {
+        cognitoUser.getSession((err, session) => {
+          if (err) reject(err)
+          else resolve(session)
+        })
+      })
+
+      if (!session || !session.isValid()) {
+        console.log('Session is invalid, cannot refresh')
+        return
+      }
+
+      const idToken = session.getIdToken().getJwtToken()
+      
+      // Check if token is expiring soon
+      if (this.isTokenExpiringSoon(idToken)) {
+        const authProvider = this.isGoogleAuth() ? '(Google OAuth)' : '(Email/Password)'
+        console.log(`🔄 Token ${authProvider} is expiring soon, refreshing...`)
+        this.isRefreshing = true
+        await this.refreshSession()
+        console.log(`✅ Token ${authProvider} refreshed successfully`)
+      }
+    } catch (error) {
+      console.error('Error checking/refreshing token:', error)
+      // If refresh fails and we're using Google auth, user might need to re-authenticate
+      if (this.isGoogleAuth()) {
+        console.warn('⚠️ Google OAuth token refresh failed. User may need to sign in again.')
+      }
+    } finally {
+      this.isRefreshing = false
+    }
   }
 
   /**
@@ -72,6 +192,9 @@ class CognitoAuthService {
           localStorage.setItem('auth-token', userData.id_token)
           localStorage.setItem('user-email', email)
           localStorage.setItem('cognito-data', JSON.stringify(userData))
+
+          // Start token refresh monitoring
+          this.startTokenRefreshMonitoring()
 
           resolve(userData)
         },
@@ -219,6 +342,9 @@ class CognitoAuthService {
         cognitoUser.signOut()
       }
       
+      // Stop token refresh monitoring
+      this.stopTokenRefreshMonitoring()
+      
       // Clear localStorage (including Google auth)
       localStorage.removeItem('auth-token')
       localStorage.removeItem('user-email')
@@ -266,6 +392,9 @@ class CognitoAuthService {
             sub: session.getIdToken().payload.sub
           }
         }
+
+        // Start token refresh monitoring
+        this.startTokenRefreshMonitoring()
 
         resolve(userData)
       })
@@ -462,6 +591,9 @@ class CognitoAuthService {
         name: payload.name,
         provider: userData.profile.provider
       })
+
+      // Start token refresh monitoring
+      this.startTokenRefreshMonitoring()
 
       return userData
     } catch (error) {

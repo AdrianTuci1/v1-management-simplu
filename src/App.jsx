@@ -96,6 +96,11 @@ function AppContent() {
         const data = await authService.initialize()
         setUserData(data)
         
+        // Start token refresh monitoring for authenticated users
+        if (!isDemoMode && authService.isAuthenticated()) {
+          cognitoAuthService.startTokenRefreshMonitoring()
+        }
+        
         // Check access permissions
         if (authService.shouldDenyAccess(data)) {
           setAccessDenied(true)
@@ -123,6 +128,13 @@ function AppContent() {
     }
 
     initializeApp()
+
+    // Cleanup: stop token refresh monitoring when component unmounts
+    return () => {
+      if (!isDemoMode) {
+        cognitoAuthService.stopTokenRefreshMonitoring()
+      }
+    }
   }, [])
 
   // Initializează WebSocket după ce avem locația selectată
