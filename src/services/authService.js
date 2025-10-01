@@ -161,9 +161,49 @@ class AuthService {
   async getUserData() {
     if (this.isDemoMode) {
       return this.getDemoUserData()
-    } else {
-      return this.getCognitoUserData()
     }
+    
+    // Check if user is authenticated via Google
+    const authProvider = localStorage.getItem('auth-provider')
+    if (authProvider === 'google') {
+      return this.getGoogleUserData()
+    }
+    
+    // Otherwise use Cognito
+    return this.getCognitoUserData()
+  }
+
+  // Get Google user data from localStorage
+  getGoogleUserData() {
+    const savedCognitoData = localStorage.getItem('cognito-data')
+    
+    if (savedCognitoData) {
+      try {
+        const userData = JSON.parse(savedCognitoData)
+        
+        // Ensure we have locations data for Google auth users
+        if (!userData.locations) {
+          // Add default demo locations for Google auth users
+          userData.locations = {
+            'L0100001': 'admin',    // Premier Central - default admin role
+            'L0100002': 'manager',  // Filiala Pipera
+            'L0100003': 'user'      // Centrul Medical Militari
+          }
+        }
+        
+        return userData
+      } catch (error) {
+        console.error('Error parsing Google user data:', error)
+        // If parsing fails, clear the data and redirect to login
+        localStorage.removeItem('auth-token')
+        localStorage.removeItem('user-email')
+        localStorage.removeItem('cognito-data')
+        localStorage.removeItem('auth-provider')
+        return null
+      }
+    }
+    
+    return null
   }
 
   // Get demo user data from localStorage

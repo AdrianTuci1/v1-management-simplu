@@ -1,20 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import TeethChart from "./teeth/TeethChart";
 import { MouthViewPermanent } from "./teeth/MouthViewPermanent";
 import { MouthViewDeciduous } from "./teeth/MouthViewDecidous";
 import ToothDrawer from "./teeth/ToothDrawer";
-import Accordion from "./teeth/Accordion";
-import { Tooth } from "./teeth/Tooth"; // Import the Tooth class
+import { Tooth } from "./teeth/Tooth";
 import { ToothCondition } from "./teeth/utils/toothCondition";
 import DentalHistoryService from "@/services/dentalHistoryService";
 import FullscreenTreatmentPlan from "./FullscreenTreatmentPlan";
-// import { useDrawer } from "@/contexts/DrawerContext";
 
-
-// React Component to display dental chart
-// To be implemented
-
-const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
+const SimpleMouthView: React.FC<{ patientId: string }> = ({ patientId }) => {
   const [teethConditions, setTeethConditions] = useState<
     Record<number, keyof typeof ToothCondition>
   >({});
@@ -22,11 +15,10 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
     Record<number, { id: string; name: string; duration?: number }[]>
   >({});
   const [selectedTooth, setSelectedTooth] = useState<Tooth | null>(null);
-  const [showCharts, setShowCharts] = useState<boolean>(false);
   const [isPlanOpen, setIsPlanOpen] = useState<boolean>(false);
+  const [viewType, setViewType] = useState<"permanent" | "deciduous">("permanent");
 
   const dentalHistoryService = new DentalHistoryService();
-  // const { openDrawer } = useDrawer();
 
   // Track initial state for change detection
   const initialTeethConditions = useRef<Record<number, keyof typeof ToothCondition>>({});
@@ -141,71 +133,29 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
     setSelectedTooth(null);
   };
 
-  const handleOpenTreatmentPlan = () => {
-    setIsPlanOpen(true);
+
+  const toggleView = () => {
+    setViewType(viewType === "permanent" ? "deciduous" : "permanent");
   };
 
   return (
     <div className="space-y-4">
-      {/* Buttons moved outside the main container */}
+      {/* Control buttons */}
       <div className="flex items-center justify-between">
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={showCharts}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowCharts(e.target.checked)}
-            className="h-4 w-4"
-          />
-          {showCharts ? "Teeth Charts" : "Mouth View"}
-        </label>
         <button
-          className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-2 text-white text-sm hover:bg-emerald-700"
-          onClick={handleOpenTreatmentPlan}
+          className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+          onClick={toggleView}
         >
-          Plan tratament
+          {viewType === "permanent" ? "Dinți permanenți" : "Dinți de lapte"}
         </button>
       </div>
 
-      {/* Main content container */}
-      <div className="bg-white">
-        {showCharts ? (
-          <div className="space-y-4">
-            <div className="border rounded-lg p-3">
-              <Accordion title="Permanent Teeth Chart">
-                <div className="overflow-x-auto">
-                  <TeethChart
-                    teethType="permanent"
-                    onSelectTooth={handleSelectTooth}
-                    teethConditions={teethConditions}
-                  />
-                </div>
-              </Accordion>
-            </div>
-            <div className="border rounded-lg p-3">
-              <Accordion title="Deciduous Teeth Chart">
-                <div className="overflow-x-auto">
-                  <TeethChart
-                    teethType="deciduous"
-                    onSelectTooth={handleSelectTooth}
-                    teethConditions={teethConditions}
-                  />
-                </div>
-              </Accordion>
-            </div>
-          </div>
+      {/* Mouth view display */}
+      <div className="bg-white border rounded-lg p-6">
+        {viewType === "permanent" ? (
+          <MouthViewPermanent teeth={permanentTeeth} onClick={handleSelectTooth} />
         ) : (
-          <div className="space-y-4">
-            <div className="border rounded-lg p-3">
-              <Accordion title="Permanent Teeth Mouth View">
-                <MouthViewPermanent teeth={permanentTeeth} onClick={handleSelectTooth} />
-              </Accordion>
-            </div>
-            <div className="border rounded-lg p-3">
-              <Accordion title="Deciduous Teeth Mouth View">
-                <MouthViewDeciduous teeth={deciduousTeeth} onClick={handleSelectTooth} />
-              </Accordion>
-            </div>
-          </div>
+          <MouthViewDeciduous teeth={deciduousTeeth} onClick={handleSelectTooth} />
         )}
       </div>
 
@@ -228,4 +178,5 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
   );
 };
 
-export default TeethChartTab;
+export default SimpleMouthView;
+

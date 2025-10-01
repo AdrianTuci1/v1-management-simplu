@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from "react-oidc-context"
 import { Calendar, FileText, Image, User, Pill } from 'lucide-react'
 import Navbar from './components/Navbar'
 import NewSidebar from './components/NewSidebar'
@@ -12,11 +11,11 @@ import AccessDenied from './components/AccessDenied'
 import QuickActionsDrawer from './components/drawers/QuickActionsDrawer'
 import SalesDrawer from './components/drawers/SalesDrawer'
 import authService from './services/authService'
+import cognitoAuthService from './services/cognitoAuthService'
 import { DrawerProvider, useDrawer } from './contexts/DrawerContext'
 import { connectWebSocket } from './data/infrastructure/websocketClient'
 
 function AppContent() {
-  const auth = useAuth()
   const [currentView, setCurrentView] = useState('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState(null)
@@ -56,6 +55,27 @@ function AppContent() {
       try {
         setIsLoading(true)
         
+        // Check for OAuth callback (code parameter from Cognito/Google)
+        const urlParams = new URLSearchParams(window.location.search)
+        const code = urlParams.get('code')
+        
+        if (code && !isDemoMode) {
+          console.log('OAuth callback detected, processing...')
+          try {
+            // Handle OAuth callback from Cognito
+            await cognitoAuthService.handleOAuthCallback(code)
+            
+            // Clean URL and reload to initialize app with new auth
+            window.history.replaceState({}, document.title, window.location.pathname)
+            window.location.reload()
+            return
+          } catch (error) {
+            console.error('OAuth callback error:', error)
+            setError('Eroare la procesarea autentificării. Te rugăm să încerci din nou.')
+            cleanUrlParameters()
+          }
+        }
+        
         // Load saved UI state FIRST
         const savedView = localStorage.getItem('dashboard-view')
         const savedSidebarState = localStorage.getItem('sidebar-collapsed')
@@ -94,10 +114,7 @@ function AppContent() {
         }
         
         // Clean up URL parameters AFTER successful initialization to prevent auth loops
-        // but only if we're not in the middle of an OAuth flow
-        if (!auth.isLoading && auth.isAuthenticated) {
-          cleanUrlParameters()
-        }
+        cleanUrlParameters()
       } catch (error) {
         console.error('Error initializing app:', error)
       } finally {
@@ -118,69 +135,6 @@ function AppContent() {
     }
   }, [])
 
-  // Store auth data when user is authenticated via Cognito
-  useEffect(() => {
-    if (auth.user && !isDemoMode && !userData) {
-      console.log('User authenticated, storing auth data and reinitializing...')
-      const authData = {
-        id_token: auth.user.id_token,
-        access_token: auth.user.access_token,
-        refresh_token: auth.user.refresh_token,
-        profile: auth.user.profile
-      }
-      
-      authService.storeUserData(authData)
-      
-      // Re-initialize app with new auth data
-      const reinitialize = async () => {
-        try {
-          setIsLoading(true)
-          
-          // Load saved UI state again to preserve user's navigation
-          const savedView = localStorage.getItem('dashboard-view')
-          const savedSidebarState = localStorage.getItem('sidebar-collapsed')
-          const savedLocation = localStorage.getItem('selected-location')
-          
-          console.log('Reinitializing with saved state:', { savedView, savedSidebarState, savedLocation })
-          
-          if (savedView) {
-            console.log('Reinitializing with saved view:', savedView)
-            setCurrentView(savedView)
-          }
-          if (savedSidebarState) setSidebarCollapsed(JSON.parse(savedSidebarState))
-          
-          const data = await authService.initialize()
-          setUserData(data)
-          
-          if (authService.shouldDenyAccess(data)) {
-            setAccessDenied(true)
-            return
-          }
-          
-          // Restore saved location or set default
-          if (savedLocation) {
-            setSelectedLocation(JSON.parse(savedLocation))
-          } else {
-            const defaultLocation = authService.getDefaultLocation(data)
-            if (defaultLocation) {
-              setSelectedLocation(defaultLocation)
-              localStorage.setItem('selected-location', JSON.stringify(defaultLocation))
-            }
-          }
-          
-          // Clean up URL by removing authorization code and state parameters
-          // AFTER successful re-initialization
-          cleanUrlParameters()
-        } catch (error) {
-          console.error('Error reinitializing app:', error)
-        } finally {
-          setIsLoading(false)
-        }
-      }
-      
-      reinitialize()
-    }
-  }, [auth.isAuthenticated, auth.user, isDemoMode, userData])
 
   // Save state to localStorage when it changes
   useEffect(() => {
@@ -245,18 +199,8 @@ function AppContent() {
     }))
   }
 
-  // Show loading screen while auth is loading
-  if (auth.isLoading) {
-    return <LoadingScreen message="Se încarcă autentificarea..." />
-  }
-
-  // Show error screen if auth error
-  if (auth.error) {
-    return <div>Encountering error... {auth.error.message}</div>
-  }
-
   // Show auth screen if not authenticated and not in demo mode
-  if (!auth.isAuthenticated && !isDemoMode) {
+  if (!isDemoMode && !authService.isAuthenticated()) {
     return <AuthScreen />
   }
 

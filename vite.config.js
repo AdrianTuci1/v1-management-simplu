@@ -13,21 +13,20 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      buffer: 'buffer',
     },
+  },
+  define: {
+    'global': 'globalThis',
+    'process.env': {}
   },
   server: {
     headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
+      // Temporarily disabled to allow external images (testimonials, etc.)
+      // Re-enable for production if needed for SharedArrayBuffer
+      // 'Cross-Origin-Embedder-Policy': 'require-corp',
+      // 'Cross-Origin-Opener-Policy': 'same-origin',
     },
-    proxy: {
-      '/auth/callback': {
-        target: 'https://simplu.io',
-        changeOrigin: true,
-        secure: true,
-        rewrite: (path) => path.replace('/auth/callback', '/auth/callback')
-      }
-    }
   },
   build: {
     rollupOptions: {

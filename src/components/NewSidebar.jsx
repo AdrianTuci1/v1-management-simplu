@@ -25,8 +25,8 @@ import LocationSwitcher from './LocationSwitcher';
 import DraftsMenu from './DraftsMenu';
 import { useBusinessConfig } from '../config/businessConfig';
 import { useHealthRepository } from '../hooks/useHealthRepository';
-import { useAuth } from "react-oidc-context";
 import { LogOut } from "lucide-react";
+import cognitoAuthService from '../services/cognitoAuthService';
 
 // Softer spring animation curve
 const softSpringEasing = "cubic-bezier(0.25, 1.1, 0.4, 1)";
@@ -289,11 +289,9 @@ function IconNavigation({
       {/* Bottom section */}
       <div className="flex flex-col gap-2 w-full items-center">
         <button
-          onClick={() => {
-            const clientId = "ar2m2qg3gp4a0b4cld09aegdb";
-            const logoutUri = window.location.href;
-            const cognitoDomain = "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_KUaE0MTcQ";
-            window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+          onClick={async () => {
+            await cognitoAuthService.signOut();
+            window.location.reload();
           }}
           className="h-8 w-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors"
           title="Deconectare"

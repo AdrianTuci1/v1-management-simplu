@@ -343,7 +343,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       <div className="text-sm font-medium text-muted-foreground">
         Note dentare
       </div>
-      <div className="border rounded-md p-2">
+      <div className="">
         <TeethChartTab patientId={String(patientData?.id || patientData?.resourceId || '')} />
       </div>
     </div>

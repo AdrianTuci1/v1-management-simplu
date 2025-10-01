@@ -104,36 +104,7 @@ const OperationsTreatments = () => {
     }
   }
 
-  // Gestionează exportul
-  const handleExport = async (format) => {
-    try {
-      const exportData = await exportTreatments(format)
-      
-      if (format === 'csv') {
-        const blob = new Blob([exportData], { type: 'text/csv' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `tratamente_${new Date().toISOString().split('T')[0]}.csv`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      } else {
-        const blob = new Blob([exportData], { type: 'application/json' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `tratamente_${new Date().toISOString().split('T')[0]}.json`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      }
-    } catch (error) {
-      console.error('Error exporting treatments:', error)
-    }
-  }
 
-  // Obține categoriile și tipurile unice pentru filtre
-  const uniqueCategories = getUniqueCategories()
-  const uniqueTreatmentTypes = getUniqueTreatmentTypes()
 
   // Get treatment type icon
   const getTreatmentTypeIcon = (type) => {
@@ -154,16 +125,6 @@ const OperationsTreatments = () => {
     return iconMap[type] || iconMap.default
   }
 
-  // Handle delete treatment
-  const handleDeleteTreatment = async (treatmentId) => {
-    if (confirm('Ești sigur că vrei să ștergi acest tratament?')) {
-      try {
-        await deleteTreatment(treatmentId)
-      } catch (error) {
-        console.error('Error deleting treatment:', error)
-      }
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -182,13 +143,6 @@ const OperationsTreatments = () => {
           >
             <Plus className="h-4 w-4 mr-2" />
             Tratament nou
-          </button>
-          <button
-            onClick={() => handleExport('csv')}
-            className="btn btn-outline"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
           </button>
         </div>
       </div>

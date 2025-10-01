@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Google Authentication</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #357ae8; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        h2 { color: #333; margin-top: 0; }
+        .checklist { list-style: none; padding: 0; }
+        .checklist li { padding: 8px 0; }
+        .checklist li:before { content: "✓ "; color: #28a745; font-weight: bold; }
+        .checklist li.error:before { content: "✗ "; color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Google Authentication Debugger</h1>
+    
+    <div class="section">
+        <h2>1. Verificare Environment Variables</h2>
+        <div id="env-check"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Verificare Format Client ID</h2>
+        <div id="client-id-check"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Test Google OAuth Popup</h2>
+        <button onclick="testGooglePopup()">Test Google Popup</button>
+        <div id="popup-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>4. Verificare Console Logs</h2>
+        <div class="info">
+            Deschide Console-ul browserului (F12) și verifică erorile.
+            <br>Caută erori care conțin "google", "oauth", "origin", sau "popup".
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>5. Checklist Configurare Google Cloud</h2>
+        <ul class="checklist">
+            <li>Am creat OAuth credentials în Google Cloud Console</li>
+            <li>Am adăugat <code>http://localhost:5173</code> la Authorized JavaScript origins</li>
+            <li>Am copiat Client ID corect (se termină cu .apps.googleusercontent.com)</li>
+            <li>Am repornit serverul după configurare (.env)</li>
+            <li>Popup-urile sunt permise în browser</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>6. Link-uri Utile</h2>
+        <ul>
+            <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console - Credentials</a></li>
+            <li><a href="https://developers.google.com/identity/oauth2/web/guides/error-codes" target="_blank">Google OAuth Error Codes</a></li>
+        </ul>
+    </div>
+
+    <script>
+        // Check environment variables
+        function checkEnvironment() {
+            const envDiv = document.getElementById('env-check');
+            
+            // Simulăm verificarea (în aplicația reală, acestea vin din Vite)
+            const checks = [
+                {
+                    name: 'VITE_GOOGLE_CLIENT_ID',
+                    value: 'Verifică în fișierul .env sau .env.local',
+                    status: 'info'
+                },
+                {
+                    name: 'Server Status',
+                    value: 'Asigură-te că ai repornit serverul după configurare',
+                    status: 'warning'
+                }
+            ];
+            
+            let html = '';
+            checks.forEach(check => {
+                html += `<div class="status ${check.status}">
+                    <strong>${check.name}:</strong> ${check.value}
+                </div>`;
+            });
+            
+            envDiv.innerHTML = html;
+        }
+
+        // Check client ID format
+        function checkClientId() {
+            const clientIdDiv = document.getElementById('client-id-check');
+            const exampleClientId = 'xxxxx-yyyyyyy.apps.googleusercontent.com';
+            
+            clientIdDiv.innerHTML = `
+                <div class="info">
+                    <strong>Format corect:</strong> <code>${exampleClientId}</code>
+                    <br><br>
+                    <strong>Client ID-ul tău ar trebui:</strong>
+                    <ul>
+                        <li>Să conțină caractere alfanumerice și '-'</li>
+                        <li>Să se termine cu <code>.apps.googleusercontent.com</code></li>
+                        <li>Să NU fie Client Secret (asta rămâne secret)</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Test Google popup
+        function testGooglePopup() {
+            const resultDiv = document.getElementById('popup-result');
+            resultDiv.innerHTML = '<div class="info">Se deschide popup-ul de test...</div>';
+            
+            try {
+                // Test dacă popup-ul poate fi deschis
+                const popup = window.open('about:blank', 'test', 'width=500,height=600');
+                
+                if (popup) {
+                    popup.close();
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✓ Popup-urile funcționează! Browser-ul permite deschiderea ferestrelor popup.
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ✗ Popup-ul a fost blocat! 
+                            <br><br>
+                            <strong>Soluție:</strong> Permite popup-urile pentru acest site:
+                            <ol>
+                                <li>Click pe iconița de blocare popup din address bar</li>
+                                <li>Selectează "Always allow pop-ups from..."</li>
+                                <li>Reîncarcă pagina</li>
+                            </ol>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        Eroare la testarea popup-ului: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize checks on load
+        window.onload = function() {
+            checkEnvironment();
+            checkClientId();
+        };
+
+        // Log pentru debugging
+        console.log('%c🔍 Google Auth Debugger Loaded', 'color: blue; font-size: 16px; font-weight: bold');
+        console.log('%cCaută în console pentru orice erori Google OAuth', 'color: orange');
+    </script>
+</body>
+</html>
+

@@ -1,12 +1,10 @@
 import { Bell, User, Search, Menu, MapPin, Bot, Plus } from 'lucide-react'
-import { useAuth } from "react-oidc-context"
 import { useDrawer } from '../contexts/DrawerContext'
 import { useQuickActionsStore } from '../stores/quickActionsStore'
 import { useBusinessConfig } from '../config/businessConfig'
 import { useHealthRepository } from '../hooks/useHealthRepository'
 
 const Navbar = ({ currentView, currentLocation }) => {
-  const auth = useAuth()
   const { openMenuDrawer, openUserProfileDrawer, openAIAssistantDrawer } = useDrawer()
   const { toggleQuickActions } = useQuickActionsStore()
   const { businessName, BusinessIcon } = useBusinessConfig()
@@ -38,7 +36,7 @@ const Navbar = ({ currentView, currentLocation }) => {
   }
 
 
-  const userEmail = auth.user?.profile?.email || localStorage.getItem('user-email') || 'Demo User'
+  const userEmail = localStorage.getItem('user-email') || 'Demo User'
 
   return (
     <header className="absolute top-4 right-4 z-20">

@@ -11,7 +11,7 @@ import {
   LogOut
 } from 'lucide-react'
 import { useAppointments } from '../../hooks/useAppointments.js'
-import { useAuth } from "react-oidc-context"
+import cognitoAuthService from '../../services/cognitoAuthService'
 import { 
   Drawer, 
   DrawerHeader, 
@@ -20,7 +20,6 @@ import {
 } from '../ui/drawer'
 
 const UserProfileDrawer = ({ onClose, position = "side" }) => {
-  const auth = useAuth()
   const { appointments, loading: appointmentsLoading } = useAppointments()
   const [userInfo, setUserInfo] = useState(null)
   const [userNotes, setUserNotes] = useState([])
@@ -354,9 +353,10 @@ const UserProfileDrawer = ({ onClose, position = "side" }) => {
             Închide
           </button>
           <button
-            onClick={() => {
+            onClick={async () => {
               // Handle logout
-              auth.signoutRedirect()
+              await cognitoAuthService.signOut()
+              window.location.reload()
             }}
             className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >

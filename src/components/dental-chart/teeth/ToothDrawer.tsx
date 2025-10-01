@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { ToothCondition } from "./utils/toothCondition";
-import styles from "./ToothDrawer.module.css";
+import { 
+  Drawer, 
+  DrawerHeader, 
+  DrawerContent, 
+  DrawerFooter 
+} from '../../ui/drawer';
 import TreatmentCombobox from "@/components/combobox/TreatmentCombobox.jsx";
 
 interface ToothTreatment {
@@ -23,6 +28,7 @@ interface ToothDrawerProps {
   setToothTreatments: React.Dispatch<
     React.SetStateAction<Record<number, ToothTreatment[]>>
   >;
+  position?: "side" | "overlay";
 }
 
 const ToothDrawer: React.FC<ToothDrawerProps> = ({
@@ -32,6 +38,7 @@ const ToothDrawer: React.FC<ToothDrawerProps> = ({
   setTeethConditions,
   toothTreatments,
   setToothTreatments,
+  position = "overlay",
 }) => {
   const [selectedTreatment, setSelectedTreatment] = useState<ToothTreatment | null>(null);
 
@@ -74,72 +81,93 @@ const ToothDrawer: React.FC<ToothDrawerProps> = ({
   };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/50 z-50"
-        onClick={onClose}
+    <Drawer onClose={onClose} position={position} size="md">
+      <DrawerHeader
+        title={`Dinte ${selectedTooth.ISO}`}
+        subtitle={selectedTooth.Name}
+        onClose={onClose}
       />
       
-      {/* Drawer */}
-      <div className={styles.drawer}>
-        <h4 className={styles.title}>Tooth Details</h4>
-        <p>
-          <strong>ISO:</strong> {selectedTooth.ISO}
-        </p>
-        <p>
-          <strong>Name:</strong> {selectedTooth.Name}
-        </p>
+      <DrawerContent>
+        <div className="space-y-6">
+          {/* Tooth Information */}
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="condition" className="block text-sm font-medium text-gray-700 mb-2">
+                Selectează condiția
+              </label>
+              <select
+                id="condition"
+                onChange={handleConditionChange}
+                defaultValue={teethConditions[selectedTooth.ISO] || ""}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Selectează...</option>
+                {Object.keys(ToothCondition).map((key) => (
+                  <option key={key} value={key}>
+                    {ToothCondition[key as keyof typeof ToothCondition]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-        <label htmlFor="condition" className={styles.label}>Select Condition:</label>
-        <select
-          id="condition"
-          onChange={handleConditionChange}
-          defaultValue={teethConditions[selectedTooth.ISO] || ""}
-          className={styles.select}
-        >
-          <option value="">Select</option>
-          {Object.keys(ToothCondition).map((key) => (
-            <option key={key} value={key}>
-              {ToothCondition[key as keyof typeof ToothCondition]}
-            </option>
-          ))}
-        </select>
+          {/* Treatments Section */}
+          <div className="space-y-4">
+            <h4 className="text-lg font-medium text-gray-900">Tratamente pentru dinte</h4>
+            
+            {toothTreatments[selectedTooth.ISO] && toothTreatments[selectedTooth.ISO].length > 0 ? (
+              <div className="space-y-3">
+                {toothTreatments[selectedTooth.ISO].map((treatment, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">{treatment.name}</p>
+                      {treatment.duration && (
+                        <p className="text-xs text-gray-500">{treatment.duration} min</p>
+                      )}
+                    </div>
+                    <button
+                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      onClick={() => handleRemoveTreatment(index)}
+                      title="Șterge tratament"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                Nu există tratamente pentru acest dinte
+              </div>
+            )}
 
-        <div className={styles.historySection}>
-          <h4 className={styles.subtitle}>Tooth Treatments</h4>
-          <ul className={styles.historyList}>
-            {(toothTreatments[selectedTooth.ISO] || []).map((treatment, index) => (
-              <li key={index} className={styles.historyItem}>
-                <div className={styles.treatmentInfo}>
-                  <p className={styles.historyText}>{treatment.name}</p>
-                  {treatment.duration && (
-                    <p className={styles.treatmentDuration}>{treatment.duration} min</p>
-                  )}
-                </div>
-                <button
-                  className={styles.removeHistory}
-                  onClick={() => handleRemoveTreatment(index)}
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <div className={styles.historyInput}>
-            <TreatmentCombobox
-              value={selectedTreatment}
-              onValueChange={handleAddTreatment}
-              placeholder="Selectează tratament..."
-              className="w-full"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Adaugă tratament nou
+              </label>
+              <TreatmentCombobox
+                value={selectedTreatment}
+                onValueChange={handleAddTreatment}
+                placeholder="Selectează tratament..."
+                className="w-full"
+              />
+            </div>
           </div>
         </div>
-
-        <button className={styles.closeButton} onClick={onClose}>Close</button>
-      </div>
-    </>
+      </DrawerContent>
+      
+      <DrawerFooter>
+        <button
+          onClick={onClose}
+          className="btn btn-outline"
+        >
+          Închide
+        </button>
+      </DrawerFooter>
+    </Drawer>
   );
 };
 
