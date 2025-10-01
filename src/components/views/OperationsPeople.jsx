@@ -25,8 +25,7 @@ const OperationsPeople = () => {
     loadPatients, 
     loadPatientsByPage, 
     searchPatients,
-    deletePatient,
-    exportPatients 
+    deletePatient, 
   } = usePatients()
   
   const [searchTerm, setSearchTerm] = useState('')
@@ -64,23 +63,7 @@ const OperationsPeople = () => {
     }
   }
 
-  // Funcție pentru export
-  const handleExport = async () => {
-    try {
-      const csvData = await exportPatients('csv')
-      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' })
-      const link = document.createElement('a')
-      const url = URL.createObjectURL(blob)
-      link.setAttribute('href', url)
-      link.setAttribute('download', `pacienti_${new Date().toISOString().split('T')[0]}.csv`)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    } catch (error) {
-      console.error('Error exporting patients:', error)
-    }
-  }
+
 
   // Funcție pentru sortare
   const handleSort = (field) => {
@@ -174,56 +157,7 @@ const OperationsPeople = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card">
-          <div className="card-content p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total pacienți</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-              <Users className="h-8 w-8 text-primary" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="card-content p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Activi</p>
-                <p className="text-2xl font-bold text-green-600">{stats.active}</p>
-              </div>
-              <User className="h-8 w-8 text-green-600" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="card-content p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Inactivi</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.inactive}</p>
-              </div>
-              <User className="h-8 w-8 text-yellow-600" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="card-content p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Noi luna aceasta</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.newThisMonth}</p>
-              </div>
-              <Plus className="h-8 w-8 text-blue-600" />
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       {/* Filters and Search */}
       <div className="card">

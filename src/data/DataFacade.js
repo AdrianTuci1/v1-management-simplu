@@ -23,6 +23,9 @@ import {
 // Import DraftAwareResourceRepository
 import { DraftAwareResourceRepository } from './repositories/DraftAwareResourceRepository.js';
 
+// Import ResourceSearchRepository
+import { resourceSearchRepository } from './repositories/ResourceSearchRepository.js';
+
 // Import commands
 import { AddCommand } from './commands/AddCommand.js';
 import { UpdateCommand } from './commands/UpdateCommand.js';
@@ -53,6 +56,7 @@ export class DataFacade {
     this.isInitialized = false;
     this.healthListeners = new Set();
     this.socketFacade = socketFacade; // Reference to SocketFacade
+    this.searchRepository = resourceSearchRepository; // Reference to ResourceSearchRepository
     
     this.initializeRepositories();
     this.initializeInvokers();
@@ -178,6 +182,112 @@ export class DataFacade {
   async getAll(resourceType, params = {}) {
     const repository = this.getRepository(resourceType);
     return await repository.query(params);
+  }
+
+  // ========================================
+  // SEARCH OPERATIONS
+  // ========================================
+
+  /**
+   * Caută resurse folosind ResourceSearchRepository
+   * @param {string} resourceType - Tipul resursei
+   * @param {string} searchField - Câmpul în care să caute
+   * @param {string} searchTerm - Termenul de căutare
+   * @param {number} limit - Limita de rezultate
+   * @param {Object} additionalFilters - Filtre suplimentare
+   * @returns {Promise<Array>} Rezultatele căutării
+   */
+  async searchByField(resourceType, searchField, searchTerm, limit = 50, additionalFilters = {}) {
+    return await this.searchRepository.searchByCustomField(
+      resourceType,
+      searchField,
+      searchTerm,
+      limit,
+      additionalFilters
+    );
+  }
+
+  /**
+   * Caută resurse cu suport pentru fallback
+   * @param {string} resourceType - Tipul resursei
+   * @param {string} searchField - Câmpul în care să caute
+   * @param {string} searchTerm - Termenul de căutare
+   * @param {number} limit - Limita de rezultate
+   * @param {Function} fallbackMethod - Metoda de fallback
+   * @param {Object} additionalFilters - Filtre suplimentare
+   * @returns {Promise<Array>} Rezultatele căutării
+   */
+  async searchWithFallback(resourceType, searchField, searchTerm, limit = 50, fallbackMethod = null, additionalFilters = {}) {
+    return await this.searchRepository.searchWithFallback(
+      resourceType,
+      searchField,
+      searchTerm,
+      limit,
+      fallbackMethod,
+      additionalFilters
+    );
+  }
+
+  /**
+   * Caută resurse cu multiple câmpuri
+   * @param {string} resourceType - Tipul resursei
+   * @param {Object} searchFields - Obiect cu câmpuri și termeni de căutare
+   * @param {number} limit - Limita de rezultate
+   * @param {Object} additionalFilters - Filtre suplimentare
+   * @returns {Promise<Array>} Rezultatele căutării
+   */
+  async searchByMultipleFields(resourceType, searchFields, limit = 50, additionalFilters = {}) {
+    return await this.searchRepository.searchByMultipleFields(
+      resourceType,
+      searchFields,
+      limit,
+      additionalFilters
+    );
+  }
+
+  /**
+   * Caută resurse cu fuzzy matching
+   * @param {string} resourceType - Tipul resursei
+   * @param {string} searchField - Câmpul în care să caute
+   * @param {string} searchTerm - Termenul de căutare
+   * @param {number} limit - Limita de rezultate
+   * @param {Object} additionalFilters - Filtre suplimentare
+   * @returns {Promise<Array>} Rezultatele căutării
+   */
+  async fuzzySearch(resourceType, searchField, searchTerm, limit = 50, additionalFilters = {}) {
+    return await this.searchRepository.fuzzySearch(
+      resourceType,
+      searchField,
+      searchTerm,
+      limit,
+      additionalFilters
+    );
+  }
+
+  /**
+   * Obține rezultate din cache
+   * @param {string} resourceType - Tipul resursei
+   * @param {string} searchField - Câmpul de căutare
+   * @param {string} searchTerm - Termenul de căutare
+   * @returns {Array|null} Rezultatele din cache sau null
+   */
+  getCachedSearchResults(resourceType, searchField, searchTerm) {
+    return this.searchRepository.getCachedResults(resourceType, searchField, searchTerm);
+  }
+
+  /**
+   * Curăță cache-ul de căutări
+   */
+  clearSearchCache() {
+    this.searchRepository.clearAllCache();
+  }
+
+  /**
+   * Obține statistici despre cache-ul de căutări
+   * @returns {Object} Statisticile cache-ului
+   */
+  getSearchCacheStats() {
+    return this.searchRepository.getCacheStats();
   }
 
   // ========================================

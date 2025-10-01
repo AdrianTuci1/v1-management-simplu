@@ -187,7 +187,7 @@ class AppointmentService {
       const locationId = localStorage.getItem("locationId") || 'L0100001';
       
       const baseUrl = import.meta.env.VITE_API_URL || '';
-      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.patient.id=${encodeURIComponent(patientId)}&page=1&limit=50`;
+      const endpoint = `${baseUrl}/resources/${businessId}-${locationId}?data.patient.id=${encodeURIComponent(patientId)}&page=1&limit=50`;
       const response = await fetch(endpoint, {
         method: "GET",
         headers: {
@@ -229,7 +229,7 @@ class AppointmentService {
       const locationId = localStorage.getItem("locationId") || 'L0100001';
       
       const baseUrl = import.meta.env.VITE_API_URL || '';
-      const endpoint = `${baseUrl}/api/resources/${businessId}-${locationId}?data.doctor.id=${encodeURIComponent(medicId)}&page=1&limit=50`;
+      const endpoint = `${baseUrl}/resources/${businessId}-${locationId}?data.doctor.id=${encodeURIComponent(medicId)}&page=1&limit=50`;
       const response = await fetch(endpoint, {
         method: "GET",
         headers: {
@@ -246,6 +246,7 @@ class AppointmentService {
       }
       
       const data = await response.json();
+
       
       // Extract data from API response structure
       let appointments = [];

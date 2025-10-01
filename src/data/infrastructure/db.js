@@ -111,16 +111,32 @@ export const indexedDb = {
     return db.table('outbox').where('tempId').equals(tempId).first()
   },
   async outboxFindByResourceId(resourceId, resourceType) {
-    // Caută în outbox o intrare care să corespundă resource-ului creat/actualizat
-    // Această metodă va fi folosită când primim confirmarea de la server
+    // Caută în idMap pentru a găsi tempId-ul corespunzător ID-ului real
+    const idMapping = await db.table('idMap')
+      .where('permId')
+      .equals(resourceId)
+      .and(entry => entry.resourceType === resourceType)
+      .first()
+    
+    if (idMapping && idMapping.tempId) {
+      // Dacă găsim maparea, caută în outbox după tempId
+      return await db.table('outbox')
+        .where('tempId')
+        .equals(idMapping.tempId)
+        .first()
+    }
+    
+    // Fallback: caută prima intrare pending pentru operația 'create' pe acest tip de resursă
+    // Sortăm după timestamp pentru a lua cea mai veche (FIFO)
     const entries = await db.table('outbox')
       .where('resourceType')
       .equals(resourceType)
-      .and(entry => entry.status === 'pending' || entry.status === 'retry')
-      .toArray()
+      .and(entry => 
+        (entry.status === 'pending' || entry.status === 'retry') && 
+        entry.operation === 'create'
+      )
+      .sortBy('createdAt')
     
-    // Pentru moment, returnăm prima intrare găsită pentru tipul de resource
-    // Într-o implementare mai robustă, am putea folosi timestamp-uri sau alte criterii
     return entries.length > 0 ? entries[0] : null
   },
   

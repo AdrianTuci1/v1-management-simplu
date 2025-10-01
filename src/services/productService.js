@@ -1,5 +1,4 @@
 import { dataFacade } from '../data/DataFacade.js';
-import { socketFacade } from '../data/SocketFacade.js';
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js';
 import { productManager } from '../business/productManager.js';
 
@@ -9,7 +8,6 @@ class ProductService {
   constructor() {
     this.repository = new DraftAwareResourceRepository('products', 'product');
     this.dataFacade = dataFacade;
-    this.socketFacade = socketFacade;
   }
 
   // Încarcă toate produsele

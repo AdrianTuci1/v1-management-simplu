@@ -1,5 +1,4 @@
 import { dataFacade } from '../data/DataFacade.js'
-import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { roleManager } from '../business/roleManager.js'
 
@@ -7,7 +6,6 @@ class RoleService {
   constructor() {
     this.repository = new DraftAwareResourceRepository('roles', 'role')
     this.dataFacade = dataFacade
-    this.socketFacade = socketFacade
   }
 
   // Obține toate rolurile

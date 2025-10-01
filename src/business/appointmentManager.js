@@ -61,17 +61,22 @@ class AppointmentManager {
 
   // Transformare date pentru UI (Backend -> UI)
   transformAppointmentForUI(appointmentData) {
-
-    
     // Extragem datele din structura nested dacă există
     const data = appointmentData.data || appointmentData
     
     // Funcție pentru formatarea datelor în format yyyy-mm-dd
     const formatDate = (date) => {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
+      if (!date) return ''
+      try {
+        const dateObj = new Date(date)
+        if (isNaN(dateObj.getTime())) return ''
+        const year = dateObj.getFullYear()
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+        const day = String(dateObj.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      } catch (error) {
+        return ''
+      }
     }
     
     // Găsim ID-ul valid
@@ -80,44 +85,61 @@ class AppointmentManager {
     const transformed = {
       ...appointmentData, // Preserve toate proprietățile existente, inclusiv _isOptimistic, _isDeleting, _tempId
       id: appointmentId,
-      date: data.date ? formatDate(new Date(data.date)) : '',
-      time: data.time || '',
-      price: data.price?.toString() || '',
-      status: data.status || 'scheduled',
-      prescription: data.prescription || '',
-      postOperativeNotes: data.postOperativeNotes || '',
-      images: data.images || [],
-      createdAt: data.createdAt || '',
-      updatedAt: data.updatedAt || ''
+      // Mapăm câmpurile pentru UI - folosim datele din nested structure dacă există, altfel din root
+      date: formatDate(data.date || appointmentData.date || appointmentData.startDate || appointmentData.timestamp),
+      time: data.time || appointmentData.time || '',
+      appointmentDate: formatDate(data.date || appointmentData.date || appointmentData.startDate || appointmentData.timestamp),
+      startTime: data.time || appointmentData.time || '',
+      price: data.price?.toString() || appointmentData.price?.toString() || '',
+      status: data.status || appointmentData.status || 'scheduled',
+      prescription: data.prescription || appointmentData.prescription || '',
+      postOperativeNotes: data.postOperativeNotes || appointmentData.postOperativeNotes || '',
+      images: data.images || appointmentData.images || [],
+      createdAt: data.createdAt || appointmentData.createdAt || '',
+      updatedAt: data.updatedAt || appointmentData.updatedAt || ''
     }
     
 
 
     // Transformare obiecte în obiecte cu nume pentru afișare
-    if (data.patient) {
-      const patientId = transformObjectToId(data.patient)
-      const patientName = typeof data.patient === 'object' && data.patient.name ? data.patient.name : 'Pacient necunoscut'
+    // Mapăm câmpurile specifice (patientName, medicName, treatmentType) la 'name' pentru consistență
+    if (data.patient || appointmentData.patient) {
+      const patient = data.patient || appointmentData.patient
+      const patientId = transformObjectToId(patient)
+      const patientName = typeof patient === 'object' && (patient.name || patient.patientName) ? 
+        (patient.name || patient.patientName) : 'Pacient necunoscut'
       transformed.patient = { id: patientId || null, name: patientName }
     }
 
-    if (data.doctor) {
-      const doctorId = transformObjectToId(data.doctor)
-      const doctorName = typeof data.doctor === 'object' && data.doctor.name ? data.doctor.name : 'Doctor necunoscut'
+    if (data.doctor || appointmentData.doctor) {
+      const doctor = data.doctor || appointmentData.doctor
+      const doctorId = transformObjectToId(doctor)
+      const doctorName = typeof doctor === 'object' && (doctor.name || doctor.medicName) ? 
+        (doctor.name || doctor.medicName) : 'Doctor necunoscut'
       transformed.doctor = { id: doctorId || null, name: doctorName }
     }
 
-    if (data.service) {
-      const serviceId = transformObjectToId(data.service)
-      const serviceName = typeof data.service === 'object' && (data.service.name || data.service.treatmentType) ? 
-        (data.service.name || data.service.treatmentType) : 'Serviciu necunoscut'
-      const serviceDuration = typeof data.service === 'object' && data.service.duration ? data.service.duration : null
+    if (data.service || appointmentData.service) {
+      const service = data.service || appointmentData.service
+      const serviceId = transformObjectToId(service)
+      const serviceName = typeof service === 'object' && (service.name || service.treatmentType) ? 
+        (service.name || service.treatmentType) : 'Serviciu necunoscut'
+      const serviceDuration = typeof service === 'object' && service.duration ? service.duration : null
       transformed.service = { 
         id: serviceId || null, 
         name: serviceName,
         duration: serviceDuration
       }
+      // Adăugăm și pentru UI
+      transformed.treatmentType = serviceName
+      transformed.type = serviceName
     }
 
+    // Debug logging pentru a vedea structura transformată
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Transformed appointment:', transformed)
+    }
+    
     return transformed
   }
 

@@ -3,7 +3,7 @@
  * This file can be used to test the updated search methods
  */
 
-import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js';
+import { dataFacade } from '../data/DataFacade.js';
 import userService from '../services/userService.js';
 import patientService from '../services/patientService.js';
 import treatmentService from '../services/treatmentService.js';
@@ -30,12 +30,12 @@ export async function testSearchFunctionality() {
     const treatmentResults = await treatmentService.searchTreatments('test', 10);
     console.log(`Found ${treatmentResults.length} treatments`);
     
-    // Test direct resource search repository
-    console.log('\n--- Testing ResourceSearchRepository ---');
+    // Test direct DataFacade search
+    console.log('\n--- Testing DataFacade Search ---');
     try {
-      const directResults = await resourceSearchRepository.searchByCustomField(
-        'user',
-        'userName',
+      const directResults = await dataFacade.searchByField(
+        'medic',
+        'medicName',
         'test',
         10
       );
@@ -46,7 +46,7 @@ export async function testSearchFunctionality() {
     
     // Test cache functionality
     console.log('\n--- Testing Cache ---');
-    const cacheStats = resourceSearchRepository.getCacheStats();
+    const cacheStats = dataFacade.getSearchCacheStats();
     console.log('Cache stats:', cacheStats);
     
     console.log('\n✅ Search functionality test completed successfully!');
@@ -65,9 +65,9 @@ export async function testFuzzySearch() {
   console.log('Testing fuzzy search functionality...');
   
   try {
-    const fuzzyResults = await resourceSearchRepository.fuzzySearch(
-      'user',
-      'userName',
+    const fuzzyResults = await dataFacade.fuzzySearch(
+      'medic',
+      'medicName',
       'test',
       10
     );
@@ -86,10 +86,10 @@ export async function testMultipleFieldSearch() {
   console.log('Testing multiple field search...');
   
   try {
-    const multiResults = await resourceSearchRepository.searchByMultipleFields(
-      'user',
+    const multiResults = await dataFacade.searchByMultipleFields(
+      'medic',
       {
-        userName: 'test',
+        medicName: 'test',
         email: 'test'
       },
       10

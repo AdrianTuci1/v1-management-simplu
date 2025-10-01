@@ -1,5 +1,4 @@
 import { dataFacade } from '../data/DataFacade.js'
-import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
 import { permissionManager } from '../business/permissionManager.js'
 
@@ -7,7 +6,6 @@ class PermissionService {
   constructor() {
     this.repository = new DraftAwareResourceRepository('permissions', 'permission')
     this.dataFacade = dataFacade
-    this.socketFacade = socketFacade
   }
 
   // Obține toate permisiunile

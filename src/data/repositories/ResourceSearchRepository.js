@@ -58,6 +58,8 @@ export class ResourceSearchRepository {
       
       const data = await response.json();
       
+      console.log(`🔍 ResourceSearchRepository - ${resourceType} search response:`, data);
+      
       // Extract data from API response structure
       let results = [];
       if (data && data.data) {
@@ -65,6 +67,8 @@ export class ResourceSearchRepository {
       } else if (Array.isArray(data)) {
         results = data;
       }
+      
+      console.log(`✅ ResourceSearchRepository - Extracted ${results.length} ${resourceType} results:`, results);
       
       // Cache results
       this.cacheResults(resourceType, searchField, searchTerm, results);

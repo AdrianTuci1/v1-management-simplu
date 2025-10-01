@@ -1,14 +1,11 @@
 import { dataFacade } from '../data/DataFacade.js'
-import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
-import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js'
 import { userManager } from '../business/userManager.js'
 
 class UserService {
   constructor() {
     this.repository = new DraftAwareResourceRepository('users', 'medic')
     this.dataFacade = dataFacade
-    this.socketFacade = socketFacade
   }
 
   // Obține toți utilizatorii
@@ -75,10 +72,15 @@ class UserService {
   }
 
   // Căutare utilizatori folosind resource queries
-  async searchUsers(query, limit = 50, filters = {}) {
+  async searchUsers(query, filters = {}) {
     try {
-      // Încearcă mai întâi resource query pentru căutare eficientă
-      const users = await resourceSearchRepository.searchWithFallback(
+      // Extragem limit din filters sau folosim default
+      const limit = filters.limit || 50;
+      const additionalFilters = { ...filters };
+      delete additionalFilters.limit; // Eliminăm limit din filters pentru a-l trimite separat
+      
+      // Încearcă mai întâi resource query pentru căutare eficientă prin DataFacade
+      const users = await this.dataFacade.searchWithFallback(
         'medic',
         'medicName',
         query,
@@ -104,7 +106,7 @@ class UserService {
             }
           }
         },
-        filters
+        additionalFilters
       );
       
       // Transformăm fiecare utilizator pentru UI

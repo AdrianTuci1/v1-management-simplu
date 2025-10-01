@@ -184,14 +184,20 @@ export const useAppointments = () => {
     try {
       const created = await appointmentService.addAppointment(apiData)
       const ui = appointmentManager.transformAppointmentForUI(created)
-      const idx = sharedAppointments.findIndex(a => a.id === ui.id || a.resourceId === ui.resourceId)
-      if (idx >= 0) {
-        sharedAppointments[idx] = { ...ui, _isOptimistic: false }
-      } else {
-        sharedAppointments = [{ ...ui, _isOptimistic: !!ui._isOptimistic }, ...sharedAppointments]
+      
+      // Doar resursele optimistice sunt adăugate imediat în shared state
+      // Resursele cu ID real vor fi adăugate de WebSocket
+      if (ui._isOptimistic || ui._tempId) {
+        const idx = sharedAppointments.findIndex(a => a._tempId === ui._tempId)
+        if (idx >= 0) {
+          sharedAppointments[idx] = ui
+        } else {
+          sharedAppointments = [ui, ...sharedAppointments]
+        }
+        setAppointments([...sharedAppointments])
+        notifySubscribers()
       }
-      setAppointments([...sharedAppointments])
-      notifySubscribers()
+      
       return ui
     } catch (err) {
       setError(err.message)
@@ -394,24 +400,68 @@ export const useAppointments = () => {
       const operation = type?.replace('resource_', '') || type
       const id = data?.id || data?.resourceId
       if (!id) return
-      if (operation === 'created' || operation === 'create') {
-        const ui = appointmentManager.transformAppointmentForUI({ ...data, id, resourceId: id })
-        const idx = sharedAppointments.findIndex(a => a.id === id || a.resourceId === id)
-        if (idx >= 0) sharedAppointments[idx] = { ...ui, _isOptimistic: false }
-        else sharedAppointments = [{ ...ui, _isOptimistic: false }, ...sharedAppointments]
-        setAppointments([...sharedAppointments])
-        notifySubscribers()
-      } else if (operation === 'updated' || operation === 'update') {
-        const ui = appointmentManager.transformAppointmentForUI({ ...data, id, resourceId: id })
-        const idx = sharedAppointments.findIndex(a => a.id === id || a.resourceId === id)
-        if (idx >= 0) sharedAppointments[idx] = { ...ui, _isOptimistic: false }
-        else sharedAppointments = [{ ...ui, _isOptimistic: false }, ...sharedAppointments]
-        setAppointments([...sharedAppointments])
-        notifySubscribers()
-      } else if (operation === 'deleted' || operation === 'delete') {
-        sharedAppointments = sharedAppointments.filter(a => (a.id !== id && a.resourceId !== id))
-        setAppointments([...sharedAppointments])
-        notifySubscribers()
+      
+      try {
+        if (operation === 'created' || operation === 'create') {
+          // Înlocuiește programarea optimistă cu datele reale
+          const ui = appointmentManager.transformAppointmentForUI({ ...data, id, resourceId: id })
+          
+          // Caută în outbox pentru a găsi operația optimistă folosind ID-ul real
+          const outboxEntry = await indexedDb.outboxFindByResourceId(id, 'appointment')
+          
+          if (outboxEntry) {
+            const optimisticIndex = sharedAppointments.findIndex(a => a._tempId === outboxEntry.tempId)
+            if (optimisticIndex >= 0) {
+              sharedAppointments[optimisticIndex] = { ...ui, _isOptimistic: false }
+            }
+            await indexedDb.outboxDelete(outboxEntry.id)
+          } else {
+            // Dacă nu găsim în outbox, încercăm să găsim după euristică
+            const optimisticIndex = sharedAppointments.findIndex(a => 
+              a._isOptimistic && 
+              a.patientId === data.patientId &&
+              a.date === data.date &&
+              a.startTime === data.startTime
+            )
+            if (optimisticIndex >= 0) {
+              sharedAppointments[optimisticIndex] = { ...ui, _isOptimistic: false }
+            } else {
+              // Verifică dacă nu există deja (evită dubluri)
+              const existingIndex = sharedAppointments.findIndex(a => a.id === id || a.resourceId === id)
+              if (existingIndex >= 0) {
+                sharedAppointments[existingIndex] = { ...ui, _isOptimistic: false }
+              } else {
+                // Adaugă ca nou doar dacă nu există deloc
+                sharedAppointments = [{ ...ui, _isOptimistic: false }, ...sharedAppointments]
+              }
+            }
+          }
+          
+          setAppointments([...sharedAppointments])
+          notifySubscribers()
+        } else if (operation === 'updated' || operation === 'update') {
+          // Dezactivează flag-ul optimistic
+          const ui = appointmentManager.transformAppointmentForUI({ ...data, id, resourceId: id })
+          const existingIndex = sharedAppointments.findIndex(a => 
+            a.id === id || a.resourceId === id
+          )
+          if (existingIndex >= 0) {
+            sharedAppointments[existingIndex] = { ...ui, _isOptimistic: false }
+          }
+          
+          setAppointments([...sharedAppointments])
+          notifySubscribers()
+        } else if (operation === 'deleted' || operation === 'delete') {
+          // Elimină programarea din lista locală
+          sharedAppointments = sharedAppointments.filter(a => {
+            const matches = a.id === id || a.resourceId === id
+            return !matches
+          })
+          setAppointments([...sharedAppointments])
+          notifySubscribers()
+        }
+      } catch (error) {
+        console.error('Error handling appointment WebSocket message:', error)
       }
     }
     

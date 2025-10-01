@@ -31,7 +31,7 @@ const DoctorCombobox = ({
   // Căutare când se deschide combobox-ul sau când se schimbă termenul de căutare
   React.useEffect(() => {
     if (open) {
-      searchUsers(searchTerm, 5);
+      searchUsers(searchTerm, {}, 5);
     }
   }, [open, searchTerm, searchUsers]);
 

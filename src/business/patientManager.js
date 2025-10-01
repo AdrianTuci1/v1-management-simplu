@@ -74,15 +74,28 @@ class PatientManager {
 
   // Transformare date pentru UI
   transformPatientForUI(patientData) {
+    // Flatten nested data structure dacă există
+    const data = patientData.data || patientData;
+    
+    // Asigură-te că avem ambele câmpuri pentru compatibilitate
+    const patientName = data.patientName || patientData.patientName || data.name || patientData.name;
+    
+    if (!patientName) {
+      console.warn('⚠️ patientManager.transformPatientForUI - No name found in:', patientData);
+    }
+    
     return {
       ...patientData,
+      ...data, // Spread nested data peste proprietățile root
       id: patientData._tempId || patientData.resourceId || patientData.id, // Prioritizează tempId pentru optimistic updates
-      name: patientData.patientName || patientData.name, // Mapăm patientName la name pentru UI
-      birthYear: patientData.birthYear ? patientData.birthYear.toString() : '',
-      age: patientData.birthYear ? this.calculateAgeFromYear(patientData.birthYear) : null,
-      fullAddress: this.formatAddress(patientData),
-      statusLabel: this.getStatusLabel(patientData.status),
-      tags: Array.isArray(patientData.tags) ? patientData.tags : []
+      resourceId: patientData.resourceId || patientData.id, // Păstrăm resourceId
+      name: patientName, // Pentru UI
+      patientName: patientName, // Pentru backend/search - păstrăm ambele
+      birthYear: data.birthYear ? data.birthYear.toString() : '',
+      age: data.birthYear ? this.calculateAgeFromYear(data.birthYear) : null,
+      fullAddress: this.formatAddress(data),
+      statusLabel: this.getStatusLabel(data.status),
+      tags: Array.isArray(data.tags) ? data.tags : []
     }
   }
 

@@ -43,7 +43,7 @@ export const useUsers = () => {
   useEffect(() => {
     const handler = async (message) => {
       const { type, data, resourceType } = message
-      if (resourceType !== 'users' && resourceType !== 'user') return
+      if (resourceType !== 'medic' && resourceType !== 'user') return
       const operation = type?.replace('resource_', '') || type
       const userId = data?.id || data?.resourceId
       if (!userId) return
@@ -207,6 +207,7 @@ export const useUsers = () => {
     
     try {
       const searchResults = await userService.searchUsers(query, { ...searchFilters, limit })
+      console.log(`searchUsers - Found ${searchResults.length} users for query "${query}"`, searchResults)
       
       // Actualizează starea partajată
       sharedUsers = searchResults

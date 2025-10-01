@@ -58,14 +58,23 @@ class UserManager {
 
   // Transformare pentru UI
   transformUserForUI(userData) {
+    // Flatten nested data structure dacă există
+    const data = userData.data || userData;
+    
+    // Asigură-te că avem medicName consistent pentru backend/search
+    const medicName = data.medicName || userData.medicName || data.fullName || userData.fullName;
+    
     return {
       ...userData,
+      ...data, // Spread nested data peste proprietățile root
       id: userData.resourceId || userData.id, // Folosim resourceId ca ID principal
-      fullName: userData.medicName || userData.fullName,
-      dutyDays: userData.dutyDays || [],
+      resourceId: userData.resourceId || userData.id, // Păstrăm resourceId
+      medicName: medicName, // Pentru backend/search - păstrăm consistent
+      fullName: medicName, // Pentru UI - alias pentru compatibilitate
+      dutyDays: data.dutyDays || userData.dutyDays || [],
       // Proprietăți calculate
-      isActive: userData.status === 'active',
-      statusText: this.getStatusText(userData.status)
+      isActive: (data.status || userData.status) === 'active',
+      statusText: this.getStatusText(data.status || userData.status)
     }
   }
 

@@ -1,14 +1,11 @@
 import { dataFacade } from '../data/DataFacade.js'
-import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
-import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js'
 import treatmentManager from '../business/treatmentManager.js'
 
 class TreatmentService {
   constructor() {
     this.repository = new DraftAwareResourceRepository('treatments', 'treatment')
     this.dataFacade = dataFacade
-    this.socketFacade = socketFacade
   }
 
   // Obține toate tratamentele
@@ -105,19 +102,20 @@ class TreatmentService {
   // Căutare tratamente folosind resource queries
   async searchTreatments(query, limit = 50) {
     try {
-      // Folosește ResourceSearchRepository pentru căutare eficientă
-      const treatments = await resourceSearchRepository.searchWithFallback(
+      // Folosește DataFacade pentru căutare eficientă
+      const treatments = await this.dataFacade.searchWithFallback(
         'treatment',
         'treatmentType',
         query,
         limit,
-        // Fallback method
+        // Fallback method - returnează date RAW pentru transformare consistentă
         async (searchTerm, fallbackFilters) => {
           try {
             const searchFilters = {
               search: searchTerm,
               limit: fallbackFilters.limit || limit
             }
+            // Obținem date RAW direct din dataFacade
             const treatments = await this.dataFacade.getAll('treatment', searchFilters)
             return Array.isArray(treatments) ? treatments : []
           } catch (fallbackError) {
@@ -126,7 +124,7 @@ class TreatmentService {
         }
       );
       
-      // Transformăm fiecare tratament pentru UI
+      // Transformăm fiecare tratament pentru UI o singură dată
       return treatments.map(treatment => 
         treatmentManager.transformTreatmentForUI(treatment)
       );

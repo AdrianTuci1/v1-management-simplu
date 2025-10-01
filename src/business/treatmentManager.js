@@ -48,15 +48,26 @@ class TreatmentManager {
 
   // Transformare date pentru UI
   transformTreatmentForUI(treatmentData) {
+    // Flatten nested data structure dacă există
+    const data = treatmentData.data || treatmentData;
+    
+    const treatmentType = data.treatmentType || treatmentData.treatmentType || data.name || treatmentData.name || '';
+    
+    if (!treatmentType) {
+      console.warn('⚠️ treatmentManager.transformTreatmentForUI - No treatmentType found in:', treatmentData);
+    }
+    
     return {
       ...treatmentData,
+      ...data, // Spread nested data peste proprietățile root
       id: treatmentData.resourceId || treatmentData.id, // Folosim resourceId ca ID principal
-      name: treatmentData.treatmentType || treatmentData.name || '', // Adăugăm name pentru compatibilitate
-      treatmentType: treatmentData.treatmentType || '',
-      category: treatmentData.category || '',
-      duration: treatmentData.duration?.toString() || '',
-      price: treatmentData.price?.toString() || '',
-      description: treatmentData.description || ''
+      resourceId: treatmentData.resourceId || treatmentData.id, // Păstrăm resourceId
+      name: treatmentType, // Adăugăm name pentru compatibilitate
+      treatmentType: treatmentType, // Păstrăm câmpul real
+      category: data.category || treatmentData.category || '',
+      duration: (data.duration || treatmentData.duration)?.toString() || '',
+      price: (data.price || treatmentData.price)?.toString() || '',
+      description: data.description || treatmentData.description || ''
     }
   }
 

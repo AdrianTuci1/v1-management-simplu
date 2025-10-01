@@ -1,7 +1,5 @@
 import { dataFacade } from '../data/DataFacade.js'
-import { socketFacade } from '../data/SocketFacade.js'
 import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareResourceRepository.js'
-import { resourceSearchRepository } from '../data/repositories/ResourceSearchRepository.js'
 import patientManager from '../business/patientManager.js'
 
 
@@ -9,7 +7,6 @@ class PatientService {
   constructor() {
     this.repository = new DraftAwareResourceRepository('patients', 'patient')
     this.dataFacade = dataFacade
-    this.socketFacade = socketFacade
   }
 
   // Obține pacienții cu parametri de filtrare
@@ -41,13 +38,13 @@ class PatientService {
   // Obține pacienții după nume (căutare) folosind resource queries
   async searchPatients(searchTerm, limit = 50) {
     try {
-      // Folosește ResourceSearchRepository pentru căutare eficientă
-      const patients = await resourceSearchRepository.searchWithFallback(
+      // Folosește DataFacade pentru căutare eficientă
+      const patients = await this.dataFacade.searchWithFallback(
         'patient',
         'patientName',
         searchTerm,
         limit,
-        // Fallback method
+        // Fallback method - returnează date RAW pentru transformare consistentă
         async (searchTerm, fallbackFilters) => {
           const params = {
             search: searchTerm,
@@ -55,12 +52,13 @@ class PatientService {
             sortBy: 'name',
             sortOrder: 'asc'
           }
-          const result = await this.getPatients(params)
+          // Apelăm direct dataFacade pentru a obține date RAW, nu getPatients care transformă deja
+          const result = await this.dataFacade.getAll('patient', params)
           return Array.isArray(result) ? result : []
         }
       );
       
-      // Transformăm fiecare pacient pentru UI
+      // Transformăm fiecare pacient pentru UI o singură dată
       return patients.map(patient => 
         patientManager.transformPatientForUI(patient)
       );

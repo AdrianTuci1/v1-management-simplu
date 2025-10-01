@@ -63,8 +63,8 @@ export const useTreatments = () => {
           // Înlocuiește tratamentul optimist cu datele reale
           const ui = treatmentManager.transformTreatmentForUI({ ...data, id: treatmentId, resourceId: treatmentId })
           
-          // Caută în outbox pentru a găsi operația optimistă
-          const outboxEntry = await indexedDb.outboxFindByTempId(treatmentId)
+          // Caută în outbox pentru a găsi operația optimistă folosind ID-ul real
+          const outboxEntry = await indexedDb.outboxFindByResourceId(treatmentId, 'treatment')
           
           if (outboxEntry) {
             const optimisticIndex = sharedTreatments.findIndex(t => t._tempId === outboxEntry.tempId)
@@ -82,8 +82,14 @@ export const useTreatments = () => {
             if (optimisticIndex >= 0) {
               sharedTreatments[optimisticIndex] = { ...ui, _isOptimistic: false }
             } else {
-              // Adaugă ca nou dacă nu există
-              sharedTreatments = [ui, ...sharedTreatments]
+              // Verifică dacă nu există deja (evită dubluri)
+              const existingIndex = sharedTreatments.findIndex(t => t.id === treatmentId || t.resourceId === treatmentId)
+              if (existingIndex >= 0) {
+                sharedTreatments[existingIndex] = { ...ui, _isOptimistic: false }
+              } else {
+                // Adaugă ca nou doar dacă nu există deloc
+                sharedTreatments = [ui, ...sharedTreatments]
+              }
             }
           }
           
@@ -192,12 +198,17 @@ export const useTreatments = () => {
     try {
       // Trimitere la server
       const newTreatment = await treatmentService.addTreatment(treatmentData)
+      const ui = treatmentManager.transformTreatmentForUI(newTreatment)
       
-      if (newTreatment && newTreatment.id) {
-        const realTreatment = treatmentManager.transformTreatmentForUI(newTreatment)
-        const idx = sharedTreatments.findIndex(t => t.id === realTreatment.id || t.resourceId === realTreatment.resourceId)
-        if (idx >= 0) sharedTreatments[idx] = { ...realTreatment, _isOptimistic: false }
-        else sharedTreatments = [realTreatment, ...sharedTreatments]
+      // Doar resursele optimistice sunt adăugate imediat în shared state
+      // Resursele cu ID real vor fi adăugate de WebSocket
+      if (ui._isOptimistic || ui._tempId) {
+        const idx = sharedTreatments.findIndex(t => t._tempId === ui._tempId)
+        if (idx >= 0) {
+          sharedTreatments[idx] = ui
+        } else {
+          sharedTreatments = [ui, ...sharedTreatments]
+        }
         setTreatments(sharedTreatments)
         setTreatmentCount(sharedTreatments.length)
         notifySubscribers()
@@ -271,6 +282,7 @@ export const useTreatments = () => {
     
     try {
       const treatmentsData = await treatmentService.searchTreatments(searchTerm, limit)
+      console.log(`searchTreatments - Found ${treatmentsData.length} treatments for query "${searchTerm}"`, treatmentsData)
       sharedTreatments = treatmentsData
       setTreatments(treatmentsData)
       setTreatmentCount(treatmentsData.length)

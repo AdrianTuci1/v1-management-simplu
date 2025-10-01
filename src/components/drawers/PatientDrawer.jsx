@@ -80,8 +80,9 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
   // Load appointments when patient data changes
   useEffect(() => {
     const loadAppointments = async () => {
-      if (patientData?.id || patientData?.resourceId) {
+      if (patientData?.id) {
         setAppointmentsLoading(true)
+        console.log('patientData', patientData)
         try {
           const patientId = patientData.resourceId || patientData.id
           const patientAppointments = await appointmentService.getAppointmentsByPatientId(patientId)
@@ -98,7 +99,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     }
 
     loadAppointments()
-  }, [patientData?.id, patientData?.resourceId])
+  }, [patientData?.id])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -161,6 +162,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       setLoading(false)
     }
   }
+
+  console.log('appointments', appointments)
 
 
   const renderPatientDetails = () => (
@@ -375,7 +378,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">
-                    {appointment.appointmentDate ? new Date(appointment.appointmentDate).toLocaleDateString('ro-RO') : 'Data necunoscută'} - {appointment.startTime || 'Ora necunoscută'}
+                    {appointment.date ? new Date(appointment.date).toLocaleDateString('ro-RO') : 'Data necunoscută'} - {appointment.time || 'Ora necunoscută'}
                   </span>
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full ${
@@ -387,9 +390,18 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
                 </span>
               </div>
               <div className="text-sm text-slate-600">
-                <div className="font-medium">{appointment.treatmentType || appointment.type || 'Consultare'}</div>
-                {appointment.notes && (
-                  <div className="mt-1">{appointment.notes}</div>
+                <div className="font-medium">{appointment.service?.name || appointment.treatmentType || appointment.type || 'Consultare'}</div>
+                {appointment.doctor?.name && (
+                  <div className="mt-1"><strong>Doctor:</strong> {appointment.doctor.name}</div>
+                )}
+                {appointment.price && appointment.price !== '0' && (
+                  <div className="mt-1"><strong>Preț:</strong> {appointment.price} RON</div>
+                )}
+                {appointment.prescription && (
+                  <div className="mt-1"><strong>Prescripție:</strong> {appointment.prescription}</div>
+                )}
+                {appointment.postOperativeNotes && (
+                  <div className="mt-1"><strong>Observații:</strong> {appointment.postOperativeNotes}</div>
                 )}
               </div>
             </div>
