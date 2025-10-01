@@ -1,8 +1,9 @@
-import { Activity, MessageSquare, Mic, Mail, Facebook, Clock, CheckCircle, AlertCircle, Filter, Search, Calendar, Users, Phone, Mail as MailIcon, MessageCircle, Zap, Eye, MoreHorizontal } from 'lucide-react'
+import { Activity, MessageSquare, Mic, Mail, Facebook, Clock, CheckCircle, AlertCircle, Calendar, Users, Phone, Mail as MailIcon, MessageCircle, Zap, Eye, MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command'
+import { Calendar as CalendarComponent } from '../ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import ActivityDrawer from '../drawers/ActivityDrawer.jsx'
 
 const OperationsActivities = () => {
@@ -300,9 +301,9 @@ const OperationsActivities = () => {
   });
 
   const [selectedActivity, setSelectedActivity] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   // Funcție pentru a obține iconița serviciului
   const getServiceIcon = (service) => {
@@ -361,21 +362,37 @@ const OperationsActivities = () => {
     }
   };
 
-  // Filtrare activități
+  // Funcție pentru a formata ora
+  const formatTime = (timestamp) => {
+    return timestamp.toLocaleTimeString('ro-RO', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  // Funcție pentru a formata data pentru buton
+  const formatDateForButton = (date) => {
+    return date.toLocaleDateString('ro-RO', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Filtrare activități după dată
   const filteredActivities = activities.filter(activity => {
-    const matchesSearch = activity.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         activity.details.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         activity.service.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || activity.category === filterCategory;
-    return matchesSearch && matchesCategory;
+    const activityDate = new Date(activity.timestamp);
+    const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+    const activityDateOnly = new Date(activityDate.getFullYear(), activityDate.getMonth(), activityDate.getDate());
+    return activityDateOnly.getTime() === selectedDateOnly.getTime();
   });
 
   // Statistici rapide
   const stats = {
     total: activities.length,
     success: activities.filter(a => a.status === 'success').length,
-    error: activities.filter(a => a.status === 'error').length,
-    highPriority: activities.filter(a => a.priority === 'high').length
+    error: activities.filter(a => a.status === 'error').length
   };
 
   return (
@@ -397,59 +414,36 @@ const OperationsActivities = () => {
             <div className="text-2xl font-bold text-red-600">{stats.error}</div>
             <div className="text-sm text-muted-foreground">Erori</div>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-orange-600">{stats.highPriority}</div>
-            <div className="text-sm text-muted-foreground">Prioritate înaltă</div>
-          </div>
         </div>
       </div>
 
-      {/* Filtre și căutare */}
+      {/* Date Picker Button */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <Command>
-                <CommandInput 
-                  placeholder="Caută activități..." 
-                  value={searchQuery}
-                  onValueChange={setSearchQuery}
-                />
-              </Command>
-            </div>
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Button
-                variant={filterCategory === 'all' ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => setFilterCategory('all')}
-              >
-                Toate
-              </Button>
-              <Button
-                variant={filterCategory === 'appointment' ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => setFilterCategory('appointment')}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Programări
-              </Button>
-              <Button
-                variant={filterCategory === 'communication' ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => setFilterCategory('communication')}
-              >
-                <MessageCircle className="h-4 w-4 mr-2" />
-                Comunicare
-              </Button>
-              <Button
-                variant={filterCategory === 'social' ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => setFilterCategory('social')}
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Social
-              </Button>
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Data selectată:</span>
             </div>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-start text-left font-normal">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {formatDateForButton(selectedDate)}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <CalendarComponent
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    setDatePickerOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </CardContent>
       </Card>
@@ -461,12 +455,10 @@ const OperationsActivities = () => {
             <table className="w-full">
               <thead className="border-b bg-muted/50">
                 <tr>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Acțiune</th>
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Serviciu</th>
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Descriere</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Prioritate</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Timp</th>
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Ora</th>
                 </tr>
               </thead>
               <tbody>
@@ -474,8 +466,6 @@ const OperationsActivities = () => {
                   const ServiceIcon = getServiceIcon(activity.service);
                   const CategoryIcon = getCategoryIcon(activity.category);
                   const actionInfo = getActionInfo(activity.action);
-                  const priorityInfo = getPriorityInfo(activity.priority);
-                  const StatusIcon = activity.status === 'success' ? CheckCircle : AlertCircle;
                   
                   return (
                     <tr 
@@ -489,21 +479,11 @@ const OperationsActivities = () => {
                         setDrawerOpen(true);
                       }}
                     >
-                      {/* Status */}
-                      <td className="p-4 align-middle">
-                        <div className="flex items-center space-x-2">
-                          <StatusIcon className={`h-4 w-4 ${activity.status === 'success' ? 'text-green-500' : 'text-red-500'}`} />
-                        </div>
-                      </td>
-
                       {/* Acțiune */}
                       <td className="p-4 align-middle">
-                        <div className="flex items-center space-x-2">
-                          <CategoryIcon className="h-4 w-4 text-muted-foreground" />
-                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${actionInfo.bgColor} ${actionInfo.color}`}>
-                            {actionInfo.text}
-                          </span>
-                        </div>
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${actionInfo.bgColor} ${actionInfo.color}`}>
+                          {actionInfo.text}
+                        </span>
                       </td>
 
                       {/* Serviciu */}
@@ -522,18 +502,11 @@ const OperationsActivities = () => {
                         </div>
                       </td>
 
-                      {/* Prioritate */}
-                      <td className="p-4 align-middle">
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${priorityInfo.bgColor} ${priorityInfo.color}`}>
-                          {priorityInfo.text}
-                        </span>
-                      </td>
-
-                      {/* Timp */}
+                      {/* Ora */}
                       <td className="p-4 align-middle">
                         <div className="flex items-center space-x-2">
                           <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">{formatTimestamp(activity.timestamp)}</span>
+                          <span className="text-sm text-muted-foreground">{formatTime(activity.timestamp)}</span>
                         </div>
                       </td>
 

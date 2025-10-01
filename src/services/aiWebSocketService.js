@@ -71,43 +71,52 @@ export class AIWebSocketService {
     try {
       Logger.log('info', 'Connecting to WebSocket server via SocketFacade...');
       
-      // Connect using SocketFacade
-      const result = await this.socketFacade.connectAIAssistant(this.businessId, this.userId, this.locationId);
-      
-      // Get AI Assistant instance from SocketFacade
+      // Get or create AI Assistant instance from SocketFacade FIRST
       this.aiAssistantInstance = this.socketFacade.createAIAssistant(this.businessId, this.userId, this.locationId);
       
-      // Set up event handlers
+      // Set up event handlers BEFORE connecting
       this.aiAssistantInstance.onMessageReceived = (messages) => {
-        Logger.log('info', '🎯 AIWebSocketService received messages', {
+        Logger.log('info', '🎯 AIWebSocketService received messages from instance', {
           messageCount: messages?.length || 0,
-          hasCallback: !!this.onMessageReceived
+          hasCallback: !!this.onMessageReceived,
+          callbackType: typeof this.onMessageReceived
         });
+        
         if (this.onMessageReceived) {
-          this.onMessageReceived(messages);
+          try {
+            this.onMessageReceived(messages);
+            Logger.log('info', '✅ AIWebSocketService forwarded messages to hook');
+          } catch (error) {
+            Logger.log('error', '❌ Error in AIWebSocketService onMessageReceived callback', error);
+          }
+        } else {
+          Logger.log('warn', '⚠️ AIWebSocketService onMessageReceived callback not set');
         }
       };
       
       this.aiAssistantInstance.onConnectionChange = (isConnected) => {
-        Logger.log('info', 'AI Assistant instance connection changed', { isConnected });
+        Logger.log('info', '🔌 AI Assistant instance connection changed', { isConnected });
         this.isConnected = isConnected;
         this.onConnectionChange?.(isConnected);
       };
       
       this.aiAssistantInstance.onError = (error, details) => {
-        Logger.log('error', 'AI Assistant instance error', { error, details });
+        Logger.log('error', '❌ AI Assistant instance error', { error, details });
         this.onError?.(error, details);
       };
       
       this.aiAssistantInstance.onSessionUpdate = (payload) => {
-        Logger.log('info', 'AI Assistant instance session update', payload);
+        Logger.log('info', '🔄 AI Assistant instance session update', payload);
         this.onSessionUpdate?.(payload);
       };
       
+      // Now connect using SocketFacade
+      const result = await this.socketFacade.connectAIAssistant(this.businessId, this.userId, this.locationId);
+      
       this.isConnected = result.success;
-      Logger.log('info', 'Connected to WebSocket server via SocketFacade', result);
+      Logger.log('info', '✅ Connected to WebSocket server via SocketFacade', result);
     } catch (error) {
-      Logger.log('error', 'Failed to connect to WebSocket server', error);
+      Logger.log('error', '❌ Failed to connect to WebSocket server', error);
       this.onError?.(getConfig('ERRORS.CONNECTION_FAILED'), error);
       this.scheduleReconnect();
     }
@@ -499,32 +508,41 @@ export class AIWebSocketService {
   // Send message via WebSocket
   async sendMessage(content, context = {}) {
     if (!this.isConnected || !this.aiAssistantInstance) {
+      Logger.log('error', 'Cannot send message - WebSocket not connected', {
+        isConnected: this.isConnected,
+        hasInstance: !!this.aiAssistantInstance
+      });
       throw new Error('WebSocket not connected');
     }
 
     try {
-      // Use SocketFacade to send message
-      const result = await this.socketFacade.sendAIAssistantMessage(
-        this.businessId,
-        this.userId,
-        content,
-        context,
-        this.locationId
-      );
+      Logger.log('info', '📤 AIWebSocketService sending message', {
+        content: content.substring(0, 50) + '...',
+        sessionId: this.currentSessionId,
+        hasContext: !!context
+      });
       
-      return result.success;
+      // Ensure session ID is set in instance
+      if (this.currentSessionId && this.aiAssistantInstance) {
+        this.aiAssistantInstance.setCurrentSessionId(this.currentSessionId);
+      }
+      
+      // Send message directly through instance
+      const success = this.aiAssistantInstance.sendMessage(content, context);
+      
+      Logger.log('info', '✅ AIWebSocketService message sent', { success });
+      
+      return success;
     } catch (error) {
-      Logger.log('error', 'Failed to send message via WebSocket', error);
+      Logger.log('error', '❌ Failed to send message via WebSocket', error);
       throw error;
     }
   }
 
-
-
   // Set current session ID
   setCurrentSessionId(sessionId) {
     if (sessionId !== this.currentSessionId) {
-      Logger.log('info', 'Session ID updated in WebSocket service', { 
+      Logger.log('info', '🔄 Session ID updated in AIWebSocketService', { 
         oldSessionId: this.currentSessionId, 
         newSessionId: sessionId 
       });
@@ -534,6 +552,7 @@ export class AIWebSocketService {
       // Also set session ID in the AI Assistant instance
       if (this.aiAssistantInstance) {
         this.aiAssistantInstance.setCurrentSessionId(sessionId);
+        Logger.log('info', '✅ Session ID set in AI Assistant instance');
       }
     }
   }

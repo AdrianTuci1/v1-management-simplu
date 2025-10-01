@@ -545,15 +545,15 @@ const ActivityDrawer = ({ onClose, activity, detailedData }) => {
   )
 
   const drawerContent = (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <div className="absolute inset-0 z-50 flex flex-col bg-white ml-[400px] p-2 ">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0"
         onClick={onClose}
       />
       
       {/* Drawer positioned at top */}
-      <div className="relative z-10 w-full h-full max-h-screen flex flex-col bg-white shadow-xl">
+      <div className="relative z-10 w-full h-full max-h-screen flex flex-col bg-white shadow-xl rounded-lg border-gray-200">
         <div className="h-full px-6">
           <DrawerHeader
             title={

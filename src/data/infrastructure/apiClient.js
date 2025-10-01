@@ -25,6 +25,33 @@ export async function apiRequest(resourceType, endpoint = "", options = {}) {
     if (savedCognitoData) {
       const userData = JSON.parse(savedCognitoData);
       authToken = userData.id_token || userData.access_token;
+      
+      // Check if token is expired and try to refresh before making the request
+      if (authToken && resourceType === 'auth') {
+        try {
+          // Import cognitoAuthService dynamically to avoid circular imports
+          const { default: cognitoAuthService } = await import('../../services/cognitoAuthService.js');
+          
+          // Check if token is expired
+          if (cognitoAuthService.isTokenExpired(authToken)) {
+            console.log('🔄 Token is expired, attempting refresh before request...');
+            
+            // Try to refresh the session
+            const refreshedSession = await cognitoAuthService.refreshSession();
+            if (refreshedSession) {
+              console.log('✅ Token refreshed successfully before request');
+              authToken = refreshedSession.id_token || refreshedSession.access_token;
+            } else {
+              console.log('❌ Token refresh failed, clearing auth data');
+              cognitoAuthService.clearAuthData();
+              window.location.href = '/login';
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error checking/refreshing token before request:', error);
+        }
+      }
     }
   }
 
@@ -59,6 +86,46 @@ export async function apiRequest(resourceType, endpoint = "", options = {}) {
     });
 
     if (!response.ok) {
+      // Handle 401 Unauthorized - try to refresh token
+      if (response.status === 401 && authToken && resourceType === 'auth') {
+        console.log('🔄 Received 401, attempting token refresh...');
+        
+        try {
+          // Import cognitoAuthService dynamically to avoid circular imports
+          const { default: cognitoAuthService } = await import('../../services/cognitoAuthService.js');
+          
+          // Try to refresh the session
+          const refreshedSession = await cognitoAuthService.refreshSession();
+          if (refreshedSession) {
+            console.log('✅ Token refreshed successfully, retrying request...');
+            
+            // Update auth token and retry the request
+            const newAuthToken = refreshedSession.id_token || refreshedSession.access_token;
+            const newHeaders = {
+              ...headers,
+              "Authorization": `Bearer ${newAuthToken}`
+            };
+            
+            const retryResponse = await fetch(url, {
+              ...processedOptions,
+              headers: newHeaders,
+            });
+            
+            if (retryResponse.ok) {
+              console.log('✅ Request succeeded after token refresh');
+              return await retryResponse.json();
+            }
+          }
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          // If refresh fails, clear auth data and redirect to login
+          const { default: cognitoAuthService } = await import('../../services/cognitoAuthService.js');
+          await cognitoAuthService.signOut();
+          window.location.href = '/login';
+          return;
+        }
+      }
+      
       const text = await response.text().catch(() => "");
       const error = new Error(`API error ${response.status}`);
       error.status = response.status;

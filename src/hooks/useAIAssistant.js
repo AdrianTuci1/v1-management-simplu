@@ -96,60 +96,22 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
           // Set up WebSocket event handlers AFTER connection
           Logger.log('info', 'Setting up WebSocket event handlers');
           
+          // Message handler - simplified to handle messages from current session
           webSocketRef.current.onMessageReceived = (newMessages) => {
             Logger.log('info', '🎯 Hook received messages from WebSocket', {
               messageCount: newMessages?.length || 0,
-              currentSessionId,
               messageSessionIds: newMessages?.map(m => m.sessionId) || []
             });
             
             setMessages(prev => {
               const existingIds = new Set(prev.map(m => m.messageId));
               
-              // Filter by current session ID first
-              const sessionFilteredMessages = newMessages.filter(msg => {
-                const msgSessionId = msg.sessionId;
-                const isTempSession = currentSessionId && currentSessionId.startsWith('temp_');
-                const matchesSession = !currentSessionId || msgSessionId === currentSessionId;
-                
-                // If we have a temp session ID but got a message with real session ID, update it
-                if (isTempSession && msgSessionId && !msgSessionId.startsWith('temp_')) {
-                  Logger.log('info', '🔄 Updating session ID from temp to real', { 
-                    oldSessionId: currentSessionId, 
-                    newSessionId: msgSessionId 
-                  });
-                  setCurrentSessionId(msgSessionId);
-                  return true; // Accept the message
-                }
-                
-                // If we don't have a current session ID but got a message with one, update it
-                if (!currentSessionId && msgSessionId) {
-                  Logger.log('info', '🔄 Updating session ID from null to real', { 
-                    oldSessionId: currentSessionId, 
-                    newSessionId: msgSessionId 
-                  });
-                  setCurrentSessionId(msgSessionId);
-                  return true; // Accept the message
-                }
-                
-                if (!matchesSession) {
-                  Logger.log('info', '❌ Session ID mismatch', { 
-                    msgSessionId, 
-                    currentSessionId, 
-                    messageId: msg.messageId
-                  });
-                }
-                
-                return matchesSession;
-              });
-              
-              // Then filter by existing message IDs
-              const filteredNew = sessionFilteredMessages.filter(m => !existingIds.has(m.messageId));
+              // Filter out duplicate messages
+              const filteredNew = newMessages.filter(m => !existingIds.has(m.messageId));
               
               Logger.log('info', '✅ Messages processed in hook', {
                 originalCount: newMessages.length,
-                sessionFilteredCount: sessionFilteredMessages.length,
-                finalCount: filteredNew.length,
+                filteredCount: filteredNew.length,
                 totalCount: prev.length + filteredNew.length
               });
               
@@ -157,24 +119,42 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
             });
           };
           
+          // Connection status handler
           webSocketRef.current.onConnectionChange = (connected) => {
             Logger.log('info', 'WebSocket connection status changed', { connected });
             setIsConnected(connected);
             setConnectionStatus(connected ? 'connected' : 'disconnected');
           };
           
+          // Error handler
           webSocketRef.current.onError = (message, error) => {
             Logger.log('error', 'WebSocket error', { message, error });
             setError({ message, error });
           };
 
-          // Handle session updates from WebSocket
+          // Session update handler - handles session ID updates from WebSocket
           webSocketRef.current.onSessionUpdate = (payload) => {
-            Logger.log('info', 'WebSocket session update received', payload);
-            if (payload.sessionId && aiServiceRef.current) {
-              // Update session ID in AI Service
-              aiServiceRef.current.updateSessionId(payload.sessionId);
-              setCurrentSessionId(payload.sessionId);
+            Logger.log('info', '🔄 WebSocket session update received in hook', payload);
+            
+            if (payload.sessionId) {
+              const newSessionId = payload.sessionId;
+              
+              // Update session ID in both services
+              setCurrentSessionId(newSessionId);
+              
+              if (aiServiceRef.current) {
+                aiServiceRef.current.updateSessionId(newSessionId);
+              }
+              
+              if (webSocketRef.current) {
+                webSocketRef.current.setCurrentSessionId(newSessionId);
+              }
+              
+              Logger.log('info', '✅ Session ID updated in hook', { 
+                sessionId: newSessionId,
+                source: payload.metadata?.source,
+                reason: payload.metadata?.reason
+              });
             }
           };
           
@@ -224,7 +204,13 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       throw new Error('Message content cannot be empty');
     }
 
-    Logger.log('info', 'Sending message', { content: content.trim(), currentSessionId, isDemoMode });
+    Logger.log('info', 'Sending message', { 
+      content: content.substring(0, 50) + '...', 
+      currentSessionId, 
+      isDemoMode,
+      hasWebSocket: !!webSocketRef.current,
+      isConnected
+    });
 
     setIsLoading(true);
     setError(null);
@@ -239,34 +225,49 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       content: content.trim(),
       type: 'user',
       timestamp: new Date().toISOString(),
-      metadata: { source: 'api' }
+      metadata: { source: 'ui' }
     };
 
     try {
       // Add user message to UI immediately
       setMessages(prev => [...prev, userMessage]);
-      Logger.log('info', 'User message added to UI', userMessage);
+      Logger.log('info', '✅ User message added to UI', {
+        messageId: userMessage.messageId,
+        sessionId: currentSessionId
+      });
 
       // Try WebSocket first (if not in demo mode), fallback to API
-      if (!isDemoMode && webSocketRef.current && webSocketRef.current.isConnected) {
+      if (!isDemoMode && webSocketRef.current && isConnected) {
         Logger.log('info', '📤 Sending message via WebSocket', {
           content: content.substring(0, 50) + '...',
-          currentSessionId
+          sessionId: currentSessionId
         });
+        
+        // Ensure WebSocket has current session ID
+        if (currentSessionId) {
+          webSocketRef.current.setCurrentSessionId(currentSessionId);
+        }
+        
         await webSocketRef.current.sendMessage(content.trim(), context);
+        
+        Logger.log('info', '✅ Message sent via WebSocket');
       } else if (aiServiceRef.current) {
         Logger.log('info', '📤 Sending message via API (fallback)', {
           content: content.substring(0, 50) + '...',
-          currentSessionId
+          sessionId: currentSessionId,
+          reason: isDemoMode ? 'demo mode' : !webSocketRef.current ? 'no websocket' : 'not connected'
         });
+        
         await aiServiceRef.current.sendMessage(content.trim(), context);
+        
+        Logger.log('info', '✅ Message sent via API');
       } else {
         throw new Error('No service available to send message');
       }
 
       return { success: true, messageId: userMessage.messageId };
     } catch (error) {
-      Logger.log('error', 'Failed to send message', error);
+      Logger.log('error', '❌ Failed to send message', error);
       setError({ message: 'Failed to send message', error });
       
       // Remove the user message if sending failed using the correct messageId
@@ -276,7 +277,7 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     } finally {
       setIsLoading(false);
     }
-  }, [currentSessionId, finalBusinessId, finalUserId, isDemoMode]);
+  }, [currentSessionId, finalBusinessId, finalUserId, isDemoMode, isConnected]);
 
   // Search messages
   const searchMessages = useCallback(async (query, limit = 20) => {
@@ -302,23 +303,6 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       return await aiServiceRef.current.exportSession(format);
     } catch (error) {
       setError({ message: 'Export failed', error });
-      throw error;
-    }
-  }, []);
-
-  // Close session
-  const closeSession = useCallback(async (status = 'resolved') => {
-    if (!aiServiceRef.current) {
-      throw new Error('AI Service not initialized');
-    }
-
-    try {
-      await aiServiceRef.current.closeSession(status);
-      setMessages([]);
-      setCurrentSessionId(null);
-      return true;
-    } catch (error) {
-      setError({ message: 'Failed to close session', error });
       throw error;
     }
   }, []);
@@ -386,6 +370,7 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     }
 
     try {
+      Logger.log('info', '🆕 Starting new session');
       setIsLoading(true);
       setError(null);
       
@@ -396,10 +381,19 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       const result = await aiServiceRef.current.startNewSession();
       
       // Update session ID after service creates new session
-      setCurrentSessionId(result.sessionId || aiServiceRef.current.currentSessionId);
+      const newSessionId = result.sessionId || aiServiceRef.current.currentSessionId;
+      setCurrentSessionId(newSessionId);
+      
+      // Also update WebSocket service with new session ID
+      if (webSocketRef.current) {
+        webSocketRef.current.setCurrentSessionId(newSessionId);
+      }
+      
+      Logger.log('info', '✅ New session started', { sessionId: newSessionId });
       
       return result;
     } catch (error) {
+      Logger.log('error', '❌ Failed to start new session', error);
       setError({ message: 'Failed to start new session', error });
       throw error;
     } finally {
@@ -413,23 +407,40 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       throw new Error('AI Service not initialized');
     }
 
+    if (!sessionId) {
+      throw new Error('Session ID is required');
+    }
+
     try {
+      Logger.log('info', '🔄 Switching to session', { sessionId });
       setIsLoading(true);
       setError(null);
       
       // Clear current messages first
       setMessages([]);
       
+      // Switch session in AI service (this will load the session and its messages)
       const sessionData = await aiServiceRef.current.switchToSession(sessionId);
       
-      // Update current session and messages
+      // Update current session ID in state
       setCurrentSessionId(sessionId);
-      if (sessionData.messages) {
-        setMessages(sessionData.messages);
+      
+      // Update WebSocket service with new session ID
+      if (webSocketRef.current) {
+        webSocketRef.current.setCurrentSessionId(sessionId);
       }
+      
+      // Messages are loaded by aiServiceRef and sent via onMessageReceived callback
+      // which will update the messages state automatically
+      
+      Logger.log('info', '✅ Switched to session successfully', { 
+        sessionId,
+        messageCount: aiServiceRef.current.messageHistory?.length || 0
+      });
       
       return sessionData;
     } catch (error) {
+      Logger.log('error', '❌ Failed to switch session', error);
       setError({ message: 'Failed to switch session', error });
       throw error;
     } finally {
@@ -471,20 +482,65 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       throw new Error('AI Service not initialized');
     }
 
+    if (!sessionId) {
+      throw new Error('Session ID is required');
+    }
+
     try {
+      Logger.log('info', '📂 Loading session', { sessionId });
+      setIsLoading(true);
+      
       const sessionData = await aiServiceRef.current.loadSession(sessionId);
       
       if (sessionData) {
         setCurrentSessionId(sessionId);
-        setMessages(sessionData.messages || []);
+        
+        // Update WebSocket service with session ID
+        if (webSocketRef.current) {
+          webSocketRef.current.setCurrentSessionId(sessionId);
+        }
+        
+        // Messages are loaded by aiServiceRef and sent via onMessageReceived callback
+        Logger.log('info', '✅ Session loaded successfully', { 
+          sessionId,
+          messageCount: aiServiceRef.current.messageHistory?.length || 0
+        });
       }
       
       return sessionData;
     } catch (error) {
+      Logger.log('error', '❌ Failed to load session', error);
       setError({ message: 'Failed to load session', error });
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
+
+  // Close session
+  const closeSession = useCallback(async (status = 'resolved') => {
+    if (!aiServiceRef.current) {
+      throw new Error('AI Service not initialized');
+    }
+
+    try {
+      Logger.log('info', '🔒 Closing session', { currentSessionId, status });
+      
+      await aiServiceRef.current.closeSession(status);
+      
+      // Clear local state
+      setMessages([]);
+      setCurrentSessionId(null);
+      
+      Logger.log('info', '✅ Session closed successfully');
+      
+      return true;
+    } catch (error) {
+      Logger.log('error', '❌ Failed to close session', error);
+      setError({ message: 'Failed to close session', error });
+      throw error;
+    }
+  }, [currentSessionId]);
 
   // Clear error
   const clearError = useCallback(() => {
@@ -493,6 +549,7 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
 
   // Reconnect
   const reconnect = useCallback(async () => {
+    Logger.log('info', '🔄 Reconnecting services');
     cleanupServices();
     await initializeServices();
   }, [cleanupServices, initializeServices]);

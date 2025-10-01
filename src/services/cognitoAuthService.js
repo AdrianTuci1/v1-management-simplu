@@ -62,6 +62,18 @@ class CognitoAuthService {
   }
 
   /**
+   * Check if token is completely expired
+   * @param {string} token - JWT token
+   * @returns {boolean} True if token is expired
+   */
+  isTokenExpired(token) {
+    const expiration = this.getTokenExpiration(token)
+    if (!expiration) return true
+    
+    return Date.now() >= expiration
+  }
+
+  /**
    * Start automatic token refresh monitoring
    */
   startTokenRefreshMonitoring() {
@@ -70,14 +82,14 @@ class CognitoAuthService {
       clearInterval(this.refreshInterval)
     }
 
-    // Check token every 1 minute
+    // Check token every 30 seconds for better responsiveness
     this.refreshInterval = setInterval(async () => {
       try {
         await this.checkAndRefreshToken()
       } catch (error) {
         console.error('Token refresh check failed:', error)
       }
-    }, 60000) // Check every minute
+    }, 30000) // Check every 30 seconds
 
     // Also check immediately
     this.checkAndRefreshToken().catch(err => {
@@ -131,6 +143,27 @@ class CognitoAuthService {
 
       const idToken = session.getIdToken().getJwtToken()
       
+      // Check if token is completely expired
+      if (this.isTokenExpired(idToken)) {
+        console.log('Token is expired, attempting refresh...')
+        // Try to refresh the token using refresh token
+        try {
+          const refreshedSession = await this.refreshSession()
+          if (refreshedSession) {
+            console.log('✅ Token refreshed successfully')
+            return
+          }
+        } catch (refreshError) {
+          console.error('Failed to refresh expired token:', refreshError)
+        }
+        
+        // If refresh failed, user needs to re-authenticate
+        console.log('Token refresh failed, user needs to re-authenticate')
+        await this.signOut()
+        window.location.href = '/login'
+        return
+      }
+      
       // Check if token is expiring soon
       if (this.isTokenExpiringSoon(idToken)) {
         const authProvider = this.isGoogleAuth() ? '(Google OAuth)' : '(Email/Password)'
@@ -144,6 +177,9 @@ class CognitoAuthService {
       // If refresh fails and we're using Google auth, user might need to re-authenticate
       if (this.isGoogleAuth()) {
         console.warn('⚠️ Google OAuth token refresh failed. User may need to sign in again.')
+        // For Google OAuth, if refresh fails, user needs to re-authenticate
+        await this.signOut()
+        window.location.href = '/login'
       }
     } finally {
       this.isRefreshing = false
@@ -188,10 +224,14 @@ class CognitoAuthService {
             }
           }
 
-          // Store in localStorage
+          // Store in localStorage with remember me preference
           localStorage.setItem('auth-token', userData.id_token)
           localStorage.setItem('user-email', email)
           localStorage.setItem('cognito-data', JSON.stringify(userData))
+          localStorage.setItem('remember-me', rememberMe.toString())
+          
+          // Store session timestamp for better persistence tracking
+          localStorage.setItem('session-timestamp', Date.now().toString())
 
           // Start token refresh monitoring
           this.startTokenRefreshMonitoring()
@@ -346,10 +386,7 @@ class CognitoAuthService {
       this.stopTokenRefreshMonitoring()
       
       // Clear localStorage (including Google auth)
-      localStorage.removeItem('auth-token')
-      localStorage.removeItem('user-email')
-      localStorage.removeItem('cognito-data')
-      localStorage.removeItem('auth-provider')
+      this.clearAuthData()
       
       this.currentUser = null
       resolve()
@@ -361,6 +398,19 @@ class CognitoAuthService {
    * @returns {Promise<Object|null>}
    */
   async getCurrentSession() {
+    // First try to restore session from stored data
+    const restoredSession = await this.restoreSession()
+    if (restoredSession) {
+      return restoredSession
+    }
+
+    // If no stored session, try to refresh using stored refresh token
+    const refreshedSession = await this.tryRefreshOnPageLoad()
+    if (refreshedSession) {
+      return refreshedSession
+    }
+
+    // If no refresh possible, try to get current Cognito session
     return new Promise((resolve, reject) => {
       const cognitoUser = userPool.getCurrentUser()
 
@@ -393,6 +443,9 @@ class CognitoAuthService {
           }
         }
 
+        // Store session timestamp
+        localStorage.setItem('session-timestamp', Date.now().toString())
+
         // Start token refresh monitoring
         this.startTokenRefreshMonitoring()
 
@@ -402,18 +455,196 @@ class CognitoAuthService {
   }
 
   /**
+   * Try to refresh session using stored refresh token
+   * This is called when the app loads and we have a refresh token but no valid session
+   * @returns {Promise<Object|null>}
+   */
+  async tryRefreshOnPageLoad() {
+    try {
+      console.log('🔄 Attempting to refresh session on page load...')
+      
+      // Check if we have stored data
+      const savedCognitoData = localStorage.getItem('cognito-data')
+      if (!savedCognitoData) {
+        console.log('No stored auth data found')
+        return null
+      }
+
+      const userData = JSON.parse(savedCognitoData)
+      if (!userData.refresh_token) {
+        console.log('No refresh token found')
+        return null
+      }
+
+      // Check if we should persist this session
+      if (!this.shouldPersistSession()) {
+        console.log('Session should not be persisted, clearing auth data')
+        this.clearAuthData()
+        return null
+      }
+
+      // Try to get current user and refresh session
+      const cognitoUser = userPool.getCurrentUser()
+      if (!cognitoUser) {
+        console.log('No current Cognito user found')
+        return null
+      }
+
+      // Attempt to refresh the session
+      const refreshedSession = await this.refreshSession()
+      if (refreshedSession) {
+        console.log('✅ Session refreshed successfully on page load')
+        this.startTokenRefreshMonitoring()
+        return refreshedSession
+      }
+
+      return null
+    } catch (error) {
+      console.error('Error refreshing session on page load:', error)
+      this.clearAuthData()
+      return null
+    }
+  }
+
+  /**
    * Check if user is authenticated
    * @returns {boolean}
    */
   isAuthenticated() {
     // Check for Google auth
     if (localStorage.getItem('auth-provider') === 'google') {
-      return !!localStorage.getItem('auth-token')
+      const token = localStorage.getItem('auth-token')
+      if (!token) return false
+      
+      // Check if token is expired
+      if (this.isTokenExpired(token)) {
+        console.log('Stored token is expired, clearing auth data')
+        this.clearAuthData()
+        return false
+      }
+      return true
     }
     
     // Check for Cognito auth
     const cognitoUser = userPool.getCurrentUser()
-    return cognitoUser !== null || !!localStorage.getItem('auth-token')
+    const token = localStorage.getItem('auth-token')
+    
+    if (token && this.isTokenExpired(token)) {
+      console.log('Stored token is expired, but we might be able to refresh it')
+      // Don't clear auth data immediately - let the app try to refresh
+      return true // Return true to allow refresh attempt
+    }
+    
+    return cognitoUser !== null || !!token
+  }
+
+  /**
+   * Check if session should be persisted based on remember me setting
+   * @returns {boolean}
+   */
+  shouldPersistSession() {
+    const rememberMe = localStorage.getItem('remember-me')
+    const sessionTimestamp = localStorage.getItem('session-timestamp')
+    
+    if (rememberMe === 'true' && sessionTimestamp) {
+      const sessionAge = Date.now() - parseInt(sessionTimestamp)
+      // Keep session for 30 days if remember me is enabled
+      const maxSessionAge = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
+      return sessionAge < maxSessionAge
+    }
+    
+    return false
+  }
+
+  /**
+   * Restore session from stored data
+   * @returns {Promise<Object|null>}
+   */
+  async restoreSession() {
+    try {
+      const cognitoUser = userPool.getCurrentUser()
+      if (!cognitoUser) {
+        return null
+      }
+
+      // Check if we should persist this session
+      if (!this.shouldPersistSession()) {
+        console.log('Session should not be persisted, clearing auth data')
+        this.clearAuthData()
+        return null
+      }
+
+      // Get current session
+      const session = await new Promise((resolve, reject) => {
+        cognitoUser.getSession((err, session) => {
+          if (err) reject(err)
+          else resolve(session)
+        })
+      })
+
+      if (!session || !session.isValid()) {
+        console.log('Stored session is invalid')
+        this.clearAuthData()
+        return null
+      }
+
+      // Check if token is expired
+      const idToken = session.getIdToken().getJwtToken()
+      if (this.isTokenExpired(idToken)) {
+        console.log('Stored token is expired, attempting refresh...')
+        // Try to refresh the token using refresh token
+        try {
+          const refreshedSession = await this.refreshSession()
+          if (refreshedSession) {
+            console.log('✅ Session refreshed successfully on page load')
+            this.startTokenRefreshMonitoring()
+            return refreshedSession
+          }
+        } catch (refreshError) {
+          console.error('Failed to refresh session:', refreshError)
+        }
+        
+        // If refresh failed, clear auth data
+        this.clearAuthData()
+        return null
+      }
+
+      // Session is valid, start monitoring
+      this.startTokenRefreshMonitoring()
+
+      const userData = {
+        id_token: idToken,
+        access_token: session.getAccessToken().getJwtToken(),
+        refresh_token: session.getRefreshToken().getToken(),
+        profile: {
+          email: session.getIdToken().payload.email,
+          name: session.getIdToken().payload.name || session.getIdToken().payload.email.split('@')[0],
+          sub: session.getIdToken().payload.sub
+        }
+      }
+
+      // Update stored data
+      localStorage.setItem('auth-token', userData.id_token)
+      localStorage.setItem('cognito-data', JSON.stringify(userData))
+
+      return userData
+    } catch (error) {
+      console.error('Error restoring session:', error)
+      this.clearAuthData()
+      return null
+    }
+  }
+
+  /**
+   * Clear authentication data from localStorage
+   */
+  clearAuthData() {
+    localStorage.removeItem('auth-token')
+    localStorage.removeItem('user-email')
+    localStorage.removeItem('cognito-data')
+    localStorage.removeItem('auth-provider')
+    localStorage.removeItem('remember-me')
+    localStorage.removeItem('session-timestamp')
   }
 
   /**
@@ -582,6 +813,7 @@ class CognitoAuthService {
       localStorage.setItem('auth-token', userData.id_token)
       localStorage.setItem('user-email', payload.email)
       localStorage.setItem('cognito-data', JSON.stringify(userData))
+      localStorage.setItem('session-timestamp', Date.now().toString())
       if (userData.isGoogleAuth) {
         localStorage.setItem('auth-provider', 'google')
       }

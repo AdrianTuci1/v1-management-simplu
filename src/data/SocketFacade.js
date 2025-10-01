@@ -314,17 +314,21 @@ export class SocketFacade {
   async sendAIAssistantMessage(businessId, userId, content, context = {}, locationId = null) {
     const aiAssistant = this.createAIAssistant(businessId, userId, locationId);
     
-    // Setează callback-urile pentru mesaje
-    aiAssistant.onMessageReceived = (messages) => {
-      Logger.log('debug', 'AI Assistant message received:', messages);
-    };
+    // Setează callback-urile pentru mesaje (dacă nu sunt deja setate)
+    if (!aiAssistant.onMessageReceived) {
+      aiAssistant.onMessageReceived = (messages) => {
+        Logger.log('debug', 'AI Assistant message received via SocketFacade:', messages);
+      };
+    }
 
-    aiAssistant.onError = (error, details) => {
-      Logger.log('error', 'AI Assistant error:', error, details);
-    };
+    if (!aiAssistant.onError) {
+      aiAssistant.onError = (error, details) => {
+        Logger.log('error', 'AI Assistant error via SocketFacade:', error, details);
+      };
+    }
 
-    // Conectează dacă nu este conectat
-    if (aiAssistant && typeof aiAssistant.isConnected === 'function' && !aiAssistant.isConnected()) {
+    // Conectează dacă nu este conectat (isConnected este proprietate, nu funcție)
+    if (aiAssistant && !aiAssistant.isConnected) {
       await aiAssistant.connect();
     }
 
@@ -363,6 +367,55 @@ export class SocketFacade {
       hasInstance: true,
       timestamp: new Date().toISOString()
     };
+  }
+
+  /**
+   * Setează session ID-ul pentru AI Assistant
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @param {string} sessionId - ID-ul sesiunii
+   * @param {string} locationId - ID-ul locației (opțional)
+   */
+  setAIAssistantSessionId(businessId, userId, sessionId, locationId = null) {
+    const instanceKey = `${businessId}:${userId}:${locationId || 'default'}`;
+    const aiAssistant = this.aiAssistantInstances.get(instanceKey);
+    
+    if (aiAssistant) {
+      aiAssistant.setCurrentSessionId(sessionId);
+      Logger.log('debug', 'AI Assistant session ID set via SocketFacade', { sessionId });
+    } else {
+      Logger.log('warn', 'AI Assistant instance not found for setting session ID', { instanceKey });
+    }
+  }
+
+  /**
+   * Obține session ID-ul curent al AI Assistant
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @param {string} locationId - ID-ul locației (opțional)
+   * @returns {string|null} Session ID-ul curent sau null
+   */
+  getAIAssistantSessionId(businessId, userId, locationId = null) {
+    const instanceKey = `${businessId}:${userId}:${locationId || 'default'}`;
+    const aiAssistant = this.aiAssistantInstances.get(instanceKey);
+    
+    if (aiAssistant) {
+      return aiAssistant.currentSessionId;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Obține instanța AI Assistant (dacă există)
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @param {string} locationId - ID-ul locației (opțional)
+   * @returns {Object|null} Instanța AI Assistant sau null
+   */
+  getAIAssistantInstance(businessId, userId, locationId = null) {
+    const instanceKey = `${businessId}:${userId}:${locationId || 'default'}`;
+    return this.aiAssistantInstances.get(instanceKey) || null;
   }
 
   // ========================================

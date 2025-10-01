@@ -415,169 +415,7 @@ export class DataFacade {
     return await healthMonitor.checkServerHealth();
   }
 
-  // ========================================
-  // DRAFT MANAGEMENT
-  // ========================================
 
-  /**
-   * Creează un draft pentru o operațiune temporară
-   * @param {string} resourceType - Tipul de resursă
-   * @param {Object} data - Datele draft-ului
-   * @param {string} sessionId - ID-ul sesiunii (opțional)
-   * @returns {Promise<Object>} Draft-ul creat
-   */
-  async createDraft(resourceType, data, sessionId = null) {
-    const repository = this.getRepository(resourceType);
-    if (repository && repository.createDraft) {
-      return await repository.createDraft(data, sessionId);
-    }
-    return await draftManager.createDraft(resourceType, data, 'create', sessionId);
-  }
-
-  /**
-   * Actualizează un draft existent
-   * @param {string} draftId - ID-ul draft-ului
-   * @param {Object} data - Datele actualizate
-   * @returns {Promise<Object>} Draft-ul actualizat
-   */
-  async updateDraft(draftId, data) {
-    // Try to find the repository that has this draft
-    for (const [resourceType, repository] of this.repositories) {
-      if (repository && repository.updateDraft) {
-        try {
-          return await repository.updateDraft(draftId, data);
-        } catch (error) {
-          // Continue to next repository if this one doesn't have the draft
-          continue;
-        }
-      }
-    }
-    return await draftManager.updateDraft(draftId, data);
-  }
-
-  /**
-   * Confirmă un draft (devine ireversibil)
-   * @param {string} draftId - ID-ul draft-ului
-   * @returns {Promise<Object>} Rezultatul confirmării
-   */
-  async commitDraft(draftId) {
-    // Try to find the repository that has this draft
-    for (const [resourceType, repository] of this.repositories) {
-      if (repository && repository.commitDraft) {
-        try {
-          return await repository.commitDraft(draftId);
-        } catch (error) {
-          // Continue to next repository if this one doesn't have the draft
-          continue;
-        }
-      }
-    }
-    return await draftManager.commitDraft(draftId);
-  }
-
-  /**
-   * Anulează un draft (reversibil)
-   * @param {string} draftId - ID-ul draft-ului
-   * @returns {Promise<Object>} Rezultatul anulării
-   */
-  async cancelDraft(draftId) {
-    // Try to find the repository that has this draft
-    for (const [resourceType, repository] of this.repositories) {
-      if (repository && repository.cancelDraft) {
-        try {
-          return await repository.cancelDraft(draftId);
-        } catch (error) {
-          // Continue to next repository if this one doesn't have the draft
-          continue;
-        }
-      }
-    }
-    return await draftManager.cancelDraft(draftId);
-  }
-
-  /**
-   * Obține un draft după ID
-   * @param {string} draftId - ID-ul draft-ului
-   * @returns {Promise<Object>} Draft-ul găsit
-   */
-  async getDraft(draftId) {
-    // Try to find the repository that has this draft
-    for (const [resourceType, repository] of this.repositories) {
-      if (repository && repository.getDraft) {
-        try {
-          return await repository.getDraft(draftId);
-        } catch (error) {
-          // Continue to next repository if this one doesn't have the draft
-          continue;
-        }
-      }
-    }
-    return await draftManager.getDraft(draftId);
-  }
-
-  /**
-   * Obține toate draft-urile pentru un tip de resursă
-   * @param {string} resourceType - Tipul de resursă
-   * @returns {Promise<Array>} Lista de draft-uri
-   */
-  async getDraftsByResourceType(resourceType) {
-    const repository = this.getRepository(resourceType);
-    if (repository && repository.getAllDrafts) {
-      return await repository.getAllDrafts();
-    }
-    return await draftManager.getDraftsByResourceType(resourceType);
-  }
-
-  /**
-   * Obține toate draft-urile pentru o sesiune
-   * @param {string} sessionId - ID-ul sesiunii
-   * @returns {Promise<Array>} Lista de draft-uri
-   */
-  async getDraftsBySession(sessionId) {
-    return await draftManager.getDraftsBySession(sessionId);
-  }
-
-  // ========================================
-  // SESSION MANAGEMENT
-  // ========================================
-
-  /**
-   * Creează o nouă sesiune
-   * @param {string} type - Tipul sesiunii
-   * @param {Object} data - Datele sesiunii
-   * @returns {Promise<Object>} Sesiunea creată
-   */
-  async createSession(type, data = {}) {
-    return await draftManager.createSession(type, data);
-  }
-
-  /**
-   * Salvează o sesiune
-   * @param {string} sessionId - ID-ul sesiunii
-   * @param {Object} sessionData - Datele sesiunii
-   * @returns {Promise<Object>} Sesiunea salvată
-   */
-  async saveSession(sessionId, sessionData) {
-    return await draftManager.saveSession(sessionId, sessionData);
-  }
-
-  /**
-   * Obține o sesiune după ID
-   * @param {string} sessionId - ID-ul sesiunii
-   * @returns {Promise<Object>} Sesiunea găsită
-   */
-  async getSession(sessionId) {
-    return await draftManager.getSession(sessionId);
-  }
-
-  /**
-   * Închide o sesiune
-   * @param {string} sessionId - ID-ul sesiunii
-   * @returns {Promise<Object>} Sesiunea închisă
-   */
-  async closeSession(sessionId) {
-    return await draftManager.closeSession(sessionId);
-  }
 
   // ========================================
   // AGENT INTEGRATION
@@ -607,188 +445,93 @@ export class DataFacade {
     return agentWebSocketHandler.getConnectionStatus();
   }
 
-  /**
-   * Obține lista agenților autentificați
-   * @returns {Array} Lista agenților
-   */
-  getAuthenticatedAgents() {
-    return agentWebSocketHandler.getAuthenticatedAgents();
-  }
+
+
+ 
 
   /**
-   * Verifică dacă un agent este autentificat
+   * Încarcă istoricul mesajelor pentru o sesiune
    * @param {string} sessionId - ID-ul sesiunii
-   * @returns {boolean} True dacă agentul este autentificat
+   * @param {number} limit - Limita de mesaje (opțional)
+   * @param {string} before - Timestamp pentru paginare (opțional)
+   * @returns {Promise<Array>} Lista mesajelor
    */
-  isAgentAuthenticated(sessionId) {
-    return agentWebSocketHandler.isAgentAuthenticated(sessionId);
+  async loadAIAssistantMessageHistory(sessionId, limit = null, before = null) {
+    return await this.repositories.get('aiAssistant').loadMessageHistory(sessionId, limit, before);
   }
 
   /**
-   * Modifică un query de la agent
+   * Adaugă un mesaj local în IndexedDB
+   * @param {Object} message - Mesajul de adăugat
+   * @returns {Promise<Object>} Mesajul adăugat
+   */
+  async addLocalAIAssistantMessage(message) {
+    return await this.repositories.get('aiAssistant').addLocalMessage(message);
+  }
+
+  /**
+   * Obține mesajele locale pentru o sesiune
    * @param {string} sessionId - ID-ul sesiunii
-   * @param {string} resourceType - Tipul de resursă
-   * @param {Object} modifications - Modificările query-ului
-   * @returns {Promise<Object>} Rezultatul modificării
+   * @param {number} limit - Limita de mesaje
+   * @returns {Promise<Array>} Lista mesajelor locale
    */
-  async modifyQueryFromAgent(sessionId, resourceType, modifications) {
-    return await agentQueryModifier.modifyQuery(sessionId, resourceType, modifications);
+  async getLocalAIAssistantMessages(sessionId, limit = 50) {
+    return await this.repositories.get('aiAssistant').getLocalMessages(sessionId, limit);
   }
 
   /**
-   * Revine la query-ul original
+   * Obține o sesiune locală din IndexedDB
    * @param {string} sessionId - ID-ul sesiunii
-   * @param {string} modificationId - ID-ul modificării
-   * @returns {Promise<Object>} Rezultatul revenirii
+   * @returns {Promise<Object|null>} Sesiunea sau null
    */
-  async revertQueryModification(sessionId, modificationId) {
-    return await agentQueryModifier.revertQueryModification(sessionId, modificationId);
+  async getLocalAIAssistantSession(sessionId) {
+    return await this.repositories.get('aiAssistant').getLocalSession(sessionId);
   }
 
   /**
-   * Obține modificările pentru o sesiune
-   * @param {string} sessionId - ID-ul sesiunii
-   * @returns {Promise<Array>} Lista de modificări
+   * Salvează o sesiune local în IndexedDB
+   * @param {Object} session - Sesiunea de salvat
+   * @returns {Promise<Object>} Sesiunea salvată
    */
-  async getQueryModificationsForSession(sessionId) {
-    return await agentQueryModifier.getModificationsForSession(sessionId);
+  async saveLocalAIAssistantSession(session) {
+    return await this.repositories.get('aiAssistant').saveLocalSession(session);
   }
 
   /**
-   * Obține statistici despre modificări
-   * @returns {Promise<Object>} Statisticile modificărilor
-   */
-  async getQueryModificationStatistics() {
-    return await agentQueryModifier.getModificationStatistics();
-  }
-
-  // ========================================
-  // AI ASSISTANT INTEGRATION
-  // ========================================
-
-  /**
-   * Generează ID-ul sesiunii pentru AI Assistant (DEPRECATED)
-   * @deprecated Session IDs should be generated by the server, not the client
+   * Generează ID-ul sesiunii pentru sesiuni zilnice
    * @param {string} businessId - ID-ul business-ului
    * @param {string} userId - ID-ul utilizatorului
-   * @returns {string} ID-ul sesiunii generate
+   * @returns {string} ID-ul sesiunii generat
    */
   generateAIAssistantSessionId(businessId, userId) {
-    console.warn('generateAIAssistantSessionId() is deprecated. Session IDs should be generated by the server.');
     return this.repositories.get('aiAssistant').generateSessionId(businessId, userId);
   }
 
   /**
-   * Încarcă sesiunea de astăzi pentru AI Assistant
-   * @param {string} businessId - ID-ul business-ului
-   * @param {string} userId - ID-ul utilizatorului
-   * @param {string} locationId - ID-ul locației
-   * @returns {Promise<Object>} Sesiunea încărcată
-   */
-  async loadTodayAIAssistantSession(businessId, userId, locationId) {
-    return await this.repositories.get('aiAssistant').loadTodaySession(businessId, userId, locationId);
-  }
-
-  /**
-   * Trimite un mesaj către AI Assistant prin repository
+   * Parsează ID-ul sesiunii
    * @param {string} sessionId - ID-ul sesiunii
-   * @param {string} content - Conținutul mesajului
-   * @param {Object} context - Contextul mesajului
-   * @param {string} businessId - ID-ul business-ului
-   * @param {string} userId - ID-ul utilizatorului
-   * @param {string} locationId - ID-ul locației
-   * @returns {Promise<Object>} Rezultatul trimiterii mesajului
+   * @returns {Object} Obiect cu businessId, userId, timestamp
    */
-  async sendAIAssistantRepositoryMessage(sessionId, content, context, businessId, userId, locationId) {
-    return await this.repositories.get('aiAssistant').sendMessage(sessionId, content, context, businessId, userId, locationId);
+  parseAIAssistantSessionId(sessionId) {
+    return this.repositories.get('aiAssistant').parseSessionId(sessionId);
   }
 
   /**
-   * Obține sesiunile active pentru AI Assistant
-   * @param {string} businessId - ID-ul business-ului
-   * @returns {Promise<Array>} Lista sesiunilor active
-   */
-  async getActiveAIAssistantSessions(businessId) {
-    return await this.repositories.get('aiAssistant').getActiveSessions(businessId);
-  }
-
-  /**
-   * Închide o sesiune AI Assistant
+   * Verifică dacă ID-ul sesiunii este valid
    * @param {string} sessionId - ID-ul sesiunii
-   * @param {string} status - Statusul de închidere
-   * @returns {Promise<boolean>} True dacă închiderea a reușit
+   * @returns {boolean} True dacă este valid
    */
-  async closeAIAssistantSession(sessionId, status = 'resolved') {
-    return await this.repositories.get('aiAssistant').closeSession(sessionId, status);
+  isValidAIAssistantSessionId(sessionId) {
+    return this.repositories.get('aiAssistant').isValidSessionId(sessionId);
   }
 
   /**
-   * Obține statisticile sesiunilor AI Assistant
-   * @param {string} businessId - ID-ul business-ului
-   * @returns {Promise<Object>} Statisticile sesiunilor
+   * Curăță datele vechi din IndexedDB
+   * @param {number} daysToKeep - Numărul de zile de păstrat
+   * @returns {Promise<void>}
    */
-  async getAIAssistantSessionStats(businessId) {
-    return await this.repositories.get('aiAssistant').getSessionStats(businessId);
-  }
-
-  /**
-   * Caută mesaje în sesiunea AI Assistant
-   * @param {string} sessionId - ID-ul sesiunii
-   * @param {string} query - Query-ul de căutare
-   * @param {number} limit - Limita de rezultate
-   * @returns {Promise<Array>} Rezultatele căutării
-   */
-  async searchAIAssistantMessages(sessionId, query, limit = 20) {
-    return await this.repositories.get('aiAssistant').searchMessages(sessionId, query, limit);
-  }
-
-  /**
-   * Exportă datele sesiunii AI Assistant
-   * @param {string} sessionId - ID-ul sesiunii
-   * @param {string} format - Formatul de export
-   * @returns {Promise<Object>} Datele exportate
-   */
-  async exportAIAssistantSession(sessionId, format = 'json') {
-    return await this.repositories.get('aiAssistant').exportSession(sessionId, format);
-  }
-
-  /**
-   * Obține sesiunea activă pentru un utilizator
-   * @param {string} businessId - ID-ul business-ului
-   * @param {string} userId - ID-ul utilizatorului
-   * @returns {Promise<Object|null>} Sesiunea activă sau null
-   */
-  async getActiveAIAssistantSessionForUser(businessId, userId) {
-    return await this.repositories.get('aiAssistant').getActiveSessionForUser(businessId, userId);
-  }
-
-  /**
-   * Obține istoricul sesiunilor pentru un utilizator
-   * @param {string} businessId - ID-ul business-ului
-   * @param {string} userId - ID-ul utilizatorului
-   * @param {number} limit - Limita de sesiuni
-   * @returns {Promise<Object>} Istoricul sesiunilor
-   */
-  async getUserAIAssistantSessionHistory(businessId, userId, limit = 20) {
-    return await this.repositories.get('aiAssistant').getUserSessionHistory(businessId, userId, limit);
-  }
-
-  /**
-   * Obține o sesiune specifică după ID
-   * @param {string} sessionId - ID-ul sesiunii
-   * @returns {Promise<Object|null>} Sesiunea sau null
-   */
-  async getAIAssistantSessionById(sessionId) {
-    return await this.repositories.get('aiAssistant').getSessionById(sessionId);
-  }
-
-  /**
-   * Încarcă o sesiune specifică și mesajele sale
-   * @param {string} sessionId - ID-ul sesiunii
-   * @returns {Promise<Object>} Sesiunea cu mesajele sale
-   */
-  async loadAIAssistantSession(sessionId) {
-    return await this.repositories.get('aiAssistant').loadSession(sessionId);
+  async cleanupOldAIAssistantData(daysToKeep = 30) {
+    return await this.repositories.get('aiAssistant').cleanupOldData(daysToKeep);
   }
 
 }

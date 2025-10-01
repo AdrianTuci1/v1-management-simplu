@@ -64,7 +64,6 @@ export class WebSocketAIAssistant {
     this.onMessageReceived = null;
     this.onConnectionChange = null;
     this.onError = null;
-    this.onReconnect = null;
     this.onSessionUpdate = null;
     
     Logger.log('info', 'WebSocket AI Assistant initialized', { businessId, userId, locationId });
@@ -231,79 +230,24 @@ export class WebSocketAIAssistant {
         this.handleNewMessage(payload);
         break;
         
-      case 'ai_response':
-        this.handleAIResponse(payload);
+      case 'frontend_data_available':
+        this.handleFrontendDataAvailable(payload);
         break;
         
-      case 'session_update':
-        Logger.log('info', 'WebSocketAIAssistant handling session_update type');
-        this.handleSessionUpdate(payload);
+      case 'draft_created':
+        this.handleDraftCreated(payload);
         break;
         
-      case 'message_sent':
-        Logger.log('debug', 'Message sent successfully', payload);
+      case 'draft_updated':
+        this.handleDraftUpdated(payload);
         break;
         
-      // Handle new AI Assistant DataFacade events
-      case 'ai_assistant_connected':
-        this.handleAIAssistantConnected(payload);
+      case 'draft_deleted':
+        this.handleDraftDeleted(payload);
         break;
         
-      case 'ai_assistant_disconnected':
-        this.handleAIAssistantDisconnected(payload);
-        break;
-        
-      case 'ai_assistant_session_loaded':
-        this.handleAIAssistantSessionLoaded(payload);
-        break;
-        
-      case 'ai_assistant_session_closed':
-        this.handleAIAssistantSessionClosed(payload);
-        break;
-        
-      case 'ai_assistant_messages_searched':
-        this.handleAIAssistantMessagesSearched(payload);
-        break;
-        
-      case 'ai_assistant_session_exported':
-        this.handleAIAssistantSessionExported(payload);
-        break;
-        
-      case 'ai_assistant_stats_retrieved':
-        this.handleAIAssistantStatsRetrieved(payload);
-        break;
-        
-      // Handle AI Agent resource and draft events
-      case 'agent_resource_query_result':
-        this.handleAgentResourceQueryResult(payload);
-        break;
-        
-      case 'agent_resource_query_error':
-        this.handleAgentResourceQueryError(payload);
-        break;
-        
-      case 'agent_draft_created':
-        this.handleAgentDraftCreated(payload);
-        break;
-        
-      case 'agent_draft_updated':
-        this.handleAgentDraftUpdated(payload);
-        break;
-        
-      case 'agent_draft_committed':
-        this.handleAgentDraftCommitted(payload);
-        break;
-        
-      case 'agent_draft_cancelled':
-        this.handleAgentDraftCancelled(payload);
-        break;
-        
-      case 'agent_drafts_listed':
-        this.handleAgentDraftsListed(payload);
-        break;
-        
-      case 'agent_request_error':
-        this.handleAgentRequestError(payload);
+      case 'drafts_listed':
+        this.handleDraftsListed(payload);
         break;
         
       default:
@@ -315,26 +259,60 @@ export class WebSocketAIAssistant {
    * Gestionează mesajele noi de la WebSocket
    */
   handleNewMessage(payload) {
-    const messageData = payload.payload || payload;
-    const { message: content, responseId, timestamp, sessionId } = messageData;
+    const { responseId, message: content, timestamp, sessionId } = payload;
     
     if (content) {
+      // Check if this message is for the current session or if we need to update session ID
+      const messageSessionId = sessionId;
+      const currentSessionId = this.currentSessionId;
+      
+      // If we have a temp session ID but got a real one, update it
+      const isTempSession = currentSessionId && currentSessionId.startsWith('temp_');
+      const shouldUpdateSession = isTempSession && messageSessionId && !messageSessionId.startsWith('temp_');
+      
+      // If we don't have a current session but got one, update it
+      const shouldSetSession = !currentSessionId && messageSessionId;
+      
+      // Update session ID if needed
+      if (shouldUpdateSession || shouldSetSession) {
+        Logger.log('info', '🔄 Updating session ID from WebSocket message', { 
+          oldSessionId: currentSessionId, 
+          newSessionId: messageSessionId,
+          reason: shouldUpdateSession ? 'temp_to_real' : 'null_to_real'
+        });
+        this.currentSessionId = messageSessionId;
+        
+        // Notify about session update
+        if (this.onSessionUpdate) {
+          this.onSessionUpdate({
+            sessionId: messageSessionId,
+            status: 'updated',
+            metadata: { source: 'websocket_message', reason: shouldUpdateSession ? 'temp_to_real' : 'null_to_real' }
+          });
+        }
+      }
+      
       const aiMessage = {
         messageId: responseId || `ai_${Date.now()}`,
-        sessionId: sessionId,
+        sessionId: messageSessionId || currentSessionId,
         businessId: this.businessId,
         userId: 'agent',
         content: content,
         type: 'agent',
         timestamp: timestamp || new Date().toISOString(),
-        metadata: { source: 'websocket', responseId }
+        metadata: { 
+          source: 'websocket', 
+          responseId,
+          sessionUpdate: shouldUpdateSession || shouldSetSession
+        }
       };
       
       Logger.log('info', '🎯 WebSocketAIAssistant calling onMessageReceived (new_message)', {
         sessionId: aiMessage.sessionId,
         messageId: aiMessage.messageId,
         hasCallback: !!this.onMessageReceived,
-        callbackType: typeof this.onMessageReceived
+        callbackType: typeof this.onMessageReceived,
+        sessionUpdated: shouldUpdateSession || shouldSetSession
       });
       
       if (this.onMessageReceived) {
@@ -354,61 +332,154 @@ export class WebSocketAIAssistant {
   }
 
   /**
-   * Gestionează răspunsurile AI de la WebSocket
+   * Gestionează datele frontend disponibile
    */
-  handleAIResponse(payload) {
-    // Extract data from the actual payload structure
-    const { content, message_id, session_id, timestamp, context, type } = payload;
+  handleFrontendDataAvailable(payload) {
+    const { messageId, message, timestamp, sessionId, frontendData } = payload;
     
-    if (content) {
-      const aiMessage = {
-        messageId: message_id || `ai_${Date.now()}`,
-        sessionId: session_id,
-        businessId: this.businessId,
-        userId: 'agent',
-        content: content,
-        type: 'agent',
-        timestamp: timestamp || new Date().toISOString(),
-        metadata: { 
-          source: 'websocket', 
-          responseId: message_id,
-          context: context,
-          originalType: type
-        }
-      };
-      
-      Logger.log('info', '🎯 WebSocketAIAssistant calling onMessageReceived (ai_response)', {
-        sessionId: aiMessage.sessionId,
-        messageId: aiMessage.messageId,
-        hasCallback: !!this.onMessageReceived,
-        callbackType: typeof this.onMessageReceived
-      });
-      
-      if (this.onMessageReceived) {
-        Logger.log('info', '🎯 WebSocketAIAssistant executing callback (ai_response)');
-        try {
-          this.onMessageReceived([aiMessage]);
-          Logger.log('info', '🎯 WebSocketAIAssistant callback executed successfully (ai_response)');
-        } catch (error) {
-          Logger.log('error', '❌ WebSocketAIAssistant callback error (ai_response)', error);
-        }
-      } else {
-        Logger.log('warn', '❌ WebSocketAIAssistant callback is null/undefined (ai_response)');
+    Logger.log('info', 'Frontend data available received', payload);
+    
+    const frontendMessage = {
+      messageId: messageId || `frontend_${Date.now()}`,
+      sessionId: sessionId || this.currentSessionId,
+      businessId: this.businessId,
+      userId: 'agent',
+      content: message,
+      type: 'frontend_data',
+      timestamp: timestamp || new Date().toISOString(),
+      metadata: { 
+        source: 'websocket',
+        frontendData: frontendData
       }
-    } else {
-      Logger.log('warn', 'WebSocketAIAssistant no content found in AI response payload', payload);
+    };
+    
+    if (this.onMessageReceived) {
+      try {
+        this.onMessageReceived([frontendMessage]);
+        Logger.log('info', 'Frontend data message sent to callback');
+      } catch (error) {
+        Logger.log('error', 'Error processing frontend data message', error);
+      }
     }
   }
 
   /**
-   * Gestionează actualizările sesiunii
+   * Gestionează crearea de draft-uri
    */
-  handleSessionUpdate(payload) {
-    const { sessionId, status, metadata } = payload;
-    Logger.log('info', 'Session update received', { sessionId, status, metadata });
+  handleDraftCreated(payload) {
+    Logger.log('info', 'Draft created received', payload);
     
-    if (this.onSessionUpdate) {
-      this.onSessionUpdate(payload);
+    const draftMessage = {
+      messageId: payload.messageId || `draft_created_${Date.now()}`,
+      sessionId: payload.sessionId || this.currentSessionId,
+      businessId: this.businessId,
+      userId: 'agent',
+      content: payload.message || 'Draft created',
+      type: 'draft_created',
+      timestamp: payload.timestamp || new Date().toISOString(),
+      metadata: { 
+        source: 'websocket',
+        draftData: payload.draftData
+      }
+    };
+    
+    if (this.onMessageReceived) {
+      try {
+        this.onMessageReceived([draftMessage]);
+        Logger.log('info', 'Draft created message sent to callback');
+      } catch (error) {
+        Logger.log('error', 'Error processing draft created message', error);
+      }
+    }
+  }
+
+  /**
+   * Gestionează actualizarea de draft-uri
+   */
+  handleDraftUpdated(payload) {
+    Logger.log('info', 'Draft updated received', payload);
+    
+    const draftMessage = {
+      messageId: payload.messageId || `draft_updated_${Date.now()}`,
+      sessionId: payload.sessionId || this.currentSessionId,
+      businessId: this.businessId,
+      userId: 'agent',
+      content: payload.message || 'Draft updated',
+      type: 'draft_updated',
+      timestamp: payload.timestamp || new Date().toISOString(),
+      metadata: { 
+        source: 'websocket',
+        draftData: payload.draftData
+      }
+    };
+    
+    if (this.onMessageReceived) {
+      try {
+        this.onMessageReceived([draftMessage]);
+        Logger.log('info', 'Draft updated message sent to callback');
+      } catch (error) {
+        Logger.log('error', 'Error processing draft updated message', error);
+      }
+    }
+  }
+
+  /**
+   * Gestionează ștergerea de draft-uri
+   */
+  handleDraftDeleted(payload) {
+    Logger.log('info', 'Draft deleted received', payload);
+    
+    const draftMessage = {
+      messageId: payload.messageId || `draft_deleted_${Date.now()}`,
+      sessionId: payload.sessionId || this.currentSessionId,
+      businessId: this.businessId,
+      userId: 'agent',
+      content: payload.message || 'Draft deleted',
+      type: 'draft_deleted',
+      timestamp: payload.timestamp || new Date().toISOString(),
+      metadata: { 
+        source: 'websocket',
+        draftData: payload.draftData
+      }
+    };
+    
+    if (this.onMessageReceived) {
+      try {
+        this.onMessageReceived([draftMessage]);
+        Logger.log('info', 'Draft deleted message sent to callback');
+      } catch (error) {
+        Logger.log('error', 'Error processing draft deleted message', error);
+      }
+    }
+  }
+
+  /**
+   * Gestionează listarea de draft-uri
+   */
+  handleDraftsListed(payload) {
+    Logger.log('info', 'Drafts listed received', payload);
+    
+    const draftMessage = {
+      messageId: payload.messageId || `drafts_listed_${Date.now()}`,
+      sessionId: payload.sessionId || this.currentSessionId,
+      businessId: this.businessId,
+      userId: 'agent',
+      content: payload.message || 'Drafts listed',
+      type: 'drafts_listed',
+      timestamp: payload.timestamp || new Date().toISOString(),
+      metadata: { 
+        source: 'websocket',
+        draftData: payload.draftData
+      }
+    };
+    
+    if (this.onMessageReceived) {
+      try {
+        this.onMessageReceived([draftMessage]);
+        Logger.log('info', 'Drafts listed message sent to callback');
+      } catch (error) {
+        Logger.log('error', 'Error processing drafts listed message', error);
+      }
     }
   }
 
@@ -592,192 +663,6 @@ export class WebSocketAIAssistant {
     return this.isConnected;
   }
 
-  // ========================================
-  // AI ASSISTANT DATAFACADE EVENT HANDLERS
-  // ========================================
-
-  /**
-   * Gestionează evenimentul de conectare AI Assistant
-   */
-  handleAIAssistantConnected(payload) {
-    Logger.log('info', 'AI Assistant connected via DataFacade', payload);
-    this.isConnected = true;
-    this.onConnectionChange?.(true);
-  }
-
-  /**
-   * Gestionează evenimentul de deconectare AI Assistant
-   */
-  handleAIAssistantDisconnected(payload) {
-    Logger.log('info', 'AI Assistant disconnected via DataFacade', payload);
-    this.isConnected = false;
-    this.onConnectionChange?.(false);
-  }
-
-  /**
-   * Gestionează evenimentul de încărcare sesiune AI Assistant
-   */
-  handleAIAssistantSessionLoaded(payload) {
-    Logger.log('info', 'AI Assistant session loaded via DataFacade', payload);
-    if (payload.sessionId) {
-      this.currentSessionId = payload.sessionId;
-    }
-    this.onSessionUpdate?.(payload);
-  }
-
-  /**
-   * Gestionează evenimentul de închidere sesiune AI Assistant
-   */
-  handleAIAssistantSessionClosed(payload) {
-    Logger.log('info', 'AI Assistant session closed via DataFacade', payload);
-    this.onSessionUpdate?.(payload);
-  }
-
-  /**
-   * Gestionează evenimentul de căutare mesaje AI Assistant
-   */
-  handleAIAssistantMessagesSearched(payload) {
-    Logger.log('info', 'AI Assistant messages searched via DataFacade', payload);
-    // Poate fi folosit pentru a actualiza UI-ul cu rezultatele căutării
-    if (this.onMessageReceived) {
-      this.onMessageReceived([{
-        type: 'search_results',
-        data: payload,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-  }
-
-  /**
-   * Gestionează evenimentul de export sesiune AI Assistant
-   */
-  handleAIAssistantSessionExported(payload) {
-    Logger.log('info', 'AI Assistant session exported via DataFacade', payload);
-    // Poate fi folosit pentru a gestiona download-ul fișierului exportat
-  }
-
-  /**
-   * Gestionează evenimentul de preluare statistici AI Assistant
-   */
-  handleAIAssistantStatsRetrieved(payload) {
-    Logger.log('info', 'AI Assistant stats retrieved via DataFacade', payload);
-    // Poate fi folosit pentru a actualiza dashboard-ul cu statisticile
-  }
-
-  // ========================================
-  // AI AGENT RESOURCE AND DRAFT EVENT HANDLERS
-  // ========================================
-
-  /**
-   * Gestionează rezultatul interogării de resurse de la agent
-   */
-  handleAgentResourceQueryResult(payload) {
-    Logger.log('info', 'Agent resource query result received', payload);
-    // Poate fi folosit pentru a actualiza UI-ul cu rezultatele interogării
-    if (this.onMessageReceived) {
-      this.onMessageReceived([{
-        type: 'agent_resource_query_result',
-        data: payload,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-  }
-
-  /**
-   * Gestionează eroarea interogării de resurse de la agent
-   */
-  handleAgentResourceQueryError(payload) {
-    Logger.log('error', 'Agent resource query error received', payload);
-    if (this.onError) {
-      this.onError('Agent resource query failed', payload);
-    }
-  }
-
-  /**
-   * Gestionează crearea de draft-uri de la agent
-   */
-  handleAgentDraftCreated(payload) {
-    Logger.log('info', 'Agent draft created', payload);
-    // Poate fi folosit pentru a actualiza UI-ul cu draft-ul creat
-    if (this.onMessageReceived) {
-      this.onMessageReceived([{
-        type: 'agent_draft_created',
-        data: payload,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-  }
-
-  /**
-   * Gestionează actualizarea de draft-uri de la agent
-   */
-  handleAgentDraftUpdated(payload) {
-    Logger.log('info', 'Agent draft updated', payload);
-    // Poate fi folosit pentru a actualiza UI-ul cu draft-ul actualizat
-    if (this.onMessageReceived) {
-      this.onMessageReceived([{
-        type: 'agent_draft_updated',
-        data: payload,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-  }
-
-  /**
-   * Gestionează confirmarea de draft-uri de la agent
-   */
-  handleAgentDraftCommitted(payload) {
-    Logger.log('info', 'Agent draft committed', payload);
-    // Poate fi folosit pentru a actualiza UI-ul cu confirmarea draft-ului
-    if (this.onMessageReceived) {
-      this.onMessageReceived([{
-        type: 'agent_draft_committed',
-        data: payload,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-  }
-
-  /**
-   * Gestionează anularea de draft-uri de la agent
-   */
-  handleAgentDraftCancelled(payload) {
-    Logger.log('info', 'Agent draft cancelled', payload);
-    // Poate fi folosit pentru a actualiza UI-ul cu anularea draft-ului
-    if (this.onMessageReceived) {
-      this.onMessageReceived([{
-        type: 'agent_draft_cancelled',
-        data: payload,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-  }
-
-  /**
-   * Gestionează listarea de draft-uri de la agent
-   */
-  handleAgentDraftsListed(payload) {
-    Logger.log('info', 'Agent drafts listed', payload);
-    // Poate fi folosit pentru a actualiza UI-ul cu lista de draft-uri
-    if (this.onMessageReceived) {
-      this.onMessageReceived([{
-        type: 'agent_drafts_listed',
-        data: payload,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-  }
-
-  /**
-   * Gestionează erorile de la agent
-   */
-  handleAgentRequestError(payload) {
-    Logger.log('error', 'Agent request error received', payload);
-    if (this.onError) {
-      this.onError('Agent request failed', payload);
-    }
-  }
-
   /**
    * Curățare și dezalocare
    */
@@ -790,7 +675,6 @@ export class WebSocketAIAssistant {
     this.onMessageReceived = null;
     this.onConnectionChange = null;
     this.onError = null;
-    this.onReconnect = null;
     this.onSessionUpdate = null;
   }
 }
