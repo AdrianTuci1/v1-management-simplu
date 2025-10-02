@@ -73,7 +73,8 @@ const TreatmentCombobox = ({
                     const treatmentData = {
                       id: (treatment.resourceId || treatment.id).toString(),
                       name: treatment.treatmentType,
-                      duration: treatment.duration
+                      duration: treatment.duration,
+                      price: treatment.price
                     };
                     onValueChange(treatmentData);
                     setOpen(false);
@@ -81,11 +82,14 @@ const TreatmentCombobox = ({
                 >
                   <div className="flex flex-col">
                     <span className="truncate">{treatment.treatmentType}</span>
-                    {treatment.duration && (
-                      <span className="text-xs text-muted-foreground">
-                        Durată: {treatment.duration} min
-                      </span>
-                    )}
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                      {treatment.duration && (
+                        <span>Durată: {treatment.duration} min</span>
+                      )}
+                      {treatment.price && (
+                        <span>Preț: {treatment.price} RON</span>
+                      )}
+                    </div>
                   </div>
                   {(typeof value === 'string' ? value : value?.id) === (treatment.resourceId || treatment.id).toString() && <CommandCheck />}
                 </CommandItem>

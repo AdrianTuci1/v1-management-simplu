@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Clock, MapPin, Save } from 'lucide-react'
 import { 
   Drawer, 
@@ -6,17 +6,20 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
-import useSettingsStore from '../../stores/settingsStore'
+import { useSettings } from '../../hooks/useSettings'
 
-const WorkingHoursDrawer = ({ onClose }) => {
+const WorkingHoursDrawer = ({ onClose, settingId, settingData }) => {
   const { 
     workingHours, 
-    locationDetails, 
-    updateWorkingHours, 
-    updateLocationDetails 
-  } = useSettingsStore()
+    saveWorkingHours, 
+    updateSetting,
+    loading: settingsLoading, 
+    error: settingsError 
+  } = useSettings()
   
   const [loading, setLoading] = useState(false)
+  const [localWorkingHours, setLocalWorkingHours] = useState({})
+  const [localLocationDetails, setLocalLocationDetails] = useState({})
 
   const days = [
     { key: 'monday', label: 'Luni' },
@@ -28,23 +31,96 @@ const WorkingHoursDrawer = ({ onClose }) => {
     { key: 'sunday', label: 'Duminică' }
   ]
 
+  // Inițializează datele locale cu datele din server
+  useEffect(() => {
+    // Prioritizează settingData dacă este furnizat (din AdminSettings)
+    const sourceData = settingData || workingHours
+    
+    if (sourceData) {
+      setLocalWorkingHours(sourceData.data || {})
+      setLocalLocationDetails(sourceData.data?.locationDetails || {})
+    } else {
+      // Inițializează cu datele default dacă nu există setări
+      const defaultWorkingHours = {}
+      const defaultLocationDetails = {
+        name: '',
+        address: '',
+        phone: '',
+        email: '',
+        description: ''
+      }
+      
+      days.forEach(day => {
+        defaultWorkingHours[day.key] = {
+          enabled: false,
+          start: '09:00',
+          end: '17:00'
+        }
+      })
+      
+      setLocalWorkingHours(defaultWorkingHours)
+      setLocalLocationDetails(defaultLocationDetails)
+    }
+  }, [workingHours, settingData])
+
   const handleDayToggle = (day) => {
-    updateWorkingHours(day, { enabled: !workingHours[day].enabled })
+    setLocalWorkingHours(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        enabled: !prev[day].enabled
+      }
+    }))
   }
 
   const handleTimeChange = (day, field, value) => {
-    updateWorkingHours(day, { [field]: value })
+    setLocalWorkingHours(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [field]: value
+      }
+    }))
   }
 
   const handleLocationChange = (field, value) => {
-    updateLocationDetails({ [field]: value })
+    setLocalLocationDetails(prev => ({
+      ...prev,
+      [field]: value
+    }))
   }
 
   const handleSave = async () => {
     setLoading(true)
     try {
-      // Setările sunt deja salvate în store prin updateWorkingHours și updateLocationDetails
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Pregătește datele pentru salvare
+      const workingHoursData = {
+        days: days.map(day => ({
+          name: day.label,
+          key: day.key,
+          isWorking: localWorkingHours[day.key]?.enabled || false,
+          startTime: localWorkingHours[day.key]?.start || '09:00',
+          endTime: localWorkingHours[day.key]?.end || '17:00'
+        })),
+        locationDetails: localLocationDetails
+      }
+
+      // Dacă există settingId, actualizează setarea existentă
+      if (settingId) {
+        const settingData = {
+          data: {
+            settingType: 'working-hours',
+            name: 'Program de funcționare',
+            isActive: true,
+            ...workingHoursData
+          }
+        }
+        await updateSetting(settingId, settingData)
+      } else {
+        // Altfel, creează o setare nouă
+        await saveWorkingHours(workingHoursData)
+      }
+      
       onClose()
     } catch (error) {
       console.error('Eroare la salvarea setărilor:', error)
@@ -77,7 +153,7 @@ const WorkingHoursDrawer = ({ onClose }) => {
                     <input
                       type="checkbox"
                       id={key}
-                      checked={workingHours[key].enabled}
+                      checked={localWorkingHours[key]?.enabled || false}
                       onChange={() => handleDayToggle(key)}
                       className="w-4 h-4 text-primary rounded focus:ring-primary"
                     />
@@ -86,18 +162,18 @@ const WorkingHoursDrawer = ({ onClose }) => {
                     </label>
                   </div>
                   
-                  {workingHours[key].enabled && (
+                  {(localWorkingHours[key]?.enabled || false) && (
                     <div className="flex items-center gap-1">
                       <input
                         type="time"
-                        value={workingHours[key].start}
+                        value={localWorkingHours[key]?.start || '09:00'}
                         onChange={(e) => handleTimeChange(key, 'start', e.target.value)}
                         className="px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
                       />
                       <span className="text-xs text-muted-foreground">-</span>
                       <input
                         type="time"
-                        value={workingHours[key].end}
+                        value={localWorkingHours[key]?.end || '17:00'}
                         onChange={(e) => handleTimeChange(key, 'end', e.target.value)}
                         className="px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
                       />
@@ -120,7 +196,7 @@ const WorkingHoursDrawer = ({ onClose }) => {
                 <label className="block text-xs font-medium mb-1">Numele locației</label>
                 <input
                   type="text"
-                  value={locationDetails.name}
+                  value={localLocationDetails.name || ''}
                   onChange={(e) => handleLocationChange('name', e.target.value)}
                   placeholder="Cabinet Medical Dr. Popescu"
                   className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
@@ -131,7 +207,7 @@ const WorkingHoursDrawer = ({ onClose }) => {
                 <label className="block text-xs font-medium mb-1">Adresă</label>
                 <input
                   type="text"
-                  value={locationDetails.address}
+                  value={localLocationDetails.address || ''}
                   onChange={(e) => handleLocationChange('address', e.target.value)}
                   placeholder="Str. Mihai Viteazu nr. 10, București"
                   className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
@@ -143,7 +219,7 @@ const WorkingHoursDrawer = ({ onClose }) => {
                   <label className="block text-xs font-medium mb-1">Telefon</label>
                   <input
                     type="tel"
-                    value={locationDetails.phone}
+                    value={localLocationDetails.phone || ''}
                     onChange={(e) => handleLocationChange('phone', e.target.value)}
                     placeholder="+40 21 123 4567"
                     className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
@@ -154,7 +230,7 @@ const WorkingHoursDrawer = ({ onClose }) => {
                   <label className="block text-xs font-medium mb-1">Email</label>
                   <input
                     type="email"
-                    value={locationDetails.email}
+                    value={localLocationDetails.email || ''}
                     onChange={(e) => handleLocationChange('email', e.target.value)}
                     placeholder="contact@cabinet.ro"
                     className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
@@ -165,7 +241,7 @@ const WorkingHoursDrawer = ({ onClose }) => {
               <div>
                 <label className="block text-xs font-medium mb-1">Descriere</label>
                 <textarea
-                  value={locationDetails.description}
+                  value={localLocationDetails.description || ''}
                   onChange={(e) => handleLocationChange('description', e.target.value)}
                   placeholder="Descrierea locației și serviciilor oferite..."
                   rows={2}
@@ -186,10 +262,10 @@ const WorkingHoursDrawer = ({ onClose }) => {
         </button>
         <button
           onClick={handleSave}
-          disabled={loading}
+          disabled={loading || settingsLoading}
           className="px-4 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
-          {loading ? (
+          {(loading || settingsLoading) ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               Salvare...

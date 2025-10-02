@@ -3,6 +3,10 @@ import DataDownloadDrawer from './DataDownloadDrawer'
 import StripePaymentDrawer from './StripePaymentDrawer'
 import UserProfileDrawer from './UserProfileDrawer'
 import AIAssistantComponent from '../AIAssistant'
+import SMSConfigurationDrawer from './SMSConfigurationDrawer'
+import EmailConfigurationDrawer from './EmailConfigurationDrawer'
+import VoiceAgentConfigurationDrawer from './VoiceAgentConfigurationDrawer'
+import MetaConfigurationDrawer from './MetaConfigurationDrawer'
 import { useState, useEffect } from 'react'
 import appointmentService from '../../services/appointmentService.js'
 
@@ -78,6 +82,22 @@ export const DRAWER_REGISTRY = {
   },
   'user-profile': {
     component: 'UserProfileDrawer',
+    requiresData: false
+  },
+  'sms-configuration': {
+    component: 'SMSConfigurationDrawer',
+    requiresData: false
+  },
+  'email-configuration': {
+    component: 'EmailConfigurationDrawer',
+    requiresData: false
+  },
+  'voice-agent-configuration': {
+    component: 'VoiceAgentConfigurationDrawer',
+    requiresData: false
+  },
+  'meta-configuration': {
+    component: 'MetaConfigurationDrawer',
     requiresData: false
   }
 }
@@ -279,6 +299,14 @@ export const getDrawerComponent = (type) => {
       return AIAssistantComponent
     case 'UserProfileDrawer':
       return UserProfileDrawer
+    case 'SMSConfigurationDrawer':
+      return SMSConfigurationDrawer
+    case 'EmailConfigurationDrawer':
+      return EmailConfigurationDrawer
+    case 'VoiceAgentConfigurationDrawer':
+      return VoiceAgentConfigurationDrawer
+    case 'MetaConfigurationDrawer':
+      return MetaConfigurationDrawer
     default:
       return DefaultContent
   }

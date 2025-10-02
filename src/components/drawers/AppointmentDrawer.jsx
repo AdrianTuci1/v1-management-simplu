@@ -109,6 +109,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         doctor: uiData.doctor || '',
         service: uiData.service || '',
         serviceDuration: uiData.service?.duration || '',
+        price: uiData.price || '',
         status: 'scheduled', // Statusul este întotdeauna 'scheduled' inițial
         images: appointmentData.images || []
       }
@@ -253,7 +254,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     } else {
       // Căutăm în treatments array
       const treatment = treatments.find(t => t.id === formData.service)
-      treatmentName = treatment?.name || 'Tratament necunoscut'
+      treatmentName = treatment?.treatmentType || treatment?.name || 'Tratament necunoscut'
     }
     
     // Găsim numele pacientului - verificăm dacă este obiect sau string
@@ -272,6 +273,10 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       appointmentId: formData.id || '',
       patientName: patientName
     }
+    
+    // Debug: să vedem ce date se transmit către SalesDrawer
+    console.log('AppointmentDrawer - handlePayment - paymentData:', paymentData)
+    console.log('AppointmentDrawer - handlePayment - formData.price:', formData.price)
     
     // Deschidem SalesDrawer cu datele programării
     openSalesDrawer(paymentData)
@@ -353,9 +358,11 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
             if (typeof value === 'object' && value.id) {
               handleInputChange('service', value.id);
               handleInputChange('serviceDuration', value.duration || '');
+              handleInputChange('price', value.price || '');
             } else {
               handleInputChange('service', value);
               handleInputChange('serviceDuration', '');
+              handleInputChange('price', '');
             }
           }}
           placeholder="Selectează serviciu"

@@ -641,6 +641,7 @@ const DentalPlanDrawer: React.FC<DentalPlanDrawerProps> = ({ patientId, isOpen, 
                       treatmentId: val?.id,
                       title: val?.name || "",
                       durationMinutes: val?.duration || null,
+                      price: val?.price ? parseFloat(val.price) : null,
                     }));
                   }}
                   placeholder="Selectează tratament..."

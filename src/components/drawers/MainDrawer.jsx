@@ -30,9 +30,16 @@ const Drawer = ({ open, content, onClose, position = "side" }) => {
           return { ...baseProps, appointmentData: content?.data }
         case 'cash-register':
           return { ...baseProps, appointmentData: content?.data }
+        case 'working-hours':
+          return { ...baseProps, settingId: content?.settingId, settingData: content?.settingData }
         case 'ai-assistant':
           // AI Assistant are nevoie de onClose
           return { onClose }
+        case 'sms-configuration':
+        case 'email-configuration':
+        case 'voice-agent-configuration':
+        case 'meta-configuration':
+          return { ...baseProps, isOpen: open, locationId: content?.locationId || 'default' }
         default:
           return baseProps
       }

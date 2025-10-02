@@ -1,9 +1,24 @@
-import { Power, Mail, MessageSquare, Mic, Facebook, CheckCircle, XCircle, AlertCircle, ExternalLink, Loader2 } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import externalApiService from '../../services/externalApiService'
+import React, { useState, useEffect } from 'react'
+import { Power, Mail, MessageSquare, Mic, Facebook, CheckCircle, XCircle, AlertCircle, ExternalLink, Loader2, Settings } from 'lucide-react'
+import { useExternalApiConfig } from '../../hooks/useExternalApiConfig.js'
+import { useDrawer } from '../../contexts/DrawerContext.jsx'
 
 const BusinessProcesses = () => {
+  const {
+    getLocalServiceConfig,
+    isServiceEnabled,
+    checkAllServicesStatus: checkServicesStatus,
+    authorizeService,
+    loadAllConfigs
+  } = useExternalApiConfig()
   
+  const {
+    openSMSConfigurationDrawer,
+    openEmailConfigurationDrawer,
+    openVoiceAgentConfigurationDrawer,
+    openMetaConfigurationDrawer
+  } = useDrawer()
+
   // State for service status
   const [services, setServices] = useState({
     voiceAgent: {
@@ -47,23 +62,17 @@ const BusinessProcesses = () => {
   // Loading state for checking all services
   const [checkingStatus, setCheckingStatus] = useState(false);
 
-  // SMS options state
-  const [smsOptions, setSmsOptions] = useState({
-    sendToAllAppointments: false,
-    sendDayBefore: false,
-    sendViaAgent: false
-  });
-
   // Check service status on component mount
   useEffect(() => {
     checkAllServicesStatus();
+    loadAllConfigs();
   }, []);
 
   // Check all services authorization status
   const checkAllServicesStatus = async () => {
     setCheckingStatus(true);
     try {
-      const statusResults = await externalApiService.checkAllServicesStatus();
+      const statusResults = await checkServicesStatus();
       
       setServices(prev => {
         const updated = { ...prev };
@@ -74,7 +83,16 @@ const BusinessProcesses = () => {
             ...updated.gmail,
             authorized: statusResults.gmail.authorized,
             status: statusResults.gmail.authorized ? 'authorized' : 'unauthorized',
-            error: statusResults.gmail.error || null
+            error: statusResults.gmail.error || null,
+            active: isServiceEnabled('email')
+          };
+        } else {
+          // If no status results, still check if email service is enabled
+          updated.gmail = {
+            ...updated.gmail,
+            authorized: false,
+            status: 'unauthorized',
+            active: isServiceEnabled('email')
           };
         }
         
@@ -84,9 +102,30 @@ const BusinessProcesses = () => {
             ...updated.meta,
             authorized: statusResults.meta.authorized,
             status: statusResults.meta.authorized ? 'authorized' : 'unauthorized',
-            error: statusResults.meta.error || null
+            error: statusResults.meta.error || null,
+            active: isServiceEnabled('meta')
+          };
+        } else {
+          // If no status results, still check if meta service is enabled
+          updated.meta = {
+            ...updated.meta,
+            authorized: false,
+            status: 'unauthorized',
+            active: isServiceEnabled('meta')
           };
         }
+        
+        // Update SMS status
+        updated.sms = {
+          ...updated.sms,
+          active: isServiceEnabled('sms')
+        };
+        
+        // Update Voice Agent status
+        updated.voiceAgent = {
+          ...updated.voiceAgent,
+          active: isServiceEnabled('voiceAgent')
+        };
         
         return updated;
       });
@@ -97,34 +136,24 @@ const BusinessProcesses = () => {
     }
   };
 
-  // Handle service toggle
-  const toggleService = (serviceKey) => {
-    setServices(prev => {
-      const service = prev[serviceKey];
-      const newActive = !service.active;
-      
-      // Check if service can be activated
-      if (newActive && !service.authorized) {
-        return prev; // Don't activate if not authorized
-      }
-      
-      return {
-        ...prev,
-        [serviceKey]: {
-          ...service,
-          active: newActive,
-          status: newActive ? 'active' : 'inactive'
-        }
-      };
-    });
-  };
-
-  // Handle SMS option toggle
-  const toggleSmsOption = (option) => {
-    setSmsOptions(prev => ({
-      ...prev,
-      [option]: !prev[option]
-    }));
+  // Handle service configuration
+  const openServiceConfiguration = (serviceKey) => {
+    switch (serviceKey) {
+      case 'sms':
+        openSMSConfigurationDrawer();
+        break;
+      case 'gmail':
+        openEmailConfigurationDrawer();
+        break;
+      case 'voiceAgent':
+        openVoiceAgentConfigurationDrawer();
+        break;
+      case 'meta':
+        openMetaConfigurationDrawer();
+        break;
+      default:
+        break;
+    }
   };
 
   // Handle authorization
@@ -140,14 +169,14 @@ const BusinessProcesses = () => {
 
     try {
       if (serviceKey === 'gmail') {
-        await externalApiService.connectGmail();
+        await authorizeService('gmail');
         // Note: The page will redirect, so we don't need to update state here
       } else if (serviceKey === 'meta') {
-        await externalApiService.connectMeta();
+        await authorizeService('meta');
         // Note: The page will redirect, so we don't need to update state here
       } else if (serviceKey === 'voiceAgent') {
         // Handle voice agent session creation
-        const ephemeralKey = await externalApiService.createElevenLabsSession();
+        const ephemeralKey = await authorizeService('voiceAgent');
         console.log('ElevenLabs session created with key:', ephemeralKey);
         
         setServices(prev => ({
@@ -169,6 +198,56 @@ const BusinessProcesses = () => {
           loading: false,
           error: error.message
         }
+      }));
+    }
+  };
+
+  // Handle service toggle
+  const toggleService = async (serviceKey) => {
+    const currentService = services[serviceKey];
+    if (!currentService) return;
+
+    const newActiveState = !currentService.active;
+    
+    // Update local state immediately for better UX
+    setServices(prev => ({
+      ...prev,
+      [serviceKey]: { ...prev[serviceKey], active: newActiveState }
+    }));
+
+    try {
+      // Map service key to config type
+      let configType;
+      switch (serviceKey) {
+        case 'sms':
+          configType = 'sms';
+          break;
+        case 'gmail':
+          configType = 'email';
+          break;
+        case 'voiceAgent':
+          configType = 'voiceAgent';
+          break;
+        case 'meta':
+          configType = 'meta';
+          break;
+        default:
+          console.warn('Unknown service key for toggle:', serviceKey);
+          return;
+      }
+
+      // Get current config and update enabled state
+      const currentConfig = getLocalServiceConfig(configType);
+      await saveServiceConfig(configType, { ...currentConfig, enabled: newActiveState });
+      
+      console.log(`Service ${serviceKey} ${newActiveState ? 'enabled' : 'disabled'} successfully`);
+    } catch (error) {
+      console.error(`Error toggling ${serviceKey}:`, error);
+      
+      // Revert state on error
+      setServices(prev => ({
+        ...prev,
+        [serviceKey]: { ...prev[serviceKey], active: !newActiveState }
       }));
     }
   };
@@ -234,23 +313,34 @@ const BusinessProcesses = () => {
 
                   {/* Actions */}
                   <div className="flex items-center space-x-3">
-                    {/* Toggle Switch */}
+                    {/* Toggle Switch for services that can be enabled/disabled */}
+                    {(key === 'sms' || key === 'voiceAgent' || (key === 'gmail' && service.authorized) || (key === 'meta' && service.authorized)) && (
+                      <button
+                        onClick={() => toggleService(key)}
+                        disabled={!service.authorized && key !== 'sms' && key !== 'voiceAgent'}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          service.active ? 'bg-green-600' : 'bg-gray-300'
+                        } ${(!service.authorized && key !== 'sms' && key !== 'voiceAgent') ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            service.active ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    )}
+
+                    {/* Configuration Button - Always available */}
                     <button
-                      onClick={() => toggleService(key)}
-                      disabled={!service.authorized}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        service.active ? 'bg-green-600' : 'bg-gray-300'
-                      } ${!service.authorized ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      onClick={() => openServiceConfiguration(key)}
+                      className="btn btn-outline btn-sm flex items-center space-x-2"
                     >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          service.active ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
+                      <Settings className="h-4 w-4" />
+        
                     </button>
 
                     {/* Authorization Button */}
-                    {((key === 'gmail' || key === 'meta') && !service.authorized) || (key === 'voiceAgent' && !service.authorized) ? (
+                    {((key === 'gmail' || key === 'meta') && !service.authorized) ? (
                       <button
                         onClick={() => handleAuthorization(key)}
                         disabled={service.loading}
@@ -278,6 +368,24 @@ const BusinessProcesses = () => {
                       </button>
                     )}
 
+                    {/* Voice Agent Authorization Button */}
+                    {key === 'voiceAgent' && !service.authorized && (
+                      <button
+                        onClick={() => handleAuthorization(key)}
+                        disabled={service.loading}
+                        className="btn btn-outline btn-sm flex items-center space-x-2 disabled:opacity-50"
+                      >
+                        {service.loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ExternalLink className="h-4 w-4" />
+                        )}
+                        <span>
+                          {service.loading ? 'Se conectează...' : 'Conectează ElevenLabs'}
+                        </span>
+                      </button>
+                    )}
+
                     {/* Voice Agent Session Button */}
                     {key === 'voiceAgent' && service.authorized && !service.loading && (
                       <button
@@ -296,78 +404,37 @@ const BusinessProcesses = () => {
         })}
       </div>
 
-      {/* SMS Options Section */}
-      {services.sms.active && (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold mb-2">Opțiuni SMS</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Configurează notificările SMS pentru programări
-            </p>
-          </div>
-          
-          <div className="card">
-            <div className="card-content p-4">
-              <div className="space-y-4">
-                {/* SMS Option 1 */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="sendToAllAppointments"
-                      checked={smsOptions.sendToAllAppointments}
-                      onChange={() => toggleSmsOption('sendToAllAppointments')}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="sendToAllAppointments" className="text-sm font-medium">
-                      Trimite SMS la toate programările create
-                    </label>
+      {/* Service Status Summary */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-semibold mb-2">Rezumat Servicii</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Toate configurațiile sunt gestionate prin drawere dedicate
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(services).map(([key, service]) => (
+            <div key={key} className="card">
+              <div className="card-content p-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg ${service.active ? 'bg-green-100' : 'bg-gray-100'}`}>
+                    {React.createElement(getServiceIcon(key), {
+                      className: `h-5 w-5 ${service.active ? 'text-green-600' : 'text-gray-600'}`
+                    })}
                   </div>
-                </div>
-
-                {/* SMS Option 2 */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="sendDayBefore"
-                      checked={smsOptions.sendDayBefore}
-                      onChange={() => toggleSmsOption('sendDayBefore')}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="sendDayBefore" className="text-sm font-medium">
-                      Trimite SMS cu o zi înainte de programare
-                    </label>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-sm">{service.name}</h3>
+                    <p className={`text-xs ${service.active ? 'text-green-600' : 'text-gray-500'}`}>
+                      {service.active ? 'Activ' : 'Inactiv'}
+                    </p>
                   </div>
-                </div>
-
-                {/* SMS Option 3 */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="sendViaAgent"
-                      checked={smsOptions.sendViaAgent}
-                      onChange={() => toggleSmsOption('sendViaAgent')}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="sendViaAgent" className="text-sm font-medium">
-                      Trimite SMS prin agent
-                    </label>
-                  </div>
-                </div>
-
-                {/* Manual SMS Note */}
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-700">
-                    <strong>Notă:</strong> Poți trimite SMS-uri manual din secțiunea de programări.
-                  </p>
                 </div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
-      )}
+      </div>
 
     </div>
   )

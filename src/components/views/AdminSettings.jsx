@@ -1,10 +1,12 @@
 import { Settings, Clock, DollarSign, Globe, Receipt, Download, CreditCard, ChevronRight } from 'lucide-react'
 import { useDrawer } from '../../contexts/DrawerContext'
+import { useSettings } from '../../hooks/useSettings'
 import useSettingsStore from '../../stores/settingsStore'
 
 const AdminSettings = () => {
   const { openDrawer } = useDrawer()
   const { getSettingStatus } = useSettingsStore()
+  const { getSettingsByType } = useSettings()
 
   const settingsCategories = [
     {
@@ -46,7 +48,28 @@ const AdminSettings = () => {
   ]
 
   const handleSettingClick = (settingId) => {
-    openDrawer({ type: settingId })
+    // Pentru working-hours, găsește setarea reală din server
+    if (settingId === 'working-hours') {
+      const workingHoursSettings = getSettingsByType('working-hours')
+      if (workingHoursSettings.length > 0) {
+        // Deschide drawer-ul cu ID-ul real al setării
+        openDrawer({ 
+          type: 'working-hours',
+          settingId: workingHoursSettings[0].id,
+          settingData: workingHoursSettings[0]
+        })
+      } else {
+        // Dacă nu există setare, deschide drawer-ul pentru a crea una nouă
+        openDrawer({ 
+          type: 'working-hours',
+          settingId: null,
+          settingData: null
+        })
+      }
+    } else {
+      // Pentru alte tipuri de setări, folosește ID-ul direct
+      openDrawer({ type: settingId })
+    }
   }
 
   return (

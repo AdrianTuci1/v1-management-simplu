@@ -632,6 +632,7 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
                       treatmentId: val?.id,
                       title: val?.name || "",
                       durationMinutes: val?.duration || null,
+                      price: val?.price ? parseFloat(val.price) : null,
                     }));
                   }}
                   placeholder="Selectează tratament..."

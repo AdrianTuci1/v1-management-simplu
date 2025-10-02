@@ -12,6 +12,7 @@ interface ToothTreatment {
   id: string;
   name: string;
   duration?: number;
+  price?: string;
 }
 
 interface ToothDrawerProps {

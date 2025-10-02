@@ -119,6 +119,23 @@ export const DrawerProvider = ({ children }) => {
     openDrawer({ type: 'user-profile' })
   }
 
+  // Service configuration drawers
+  const openSMSConfigurationDrawer = (locationId = 'default') => {
+    openDrawer({ type: 'sms-configuration', locationId })
+  }
+
+  const openEmailConfigurationDrawer = (locationId = 'default') => {
+    openDrawer({ type: 'email-configuration', locationId })
+  }
+
+  const openVoiceAgentConfigurationDrawer = (locationId = 'default') => {
+    openDrawer({ type: 'voice-agent-configuration', locationId })
+  }
+
+  const openMetaConfigurationDrawer = (locationId = 'default') => {
+    openDrawer({ type: 'meta-configuration', locationId })
+  }
+
   // Funcții pentru gestionarea stivei
   const getStackInfo = () => {
     return {
@@ -146,6 +163,11 @@ export const DrawerProvider = ({ children }) => {
     openStripePaymentDrawer,
     openAIAssistantDrawer,
     openUserProfileDrawer,
+    // Service configuration drawers
+    openSMSConfigurationDrawer,
+    openEmailConfigurationDrawer,
+    openVoiceAgentConfigurationDrawer,
+    openMetaConfigurationDrawer,
     // Funcții pentru stiva de drawere
     getStackInfo,
     getStackSize,

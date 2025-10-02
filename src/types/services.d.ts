@@ -117,7 +117,7 @@ declare module "@/services/planService" {
 }
 
 declare module "@/components/combobox/TreatmentCombobox.jsx" {
-  interface TreatmentValue { id: string; name: string; duration?: number }
+  interface TreatmentValue { id: string; name: string; duration?: number; price?: string }
   interface TreatmentComboboxProps {
     value: string | TreatmentValue | null
     onValueChange: (value: TreatmentValue) => void

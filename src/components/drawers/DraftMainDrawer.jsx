@@ -1,4 +1,4 @@
-import { X, Bell, User, Settings, Calendar, Loader2 } from 'lucide-react'
+
 import { getDrawerComponent } from './DrawerRegistry.jsx'
 
 // Draft-urile sunt create doar de AI, nu automat pentru drawerele noi
@@ -47,6 +47,11 @@ const DraftMainDrawer = ({ open, content, onClose, position = "side", externalNa
         case 'ai-assistant':
           // AI Assistant are nevoie de onClose
           return { onClose }
+        case 'sms-configuration':
+        case 'email-configuration':
+        case 'voice-agent-configuration':
+        case 'meta-configuration':
+          return { ...baseProps, isOpen: open, locationId: content?.locationId || 'default' }
         default:
           return baseProps
       }
