@@ -155,6 +155,52 @@ export const useExternalApiConfig = () => {
     return defaultConfig
   }, [selectedLocationId])
 
+  // Toggle SMS service
+  const toggleSMSService = useCallback(async (enabled, locationId = selectedLocationId) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const updatedConfig = await externalServices.toggleSMSService(enabled, locationId)
+      
+      // Update shared state
+      const configKey = `sms_${locationId}`
+      sharedConfigs[configKey] = updatedConfig
+      notifySubscribers()
+      
+      return updatedConfig
+    } catch (err) {
+      setError(err.message)
+      console.error('Error toggling SMS service:', err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedLocationId])
+
+  // Toggle Email service
+  const toggleEmailService = useCallback(async (enabled, locationId = selectedLocationId) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const updatedConfig = await externalServices.toggleEmailService(enabled, locationId)
+      
+      // Update shared state
+      const configKey = `email_${locationId}`
+      sharedConfigs[configKey] = updatedConfig
+      notifySubscribers()
+      
+      return updatedConfig
+    } catch (err) {
+      setError(err.message)
+      console.error('Error toggling Email service:', err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedLocationId])
+
   // Get available locations (placeholder - would come from business service)
   const getAvailableLocations = useCallback(() => {
     return externalServices.getAvailableLocations()
@@ -184,6 +230,10 @@ export const useExternalApiConfig = () => {
     resetServiceConfig,
     setSelectedLocationId,
     getAvailableLocations,
+
+    // Toggle methods
+    toggleSMSService,
+    toggleEmailService,
 
     // Utilities
     getConfigByService: (serviceType) => getLocalServiceConfig(serviceType),

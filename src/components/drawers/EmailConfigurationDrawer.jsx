@@ -199,37 +199,32 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
               )}
             </div>
 
-            {/* Service Activation */}
+            {/* Service Status */}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-medium text-lg">Activare Email</h3>
-                  <p className="text-gray-600 text-sm">Activează trimiterea automată de email-uri</p>
+                  <h3 className="font-medium text-lg">Status Serviciu Email</h3>
+                  <p className="text-gray-600 text-sm">Serviciul este gestionat din pagina principală</p>
                 </div>
-                <button
-                  onClick={() => updateConfig({ enabled: !config.enabled })}
-                  disabled={!gmailStatus.authorized}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.enabled && gmailStatus.authorized ? 'bg-blue-600' : 'bg-gray-300'
-                  } ${!gmailStatus.authorized ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.enabled && gmailStatus.authorized ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                <div className="flex items-center space-x-3">
+                  <div className={`flex items-center ${config.enabled ? 'text-green-600' : 'text-gray-500'}`}>
+                    <div className={`w-2 h-2 rounded-full mr-2 ${config.enabled ? 'bg-green-600' : 'bg-gray-400'}`}></div>
+                    <span className="text-sm font-medium">
+                      {config.enabled ? 'Activat' : 'Dezactivat'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {!gmailStatus.authorized && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <p className="text-yellow-700 text-sm">
-                    Trebuie să conectezi Gmail pentru a activa serviciul de email.
+                    Trebuie să conectezi Gmail pentru a folosi serviciul de email.
                   </p>
                 </div>
               )}
 
-              {config.enabled && gmailStatus.authorized && (
+              {gmailStatus.authorized && (
                 <div className="space-y-4">
                   {/* When to send emails */}
                   <div>
@@ -290,7 +285,7 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
             </div>
 
             {/* Templates */}
-            {config.enabled && gmailStatus.authorized && (
+            {gmailStatus.authorized && (
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-medium text-lg">Template-uri Email</h3>
@@ -353,7 +348,7 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
             )}
 
             {/* Advanced Settings */}
-            {config.enabled && gmailStatus.authorized && (
+            {gmailStatus.authorized && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-medium text-lg mb-3">Setări avansate</h3>
                 <div className="space-y-3">
@@ -398,7 +393,7 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
               </button>
               <button
                 onClick={handleSave}
-                disabled={loading || !hasChanges || !gmailStatus.authorized}
+                disabled={loading || !hasChanges}
                 className="btn btn-primary btn-sm flex items-center space-x-2 disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />

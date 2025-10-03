@@ -176,7 +176,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       <div className="space-y-2">
         <label className="text-sm font-medium">Nume complet *</label>
         <div className="relative">
-          <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={formData.name}
@@ -191,7 +191,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       <div className="space-y-2">
         <label className="text-sm font-medium">Anul nașterii</label>
         <div className="relative">
-          <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             type="number"
             value={formData.birthYear}
@@ -223,7 +223,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       <div className="space-y-2">
         <label className="text-sm font-medium">Email</label>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             type="email"
             value={formData.email}
@@ -238,7 +238,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       <div className="space-y-2">
         <label className="text-sm font-medium">Telefon *</label>
         <div className="relative">
-          <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             type="tel"
             value={formData.phone}
@@ -253,7 +253,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       <div className="space-y-2">
         <label className="text-sm font-medium">Adresa</label>
         <div className="relative">
-          <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
           <textarea
             value={formData.address}
             onChange={(e) => handleInputChange('address', e.target.value)}
@@ -304,7 +304,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
           {/* Add new tag */}
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Tag className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Tag className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <input
                 type="text"
                 value={newTag}

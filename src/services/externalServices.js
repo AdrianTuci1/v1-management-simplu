@@ -14,6 +14,20 @@ class ExternalServices {
     return 'B0100001';
   }
 
+  getLocationId() {
+    const selectedLocation = localStorage.getItem('selected-location');
+    if (selectedLocation) {
+      try {
+        const locationData = JSON.parse(selectedLocation);
+        return locationData.id || 'L0100001';
+      } catch (error) {
+        console.error('Error parsing selected-location:', error);
+        return 'L0100001';
+      }
+    }
+    return 'L0100001';
+  }
+
   getUserId() {
     const savedCognitoData = localStorage.getItem('cognito-data');
     if (savedCognitoData) {
@@ -34,11 +48,14 @@ class ExternalServices {
   // ========================================
 
   // Get external API configuration for a specific service
-  async getExternalApiConfig(serviceType, locationId = 'default') {
+  async getExternalApiConfig(serviceType) {
     try {
       const businessId = this.getBusinessId();
+      
+      // Ensure locationId is properly encoded
+      const encodedLocationId = encodeURIComponent(this.getLocationId());
       const response = await fetch(
-        `${this.getAiAgentUrl()}/external-api-config/${businessId}/${serviceType}?locationId=${locationId}`,
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}?locationId=${encodedLocationId}`,
         {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
@@ -52,7 +69,16 @@ class ExternalServices {
         throw new Error(`Failed to get ${serviceType} configuration: ${response.status}`);
       }
 
-      return await response.json();
+      const fullConfig = await response.json();
+      
+      // Extract the specific service configuration from the full config
+      if (serviceType === 'sms' && fullConfig.sms) {
+        return fullConfig.sms;
+      } else if (serviceType === 'email' && fullConfig.email) {
+        return fullConfig.email;
+      } else {
+        return this.getDefaultServiceConfig(serviceType);
+      }
     } catch (error) {
       console.error(`Error getting ${serviceType} configuration:`, error);
       return this.getDefaultServiceConfig(serviceType);
@@ -63,12 +89,23 @@ class ExternalServices {
   async saveExternalApiConfig(serviceType, config, locationId = 'default') {
     try {
       const businessId = this.getBusinessId();
+      
+      // First, get the current full configuration
+      const currentConfig = await this.getFullExternalApiConfig(businessId, locationId);
+      
+      // Update only the specific service configuration
+      const updatePayload = {
+        [serviceType]: config
+      };
+
+      // Ensure locationId is properly encoded
+      const encodedLocationId = encodeURIComponent(this.getLocationId());
       const response = await fetch(
-        `${this.getAiAgentUrl()}/external-api-config/${businessId}/${serviceType}?locationId=${locationId}`,
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}?locationId=${encodedLocationId}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config)
+          body: JSON.stringify(updatePayload)
         }
       );
 
@@ -76,9 +113,45 @@ class ExternalServices {
         throw new Error(`Failed to save ${serviceType} configuration: ${response.status}`);
       }
 
-      return await response.json();
+      const fullConfig = await response.json();
+      return fullConfig[serviceType] || config;
     } catch (error) {
       console.error(`Error saving ${serviceType} configuration:`, error);
+      throw error;
+    }
+  }
+
+  // Get full external API configuration (helper method)
+  async getFullExternalApiConfig(businessId) {
+    try {
+      // Ensure locationId is properly encoded
+      const encodedLocationId = encodeURIComponent(this.getLocationId());
+      const response = await fetch(
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}?locationId=${encodedLocationId}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (response.ok) {
+        return await response.json();
+      } else if (response.status === 404) {
+        // Return default full configuration
+        return {
+          businessId,
+          locationId,
+          sms: this.getDefaultServiceConfig('sms'),
+          email: this.getDefaultServiceConfig('email'),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: 1
+        };
+      } else {
+        throw new Error(`Failed to get full configuration: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error getting full external API configuration:', error);
       throw error;
     }
   }
@@ -144,15 +217,18 @@ class ExternalServices {
   // ========================================
 
   // Gmail OAuth integration
-  async getGmailAuthUrl() {
+  async getGmailAuthUrl(redirectUrl = null) {
     const businessId = this.getBusinessId();
-    const userId = this.getUserId();
+    const locationId = this.getLocationId();
     
-    if (!userId) {
-      throw new Error('User ID not available for Gmail authorization');
+    if (!locationId) {
+      throw new Error('Location ID not available for Gmail authorization');
     }
 
-    const url = `${this.baseUrl}/external/gmail/auth-url?businessId=${encodeURIComponent(businessId)}&userId=${encodeURIComponent(userId)}`;
+    // Use current window location as default redirect URL if not provided
+    const defaultRedirectUrl = redirectUrl || window.location.origin + '/dashboard';
+    
+    const url = `${this.baseUrl}/external/gmail/auth-url?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}&redirectUrl=${encodeURIComponent(defaultRedirectUrl)}`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -176,7 +252,9 @@ class ExternalServices {
 
   async connectGmail() {
     try {
-      const authUrl = await this.getGmailAuthUrl();
+      // Pass current window location as redirect URL
+      const currentUrl = window.location.href;
+      const authUrl = await this.getGmailAuthUrl(currentUrl);
       // Redirect to Google OAuth
       window.location.href = authUrl;
     } catch (error) {
@@ -188,13 +266,13 @@ class ExternalServices {
   // Meta (Facebook/Instagram) OAuth integration
   async getMetaAuthUrl() {
     const businessId = this.getBusinessId();
-    const userId = this.getUserId();
+    const locationId = this.getLocationId();
     
-    if (!userId) {
-      throw new Error('User ID not available for Meta authorization');
+    if (!locationId) {
+      throw new Error('Location ID not available for Meta authorization');
     }
 
-    const url = `${this.baseUrl}/external/meta/auth-url?businessId=${encodeURIComponent(businessId)}&userId=${encodeURIComponent(userId)}`;
+    const url = `${this.baseUrl}/external/meta/auth-url?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -258,14 +336,14 @@ class ExternalServices {
   // Check service authorization status
   async checkServiceStatus(serviceName) {
     const businessId = this.getBusinessId();
-    const userId = this.getUserId();
+    const locationId = this.getLocationId();
     
-    if (!userId) {
-      return { authorized: false, error: 'User ID not available' };
+    if (!locationId) {
+      return { authorized: false, error: 'Location ID not available' };
     }
 
     try {
-      const url = `${this.baseUrl}/external/${serviceName}/status?businessId=${encodeURIComponent(businessId)}&userId=${encodeURIComponent(userId)}`;
+      const url = `${this.baseUrl}/external/${serviceName}/status?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -276,7 +354,9 @@ class ExternalServices {
 
       if (response.ok) {
         const data = await response.json();
-        return { authorized: data.authorized || false, data };
+        // Handle both 'authorized' and 'connected' properties for different services
+        const isAuthorized = data.authorized || data.connected || false;
+        return { authorized: isAuthorized, data };
       } else {
         return { authorized: false, error: `Status check failed: ${response.status}` };
       }
@@ -296,6 +376,40 @@ class ExternalServices {
     }
 
     return results;
+  }
+
+  // ========================================
+  // TOGGLE METHODS FOR SMS/EMAIL
+  // ========================================
+
+  // Toggle SMS service enabled/disabled
+  async toggleSMSService(enabled, locationId = 'default') {
+    try {
+      console.log(`Toggling SMS service to ${enabled} for locationId: ${locationId}`);
+      const currentConfig = await this.getExternalApiConfig('sms', locationId);
+      const updatedConfig = { ...currentConfig, enabled };
+      const result = await this.saveExternalApiConfig('sms', updatedConfig, locationId);
+      console.log('SMS toggle result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error toggling SMS service:', error);
+      throw error;
+    }
+  }
+
+  // Toggle Email service enabled/disabled
+  async toggleEmailService(enabled, locationId = 'default') {
+    try {
+      console.log(`Toggling Email service to ${enabled} for locationId: ${locationId}`);
+      const currentConfig = await this.getExternalApiConfig('email', locationId);
+      const updatedConfig = { ...currentConfig, enabled };
+      const result = await this.saveExternalApiConfig('email', updatedConfig, locationId);
+      console.log('Email toggle result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error toggling Email service:', error);
+      throw error;
+    }
   }
 
   // ========================================

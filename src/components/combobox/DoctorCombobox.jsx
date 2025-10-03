@@ -14,6 +14,7 @@ import {
 } from '../ui/command.tsx';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.tsx';
 import { useUsers } from '../../hooks/useUsers.js';
+import { Stethoscope } from 'lucide-react';
 
 const DoctorCombobox = ({ 
   value, 
@@ -45,9 +46,10 @@ const DoctorCombobox = ({
           size="lg"
           placeholder={!value}
           aria-expanded={open}
-          className={cn("w-full justify-between bg-white border-gray-300", className)}
+          className={cn("w-full justify-between bg-white border-gray-300 relative pl-9", className)}
           disabled={loading}
         >
+          <Stethoscope className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <span className={cn('truncate')}>
             {selectedDoctor ? selectedDoctor.medicName : (typeof value === 'object' && value?.name ? value.name : placeholder)}
           </span>

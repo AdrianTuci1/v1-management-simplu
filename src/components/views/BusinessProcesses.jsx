@@ -9,7 +9,11 @@ const BusinessProcesses = () => {
     isServiceEnabled,
     checkAllServicesStatus: checkServicesStatus,
     authorizeService,
-    loadAllConfigs
+    loadAllConfigs,
+    saveServiceConfig,
+    toggleSMSService,
+    toggleEmailService,
+    selectedLocationId
   } = useExternalApiConfig()
   
   const {
@@ -209,6 +213,8 @@ const BusinessProcesses = () => {
 
     const newActiveState = !currentService.active;
     
+    console.log(`Toggling ${serviceKey} to ${newActiveState} for locationId: ${selectedLocationId}`);
+    
     // Update local state immediately for better UX
     setServices(prev => ({
       ...prev,
@@ -216,29 +222,30 @@ const BusinessProcesses = () => {
     }));
 
     try {
-      // Map service key to config type
-      let configType;
-      switch (serviceKey) {
-        case 'sms':
-          configType = 'sms';
-          break;
-        case 'gmail':
-          configType = 'email';
-          break;
-        case 'voiceAgent':
-          configType = 'voiceAgent';
-          break;
-        case 'meta':
-          configType = 'meta';
-          break;
-        default:
-          console.warn('Unknown service key for toggle:', serviceKey);
-          return;
-      }
+      // Use specific toggle methods for SMS and Email
+      if (serviceKey === 'sms') {
+        await toggleSMSService(newActiveState, selectedLocationId);
+      } else if (serviceKey === 'gmail') {
+        await toggleEmailService(newActiveState, selectedLocationId);
+      } else {
+        // For other services, use the generic method
+        let configType;
+        switch (serviceKey) {
+          case 'voiceAgent':
+            configType = 'voiceAgent';
+            break;
+          case 'meta':
+            configType = 'meta';
+            break;
+          default:
+            console.warn('Unknown service key for toggle:', serviceKey);
+            return;
+        }
 
-      // Get current config and update enabled state
-      const currentConfig = getLocalServiceConfig(configType);
-      await saveServiceConfig(configType, { ...currentConfig, enabled: newActiveState });
+        // Get current config and update enabled state
+        const currentConfig = getLocalServiceConfig(configType);
+        await saveServiceConfig(configType, { ...currentConfig, enabled: newActiveState });
+      }
       
       console.log(`Service ${serviceKey} ${newActiveState ? 'enabled' : 'disabled'} successfully`);
     } catch (error) {
@@ -283,6 +290,12 @@ const BusinessProcesses = () => {
       <div>
         <h1 className="text-3xl font-bold">Servicii</h1>
         <p className="text-muted-foreground">Gestionează serviciile și integrarea cu platforme externe</p>
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-sm text-blue-800">
+            <strong>SMS și Email</strong> pot fi activate/dezactivate direct din interfața principală. 
+            Pentru configurații avansate (template-uri, setări de trimitere), folosește butonul de configurare.
+          </p>
+        </div>
       </div>
 
       {/* Services List */}
@@ -315,19 +328,26 @@ const BusinessProcesses = () => {
                   <div className="flex items-center space-x-3">
                     {/* Toggle Switch for services that can be enabled/disabled */}
                     {(key === 'sms' || key === 'voiceAgent' || (key === 'gmail' && service.authorized) || (key === 'meta' && service.authorized)) && (
-                      <button
-                        onClick={() => toggleService(key)}
-                        disabled={!service.authorized && key !== 'sms' && key !== 'voiceAgent'}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          service.active ? 'bg-green-600' : 'bg-gray-300'
-                        } ${(!service.authorized && key !== 'sms' && key !== 'voiceAgent') ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            service.active ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
+                      <div className="flex flex-col items-center space-y-1">
+                        <button
+                          onClick={() => toggleService(key)}
+                          disabled={!service.authorized && key !== 'sms' && key !== 'voiceAgent'}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            service.active ? 'bg-green-600' : 'bg-gray-300'
+                          } ${(!service.authorized && key !== 'sms' && key !== 'voiceAgent') ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              service.active ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                        {(key === 'sms' || key === 'gmail') && (
+                          <span className="text-xs text-gray-500">
+                            {service.active ? 'Activat' : 'Dezactivat'}
+                          </span>
+                        )}
+                      </div>
                     )}
 
                     {/* Configuration Button - Always available */}

@@ -26,16 +26,33 @@ class ExternalApiService {
     return null;
   }
 
+  getLocationId() {
+    const selectedLocation = localStorage.getItem('selected-location');
+    if (selectedLocation) {
+      try {
+        const locationData = JSON.parse(selectedLocation);
+        return locationData.id || 'L0100001';
+      } catch (error) {
+        console.error('Error parsing selected-location:', error);
+        return 'L0100001';
+      }
+    }
+    return 'L0100001';
+  }
+
   // Gmail OAuth integration
-  async getGmailAuthUrl() {
+  async getGmailAuthUrl(redirectUrl = null) {
     const businessId = this.getBusinessId();
-    const userId = this.getUserId();
+    const locationId = this.getLocationId();
     
-    if (!userId) {
-      throw new Error('User ID not available for Gmail authorization');
+    if (!locationId) {
+      throw new Error('Location ID not available for Gmail authorization');
     }
 
-    const url = `${this.baseUrl}/external/gmail/auth-url?businessId=${encodeURIComponent(businessId)}&userId=${encodeURIComponent(userId)}`;
+    // Use current window location as default redirect URL if not provided
+    const defaultRedirectUrl = redirectUrl || window.location.origin + '/dashboard';
+    
+    const url = `${this.baseUrl}/external/gmail/auth-url?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}&redirectUrl=${encodeURIComponent(defaultRedirectUrl)}`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -59,7 +76,9 @@ class ExternalApiService {
 
   async connectGmail() {
     try {
-      const authUrl = await this.getGmailAuthUrl();
+      // Pass current window location as redirect URL
+      const currentUrl = window.location.href;
+      const authUrl = await this.getGmailAuthUrl(currentUrl);
       // Redirect to Google OAuth
       window.location.href = authUrl;
     } catch (error) {
@@ -71,13 +90,13 @@ class ExternalApiService {
   // Meta (Facebook/Instagram) OAuth integration
   async getMetaAuthUrl() {
     const businessId = this.getBusinessId();
-    const userId = this.getUserId();
+    const locationId = this.getLocationId();
     
-    if (!userId) {
-      throw new Error('User ID not available for Meta authorization');
+    if (!locationId) {
+      throw new Error('Location ID not available for Meta authorization');
     }
 
-    const url = `${this.baseUrl}/external/meta/auth-url?businessId=${encodeURIComponent(businessId)}&userId=${encodeURIComponent(userId)}`;
+    const url = `${this.baseUrl}/external/meta/auth-url?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -137,14 +156,14 @@ class ExternalApiService {
   // Check service authorization status
   async checkServiceStatus(serviceName) {
     const businessId = this.getBusinessId();
-    const userId = this.getUserId();
+    const locationId = this.getLocationId();
     
-    if (!userId) {
-      return { authorized: false, error: 'User ID not available' };
+    if (!locationId) {
+      return { authorized: false, error: 'Location ID not available' };
     }
 
     try {
-      const url = `${this.baseUrl}/external/${serviceName}/status?businessId=${encodeURIComponent(businessId)}&userId=${encodeURIComponent(userId)}`;
+      const url = `${this.baseUrl}/external/${serviceName}/status?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -155,7 +174,9 @@ class ExternalApiService {
 
       if (response.ok) {
         const data = await response.json();
-        return { authorized: data.authorized || false, data };
+        // Handle both 'authorized' and 'connected' properties for different services
+        const isAuthorized = data.authorized || data.connected || false;
+        return { authorized: isAuthorized, data };
       } else {
         return { authorized: false, error: `Status check failed: ${response.status}` };
       }

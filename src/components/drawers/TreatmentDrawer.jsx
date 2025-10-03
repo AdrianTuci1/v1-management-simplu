@@ -29,7 +29,8 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
         category: treatmentData.category || '',
         duration: treatmentData.duration?.toString() || '',
         price: treatmentData.price?.toString() || '',
-        description: treatmentData.description || ''
+        description: treatmentData.description || '',
+        isPublic: treatmentData.isPublic || false
       }
     }
     return {
@@ -37,7 +38,8 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
       category: '',
       duration: '',
       price: '',
-      description: ''
+      description: '',
+      isPublic: false
     }
   })
 
@@ -118,14 +120,14 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
           {/* Treatment Name */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Nume tratament</label>
-            <div className="flex gap-2">
-              <Stethoscope className="h-4 w-4 text-muted-foreground mt-3" />
+            <div className="relative">
+              <Stethoscope className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <input
                 type="text"
                 value={formData.treatmentType}
                 onChange={(e) => handleInputChange('treatmentType', e.target.value)}
                 placeholder="Ex: Consultație stomatologică"
-                className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
             </div>
           </div>
@@ -144,8 +146,8 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
           {/* Duration */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Durata (minute)</label>
-            <div className="flex gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground mt-3" />
+            <div className="relative">
+              <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <input
                 type="number"
                 value={formData.duration}
@@ -153,7 +155,7 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
                 placeholder="30"
                 min="1"
                 max="480"
-                className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
             </div>
           </div>
@@ -187,6 +189,25 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
               rows={4}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
+          </div>
+
+          {/* Public Visibility */}
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isPublic"
+                checked={formData.isPublic}
+                onChange={(e) => handleInputChange('isPublic', e.target.checked)}
+                className="h-4 w-4 rounded border border-input bg-background text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              />
+              <label htmlFor="isPublic" className="text-sm font-medium cursor-pointer">
+                Tratament public
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Tratamentele publice sunt vizibile pentru toți utilizatorii
+            </p>
           </div>
 
           {/* Error Display */}

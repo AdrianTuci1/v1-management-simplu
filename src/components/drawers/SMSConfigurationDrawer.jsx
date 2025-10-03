@@ -135,76 +135,69 @@ const SMSConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) => 
               </div>
             )}
 
-            {/* Service Activation */}
+            {/* Service Status */}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-medium text-lg">Activare SMS</h3>
-                  <p className="text-gray-600 text-sm">Activează trimiterea automată de mesaje SMS</p>
+                  <h3 className="font-medium text-lg">Status Serviciu SMS</h3>
+                  <p className="text-gray-600 text-sm">Serviciul este gestionat din pagina principală</p>
                 </div>
-                <button
-                  onClick={() => updateConfig({ enabled: !config.enabled })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.enabled ? 'bg-green-600' : 'bg-gray-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.enabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                <div className="flex items-center space-x-3">
+                  <div className={`flex items-center ${config.enabled ? 'text-green-600' : 'text-gray-500'}`}>
+                    <div className={`w-2 h-2 rounded-full mr-2 ${config.enabled ? 'bg-green-600' : 'bg-gray-400'}`}></div>
+                    <span className="text-sm font-medium">
+                      {config.enabled ? 'Activat' : 'Dezactivat'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {config.enabled && (
-                <div className="space-y-4">
-                  {/* When to send messages */}
-                  <div>
-                    <h4 className="font-medium mb-3">Când trimite mesaje:</h4>
-                    <div className="space-y-3">
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={config.sendOnBooking}
-                          onChange={(e) => updateConfig({ sendOnBooking: e.target.checked })}
-                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                        />
-                        <span className="ml-3 text-sm">La crearea programării</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={config.sendReminder}
-                          onChange={(e) => updateConfig({ sendReminder: e.target.checked })}
-                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                        />
-                        <span className="ml-3 text-sm">Reminder</span>
-                      </label>
-                    </div>
+              <div className="space-y-4">
+                {/* When to send messages */}
+                <div>
+                  <h4 className="font-medium mb-3">Când trimite mesaje:</h4>
+                  <div className="space-y-3">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={config.sendOnBooking}
+                        onChange={(e) => updateConfig({ sendOnBooking: e.target.checked })}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                      />
+                      <span className="ml-3 text-sm">La crearea programării</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={config.sendReminder}
+                        onChange={(e) => updateConfig({ sendReminder: e.target.checked })}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                      />
+                      <span className="ml-3 text-sm">Reminder</span>
+                    </label>
                   </div>
-
-                  {/* Reminder timing */}
-                  {config.sendReminder && (
-                    <div>
-                      <h4 className="font-medium mb-2">Când trimite reminder:</h4>
-                      <select
-                        value={config.reminderTiming}
-                        onChange={(e) => updateConfig({ reminderTiming: e.target.value })}
-                        className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      >
-                        <option value="day_before">Cu o zi înainte</option>
-                        <option value="same_day">În ziua respectivă</option>
-                        <option value="both">Ambele</option>
-                      </select>
-                    </div>
-                  )}
                 </div>
-              )}
+
+                {/* Reminder timing */}
+                {config.sendReminder && (
+                  <div>
+                    <h4 className="font-medium mb-2">Când trimite reminder:</h4>
+                    <select
+                      value={config.reminderTiming}
+                      onChange={(e) => updateConfig({ reminderTiming: e.target.value })}
+                      className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    >
+                      <option value="day_before">Cu o zi înainte</option>
+                      <option value="same_day">În ziua respectivă</option>
+                      <option value="both">Ambele</option>
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Templates */}
-            {config.enabled && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-medium text-lg">Template-uri SMS</h3>
                   <button
@@ -260,11 +253,9 @@ const SMSConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) => 
                   ))}
                 </div>
               </div>
-            )}
 
             {/* Advanced Settings */}
-            {config.enabled && (
-              <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-medium text-lg mb-3">Setări avansate</h3>
                 <div className="space-y-3">
                   <div>
@@ -285,7 +276,6 @@ const SMSConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) => 
                   </div>
                 </div>
               </div>
-            )}
           </DrawerContent>
 
           <DrawerFooter>
