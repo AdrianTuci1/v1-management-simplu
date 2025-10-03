@@ -136,7 +136,7 @@ const SMSConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) => 
             )}
 
             {/* Service Status */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg mb-4">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="font-medium text-lg">Status Serviciu SMS</h3>
@@ -197,7 +197,7 @@ const SMSConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) => 
             </div>
 
             {/* Templates */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="bg-white rounded-lg mb-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-medium text-lg">Template-uri SMS</h3>
                   <button
@@ -255,7 +255,7 @@ const SMSConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) => 
               </div>
 
             {/* Advanced Settings */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg">
                 <h3 className="font-medium text-lg mb-3">Setări avansate</h3>
                 <div className="space-y-3">
                   <div>
@@ -360,7 +360,7 @@ const TemplateModal = ({ template, variables, onSave, onCancel }) => {
   }
 
   return (
-    <div className="relative inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4 h-full">
+    <div className="absolute inset-0 z-40 flex items-center justify-center h-full">
       <Drawer size="xl" onClose={onCancel} className="max-h-[90vh]">
         <DrawerHeader
           title={template ? 'Editează Template' : 'Adaugă Template'}

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { MouthViewPermanent } from "./teeth/MouthViewPermanent";
+
 import { MouthViewDeciduous } from "./teeth/MouthViewDecidous";
 import ToothDrawer from "./teeth/ToothDrawer";
 import { Tooth } from "./teeth/Tooth";
 import { ToothCondition } from "./teeth/utils/toothCondition";
 import DentalHistoryService from "@/services/dentalHistoryService";
 import FullscreenTreatmentPlan from "./FullscreenTreatmentPlan";
+import { MouthViewPermanentS } from "./teeth/MouthViewPermanentS";
 
 const SimpleMouthView: React.FC<{ patientId: string }> = ({ patientId }) => {
   const [teethConditions, setTeethConditions] = useState<
@@ -151,9 +152,9 @@ const SimpleMouthView: React.FC<{ patientId: string }> = ({ patientId }) => {
       </div>
 
       {/* Mouth view display */}
-      <div className="bg-white border rounded-lg p-6">
+      <div className="bg-white border rounded-lg p-6 w-full">
         {viewType === "permanent" ? (
-          <MouthViewPermanent teeth={permanentTeeth} onClick={handleSelectTooth} />
+          <MouthViewPermanentS teeth={permanentTeeth} onClick={handleSelectTooth} />
         ) : (
           <MouthViewDeciduous teeth={deciduousTeeth} onClick={handleSelectTooth} />
         )}
