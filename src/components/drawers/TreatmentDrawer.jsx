@@ -20,7 +20,7 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
   const [error, setError] = useState(null)
   
   // Hook pentru gestionarea tratamentelor
-  const { addTreatment, updateTreatment, deleteTreatment } = useTreatments()
+  const { addTreatment, updateTreatment, deleteTreatment, treatments } = useTreatments()
   
   const [formData, setFormData] = useState(() => {
     if (treatmentData) {
@@ -107,6 +107,9 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
     }
   }
 
+  // Extrage categoriile unice din tratamentele existente
+  const categories = [...new Set(treatments.map(t => t.category).filter(Boolean))]
+
   return (
     <Drawer onClose={onClose} size="default" position={position}>
       <DrawerHeader
@@ -139,7 +142,8 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
               value={formData.category}
               onValueChange={(category) => handleInputChange('category', category)}
               onAddNewCategory={handleAddNewCategory}
-              placeholder="Selectează categoria"
+              categories={categories}
+              placeholder="Selectează sau adaugă o categorie"
             />
           </div>
 

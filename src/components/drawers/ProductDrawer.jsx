@@ -8,9 +8,10 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer';
+import CategoryCombobox from '../combobox/CategoryCombobox.jsx';
 
 const ProductDrawer = ({ isOpen, onClose, product = null, position = "side" }) => {
-  const { addProduct, updateProduct, deleteProduct, loading, error } = useProducts();
+  const { addProduct, updateProduct, deleteProduct, loading, error, products } = useProducts();
   
   // Debug logging pentru a vedea când se schimbă starea
   console.log('ProductDrawer render - loading:', loading, 'error:', error)
@@ -97,6 +98,22 @@ const ProductDrawer = ({ isOpen, onClose, product = null, position = "side" }) =
     }
   };
 
+  // Funcție pentru adăugarea unei categorii noi
+  const handleAddNewCategory = (newCategory) => {
+    setFormData(prev => ({
+      ...prev,
+      category: newCategory
+    }));
+    
+    // Șterge eroarea de validare pentru category
+    if (validationErrors.category) {
+      setValidationErrors(prev => ({
+        ...prev,
+        category: ''
+      }));
+    }
+  };
+
   // Salvează produsul
   const handleSave = async () => {
     if (!validateForm()) {
@@ -132,8 +149,8 @@ const ProductDrawer = ({ isOpen, onClose, product = null, position = "side" }) =
     }
   };
 
-  // Obține categoriile disponibile
-  const categories = productManager.getCategories();
+  // Extrage categoriile unice din produsele existente
+  const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
 
   return (
     <Drawer onClose={onClose} size="default" position={position}>
@@ -204,21 +221,19 @@ const ProductDrawer = ({ isOpen, onClose, product = null, position = "side" }) =
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Categorie *
             </label>
-            <select
-              name="category"
+            <CategoryCombobox
               value={formData.category}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationErrors.category ? 'border-red-300' : 'border-gray-300'
-              }`}
-            >
-              <option value="">Selectează o categorie</option>
-              {categories.map(category => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
+              onValueChange={(category) => {
+                setFormData(prev => ({ ...prev, category }));
+                if (validationErrors.category) {
+                  setValidationErrors(prev => ({ ...prev, category: '' }));
+                }
+              }}
+              onAddNewCategory={handleAddNewCategory}
+              categories={categories}
+              placeholder="Selectează sau adaugă o categorie"
+              className={validationErrors.category ? 'border-red-300' : ''}
+            />
             {validationErrors.category && (
               <p className="text-red-500 text-sm mt-1">{validationErrors.category}</p>
             )}

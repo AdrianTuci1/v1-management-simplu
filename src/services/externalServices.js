@@ -51,9 +51,10 @@ class ExternalServices {
   async getExternalApiConfig(serviceType) {
     try {
       const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
       
       // Ensure locationId is properly encoded
-      const encodedLocationId = encodeURIComponent(this.getLocationId());
+      const encodedLocationId = encodeURIComponent(locationId);
       const response = await fetch(
         `${this.getAiAgentUrl()}/external-api-config/${businessId}?locationId=${encodedLocationId}`,
         {
@@ -86,12 +87,13 @@ class ExternalServices {
   }
 
   // Save external API configuration for a specific service
-  async saveExternalApiConfig(serviceType, config, locationId = 'default') {
+  async saveExternalApiConfig(serviceType, config) {
     try {
       const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
       
       // First, get the current full configuration
-      const currentConfig = await this.getFullExternalApiConfig(businessId, locationId);
+      const currentConfig = await this.getFullExternalApiConfig(businessId);
       
       // Update only the specific service configuration
       const updatePayload = {
@@ -99,7 +101,7 @@ class ExternalServices {
       };
 
       // Ensure locationId is properly encoded
-      const encodedLocationId = encodeURIComponent(this.getLocationId());
+      const encodedLocationId = encodeURIComponent(locationId);
       const response = await fetch(
         `${this.getAiAgentUrl()}/external-api-config/${businessId}?locationId=${encodedLocationId}`,
         {
@@ -124,8 +126,10 @@ class ExternalServices {
   // Get full external API configuration (helper method)
   async getFullExternalApiConfig(businessId) {
     try {
+      const locationId = this.getLocationId();
+      
       // Ensure locationId is properly encoded
-      const encodedLocationId = encodeURIComponent(this.getLocationId());
+      const encodedLocationId = encodeURIComponent(locationId);
       const response = await fetch(
         `${this.getAiAgentUrl()}/external-api-config/${businessId}?locationId=${encodedLocationId}`,
         {
@@ -383,12 +387,13 @@ class ExternalServices {
   // ========================================
 
   // Toggle SMS service enabled/disabled
-  async toggleSMSService(enabled, locationId = 'default') {
+  async toggleSMSService(enabled) {
     try {
+      const locationId = this.getLocationId();
       console.log(`Toggling SMS service to ${enabled} for locationId: ${locationId}`);
-      const currentConfig = await this.getExternalApiConfig('sms', locationId);
+      const currentConfig = await this.getExternalApiConfig('sms');
       const updatedConfig = { ...currentConfig, enabled };
-      const result = await this.saveExternalApiConfig('sms', updatedConfig, locationId);
+      const result = await this.saveExternalApiConfig('sms', updatedConfig);
       console.log('SMS toggle result:', result);
       return result;
     } catch (error) {
@@ -398,16 +403,181 @@ class ExternalServices {
   }
 
   // Toggle Email service enabled/disabled
-  async toggleEmailService(enabled, locationId = 'default') {
+  async toggleEmailService(enabled) {
     try {
+      const locationId = this.getLocationId();
       console.log(`Toggling Email service to ${enabled} for locationId: ${locationId}`);
-      const currentConfig = await this.getExternalApiConfig('email', locationId);
+      const currentConfig = await this.getExternalApiConfig('email');
       const updatedConfig = { ...currentConfig, enabled };
-      const result = await this.saveExternalApiConfig('email', updatedConfig, locationId);
+      const result = await this.saveExternalApiConfig('email', updatedConfig);
       console.log('Email toggle result:', result);
       return result;
     } catch (error) {
       console.error('Error toggling Email service:', error);
+      throw error;
+    }
+  }
+
+  // ========================================
+  // TEMPLATE MANAGEMENT
+  // ========================================
+
+  // Add SMS template
+  async addSmsTemplate(template) {
+    try {
+      const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
+      const encodedLocationId = encodeURIComponent(locationId);
+
+      const response = await fetch(
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}/sms/templates?locationId=${encodedLocationId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(template)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to add SMS template: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error adding SMS template:', error);
+      throw error;
+    }
+  }
+
+  // Add Email template
+  async addEmailTemplate(template) {
+    try {
+      const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
+      const encodedLocationId = encodeURIComponent(locationId);
+
+      const response = await fetch(
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}/email/templates?locationId=${encodedLocationId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(template)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to add Email template: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error adding Email template:', error);
+      throw error;
+    }
+  }
+
+  // Update SMS template
+  async updateSmsTemplate(templateId, template) {
+    try {
+      const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
+      const encodedLocationId = encodeURIComponent(locationId);
+
+      const response = await fetch(
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}/sms/templates/${templateId}?locationId=${encodedLocationId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(template)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to update SMS template: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating SMS template:', error);
+      throw error;
+    }
+  }
+
+  // Update Email template
+  async updateEmailTemplate(templateId, template) {
+    try {
+      const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
+      const encodedLocationId = encodeURIComponent(locationId);
+
+      const response = await fetch(
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}/email/templates/${templateId}?locationId=${encodedLocationId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(template)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to update Email template: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating Email template:', error);
+      throw error;
+    }
+  }
+
+  // Delete SMS template
+  async deleteSmsTemplate(templateId) {
+    try {
+      const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
+      const encodedLocationId = encodeURIComponent(locationId);
+
+      const response = await fetch(
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}/sms/templates/${templateId}?locationId=${encodedLocationId}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete SMS template: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting SMS template:', error);
+      throw error;
+    }
+  }
+
+  // Delete Email template
+  async deleteEmailTemplate(templateId) {
+    try {
+      const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
+      const encodedLocationId = encodeURIComponent(locationId);
+
+      const response = await fetch(
+        `${this.getAiAgentUrl()}/external-api-config/${businessId}/email/templates/${templateId}?locationId=${encodedLocationId}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete Email template: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting Email template:', error);
       throw error;
     }
   }

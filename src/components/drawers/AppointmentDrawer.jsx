@@ -114,7 +114,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         service: uiData.service || '',
         serviceDuration: uiData.service?.duration || '',
         price: uiData.price || '',
-        status: 'scheduled', // Statusul este întotdeauna 'scheduled' inițial
+        status: uiData.status || appointmentData.status || 'scheduled',
         images: appointmentData.images || []
       }
     }

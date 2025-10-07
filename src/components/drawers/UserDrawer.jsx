@@ -9,6 +9,7 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
+import { normalizePhoneNumber } from '../../utils/phoneUtils.js'
 
 const UserDrawer = ({ onClose, user = null, position = "side" }) => {
   const { addUser, updateUser, deleteUser, loading, error } = useUsers()
@@ -244,18 +245,27 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
                 <label className="block text-sm font-medium mb-2">
                   Telefon
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <div className="relative flex items-center">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                  <span className="absolute left-10 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-700 pointer-events-none z-10">
+                    +40
+                  </span>
                   <input
                     type="tel"
                     name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className={`w-full p-3 pl-10 border rounded-lg ${
+                    value={formData.phone.startsWith('+40') ? formData.phone.substring(3) : formData.phone.startsWith('0') ? formData.phone.substring(1) : formData.phone}
+                    onChange={(e) => {
+                      // Elimină caracterele non-numerice
+                      const numericValue = e.target.value.replace(/[^\d]/g, '')
+                      // Salvează cu +40
+                      setFormData(prev => ({ ...prev, phone: numericValue ? `+40${numericValue}` : '' }))
+                    }}
+                    className={`w-full p-3 pl-[4.5rem] border rounded-lg ${
                       validationErrors.phone ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    placeholder="+40 123 456 789 (opțional)"
+                    placeholder="721 234 567 (opțional)"
                     disabled={isSubmitting}
+                    maxLength="9"
                   />
                 </div>
                 {validationErrors.phone && (

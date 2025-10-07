@@ -213,7 +213,7 @@ const BusinessProcesses = () => {
 
     const newActiveState = !currentService.active;
     
-    console.log(`Toggling ${serviceKey} to ${newActiveState} for locationId: ${selectedLocationId}`);
+    console.log(`Toggling ${serviceKey} to ${newActiveState}`);
     
     // Update local state immediately for better UX
     setServices(prev => ({
@@ -224,9 +224,9 @@ const BusinessProcesses = () => {
     try {
       // Use specific toggle methods for SMS and Email
       if (serviceKey === 'sms') {
-        await toggleSMSService(newActiveState, selectedLocationId);
+        await toggleSMSService(newActiveState);
       } else if (serviceKey === 'gmail') {
-        await toggleEmailService(newActiveState, selectedLocationId);
+        await toggleEmailService(newActiveState);
       } else {
         // For other services, use the generic method
         let configType;

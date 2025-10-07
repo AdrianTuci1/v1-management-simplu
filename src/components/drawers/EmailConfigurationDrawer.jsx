@@ -4,7 +4,7 @@ import { useExternalApiConfig } from '../../hooks/useExternalApiConfig.js'
 import { externalServices } from '../../services/externalServices.js'
 import { Drawer, DrawerHeader, DrawerContent, DrawerFooter } from '../ui/drawer.tsx'
 
-const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) => {
+const EmailConfigurationDrawer = ({ isOpen, onClose }) => {
   const {
     getLocalServiceConfig,
     saveServiceConfig,
@@ -37,12 +37,12 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
   // Load configuration on mount
   useEffect(() => {
     if (isOpen) {
-      const emailConfig = getLocalServiceConfig('email', locationId)
+      const emailConfig = getLocalServiceConfig('email')
       setConfig(emailConfig)
       setHasChanges(false)
       checkGmailStatus()
     }
-  }, [isOpen, locationId, getLocalServiceConfig])
+  }, [isOpen, getLocalServiceConfig])
 
   // Initialize config with default if not loaded yet
   useEffect(() => {
@@ -67,15 +67,21 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
   const updateConfig = (updates) => {
     const newConfig = { ...config, ...updates }
     setConfig(newConfig)
-    updateLocalConfig('email', updates, locationId)
+    updateLocalConfig('email', updates)
     setHasChanges(true)
   }
 
   // Save configuration
   const handleSave = async () => {
     try {
-      await saveServiceConfig('email', config, locationId)
+      // Exclude 'enabled' and 'templates' from the config being saved
+      // 'enabled' is managed from the main page toggle
+      // 'templates' are managed through dedicated API endpoints
+      const { enabled, templates, ...configToSave } = config
+      
+      await saveServiceConfig('email', configToSave)
       setHasChanges(false)
+      console.log('Email configuration saved successfully')
       // Show success message
     } catch (err) {
       console.error('Error saving Email configuration:', err)
@@ -85,7 +91,7 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
 
   // Reset configuration
   const handleReset = () => {
-    const defaultConfig = resetServiceConfig('email', locationId)
+    const defaultConfig = resetServiceConfig('email')
     setConfig(defaultConfig)
     setHasChanges(false)
   }
@@ -111,37 +117,57 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
     setTemplateModal({ visible: true, template })
   }
 
-  const deleteTemplate = (templateId) => {
+  const deleteTemplate = async (templateId) => {
     if (templateId === 'default') return // Can't delete default template
     
-    const updatedTemplates = config.templates.filter(t => t.id !== templateId)
-    let defaultTemplate = config.defaultTemplate
-    
-    if (defaultTemplate === templateId && updatedTemplates.length > 0) {
-      defaultTemplate = updatedTemplates[0].id
+    try {
+      await externalServices.deleteEmailTemplate(templateId)
+      
+      // Update local state without marking as changed (already saved to server)
+      const updatedTemplates = config.templates.filter(t => t.id !== templateId)
+      let defaultTemplate = config.defaultTemplate
+      
+      if (defaultTemplate === templateId && updatedTemplates.length > 0) {
+        defaultTemplate = updatedTemplates[0].id
+      }
+      
+      setConfig(prev => ({ ...prev, templates: updatedTemplates, defaultTemplate }))
+      console.log('Email template deleted successfully')
+    } catch (error) {
+      console.error('Error deleting Email template:', error)
     }
-    
-    updateConfig({ templates: updatedTemplates, defaultTemplate })
   }
 
-  const saveTemplate = (template) => {
-    if (templateModal.template) {
-      // Edit existing template
-      const updatedTemplates = config.templates.map(t => 
-        t.id === templateModal.template.id ? template : t
-      )
-      updateConfig({ templates: updatedTemplates })
-    } else {
-      // Add new template
-      const newTemplate = {
-        ...template,
-        id: `template_${Date.now()}`
+  const saveTemplate = async (template) => {
+    try {
+      if (templateModal.template) {
+        // Edit existing template
+        await externalServices.updateEmailTemplate(templateModal.template.id, template)
+        
+        // Update local state without marking as changed (already saved to server)
+        const updatedTemplates = config.templates.map(t => 
+          t.id === templateModal.template.id ? { ...template, id: templateModal.template.id } : t
+        )
+        setConfig(prev => ({ ...prev, templates: updatedTemplates }))
+        console.log('Email template updated successfully')
+      } else {
+        // Add new template
+        const newTemplate = {
+          ...template,
+          id: `template_${Date.now()}`
+        }
+        
+        await externalServices.addEmailTemplate(newTemplate)
+        
+        // Update local state without marking as changed (already saved to server)
+        setConfig(prev => ({ ...prev, templates: [...prev.templates, newTemplate] }))
+        console.log('Email template added successfully')
       }
-      updateConfig({ 
-        templates: [...config.templates, newTemplate] 
-      })
+      setTemplateModal({ visible: false, template: null })
+    } catch (error) {
+      console.error('Error saving Email template:', error)
+      // You could show an error toast here
     }
-    setTemplateModal({ visible: false, template: null })
   }
 
   if (!isOpen || !config) return null
@@ -149,7 +175,7 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
   return (
     <>
       <div className="relative h-full inset-0 bg-opacity-50 z-50 flex items-center justify-end">
-        <Drawer size="full" onClose={onClose} className="h-full">
+        <Drawer size="full" onClose={onClose} className="h-full relative">
           <DrawerHeader
             title="Configurație Email"
             subtitle="Gestionează email-urile automate"
@@ -199,90 +225,7 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
               )}
             </div>
 
-            {/* Service Status */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="font-medium text-lg">Status Serviciu Email</h3>
-                  <p className="text-gray-600 text-sm">Serviciul este gestionat din pagina principală</p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className={`flex items-center ${config.enabled ? 'text-green-600' : 'text-gray-500'}`}>
-                    <div className={`w-2 h-2 rounded-full mr-2 ${config.enabled ? 'bg-green-600' : 'bg-gray-400'}`}></div>
-                    <span className="text-sm font-medium">
-                      {config.enabled ? 'Activat' : 'Dezactivat'}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
-              {!gmailStatus.authorized && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-yellow-700 text-sm">
-                    Trebuie să conectezi Gmail pentru a folosi serviciul de email.
-                  </p>
-                </div>
-              )}
-
-              {gmailStatus.authorized && (
-                <div className="space-y-4">
-                  {/* When to send emails */}
-                  <div>
-                    <h4 className="font-medium mb-3">Când trimite email-uri:</h4>
-                    <div className="space-y-3">
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={config.sendOnBooking}
-                          onChange={(e) => updateConfig({ sendOnBooking: e.target.checked })}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span className="ml-3 text-sm">La crearea programării</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={config.sendReminder}
-                          onChange={(e) => updateConfig({ sendReminder: e.target.checked })}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span className="ml-3 text-sm">Reminder</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Reminder timing */}
-                  {config.sendReminder && (
-                    <div>
-                      <h4 className="font-medium mb-2">Când trimite reminder:</h4>
-                      <select
-                        value={config.reminderTiming}
-                        onChange={(e) => updateConfig({ reminderTiming: e.target.value })}
-                        className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="day_before">Cu o zi înainte</option>
-                        <option value="same_day">În ziua respectivă</option>
-                        <option value="both">Ambele</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Sender Name */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Nume expeditor
-                    </label>
-                    <input
-                      type="text"
-                      value={config.senderName}
-                      onChange={(e) => updateConfig({ senderName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Ex: Cabinet Medical Dr. Popescu"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Templates */}
             {gmailStatus.authorized && (
@@ -401,18 +344,18 @@ const EmailConfigurationDrawer = ({ isOpen, onClose, locationId = 'default' }) =
               </button>
             </div>
           </DrawerFooter>
+
+          {/* Template Modal */}
+          {templateModal.visible && (
+            <EmailTemplateModal
+              template={templateModal.template}
+              variables={templateVariables}
+              onSave={saveTemplate}
+              onCancel={() => setTemplateModal({ visible: false, template: null })}
+            />
+          )}
         </Drawer>
       </div>
-
-      {/* Template Modal */}
-      {templateModal.visible && (
-        <EmailTemplateModal
-          template={templateModal.template}
-          variables={templateVariables}
-          onSave={saveTemplate}
-          onCancel={() => setTemplateModal({ visible: false, template: null })}
-        />
-      )}
     </>
   )
 }
@@ -458,101 +401,105 @@ const EmailTemplateModal = ({ template, variables, onSave, onCancel }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4">
-      <Drawer size="xl" onClose={onCancel} className="max-h-[90vh]">
-        <DrawerHeader
-          title={template ? 'Editează Template Email' : 'Adaugă Template Email'}
-          onClose={onCancel}
-        />
+    <div className="absolute inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="text-lg font-semibold">
+            {template ? 'Editează Template Email' : 'Adaugă Template Email'}
+          </h3>
+          <button
+            onClick={onCancel}
+            className="p-1 hover:bg-gray-100 rounded transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <DrawerContent padding="spacious">
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Nume Template
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Ex: Confirmare programare"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Nume Template
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ex: Confirmare programare"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Subiect Email
-            </label>
-            <input
-              type="text"
-              value={formData.subject}
-              onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Ex: Confirmare programare - {{businessName}}"
-              required
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Subiect Email
+              </label>
+              <input
+                type="text"
+                value={formData.subject}
+                onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ex: Confirmare programare - {{businessName}}"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Conținut Email
-            </label>
-            <textarea
-              value={formData.content}
-              onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-              rows={8}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Salut {{patientName}},\n\nProgramarea ta la {{businessName}} este confirmată pentru {{appointmentDate}} la ora {{appointmentTime}}.\n\nTe așteptăm!\n\nCu respect,\nEchipa {{businessName}}"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {formData.content.length} caractere
-            </p>
-          </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Conținut Email
+              </label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                rows={8}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Salut {{patientName}},\n\nProgramarea ta la {{businessName}} este confirmată pentru {{appointmentDate}} la ora {{appointmentTime}}.\n\nTe așteptăm!\n\nCu respect,\nEchipa {{businessName}}"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.content.length} caractere
+              </p>
+            </div>
 
-          {/* Variables */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Variabile disponibile:
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {variables.map(variable => (
-                <button
-                  key={variable.name}
-                  type="button"
-                  onClick={() => insertVariable(variable.name)}
-                  className="text-left p-2 text-sm border border-gray-200 rounded hover:bg-gray-50 transition-colors"
-                >
-                  <span className="font-medium">{`{{${variable.name}}}`}</span>
-                  <p className="text-gray-600 text-xs">{variable.description}</p>
-                </button>
-              ))}
+            {/* Variables */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Variabile disponibile:
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {variables.map(variable => (
+                  <button
+                    key={variable.name}
+                    type="button"
+                    onClick={() => insertVariable(variable.name)}
+                    className="text-left p-2 text-sm border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="font-medium">{`{{${variable.name}}}`}</span>
+                    <p className="text-gray-600 text-xs">{variable.description}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          </DrawerContent>
 
-          <DrawerFooter>
-            <div></div>
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="btn btn-outline btn-sm"
-              >
-                Anulează
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary btn-sm"
-              >
-                Salvează
-              </button>
-            </div>
-          </DrawerFooter>
+          <div className="flex items-center justify-end gap-2 p-4 border-t">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="btn btn-outline btn-sm"
+            >
+              Anulează
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+            >
+              Salvează
+            </button>
+          </div>
         </form>
-      </Drawer>
+      </div>
     </div>
   )
 }

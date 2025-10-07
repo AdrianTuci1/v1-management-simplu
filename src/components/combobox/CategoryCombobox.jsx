@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { cn } from '../../lib/utils.js';
-import { Button, ButtonArrow } from '../ui/button.tsx';
+import { Button } from '../ui/button.tsx';
 import {
   Command,
   CommandCheck,
@@ -13,31 +13,21 @@ import {
   CommandList,
 } from '../ui/command.tsx';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.tsx';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronsUpDown } from 'lucide-react';
 
 const CategoryCombobox = ({ 
   value, 
   onValueChange, 
   placeholder = "Selectează categoria...",
   className,
-  onAddNewCategory
+  onAddNewCategory,
+  categories = []
 }) => {
   const [open, setOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
 
-  // Categorii predefinite pentru tratamente stomatologice
-  const predefinedCategories = [
-    'Consultații',
-    'Igienă orală',
-    'Tratamente conservatoare',
-    'Chirurgie orală',
-    'Imagini diagnostice',
-    'Endodonție',
-    'Protezare',
-    'Implantologie',
-    'Estetică',
-    'Ortodonție'
-  ];
+  // Folosește categoriile primite ca prop sau array gol ca fallback
+  const predefinedCategories = categories;
 
   // Filtrează categoriile pe baza termenului de căutare
   const filteredCategories = predefinedCategories.filter(category =>
@@ -68,16 +58,13 @@ const CategoryCombobox = ({
         <Button
           variant="outline"
           role="combobox"
-          mode="input"
-          size="lg"
-          placeholder={!value}
           aria-expanded={open}
-          className={cn("w-full justify-between bg-white border-gray-300", className)}
+          className={cn("w-full justify-between h-10 bg-white border-gray-300", className)}
         >
-          <span className={cn('truncate')}>
+          <span className={cn('truncate', !value && 'text-muted-foreground')}>
             {value || placeholder}
           </span>
-          <ButtonArrow />
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popper-anchor-width] p-0">

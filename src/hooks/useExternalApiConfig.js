@@ -27,12 +27,13 @@ export const useExternalApiConfig = () => {
   }, [])
 
   // Get configuration for a specific service
-  const getServiceConfig = useCallback(async (serviceType, locationId = selectedLocationId) => {
+  const getServiceConfig = useCallback(async (serviceType) => {
     setLoading(true)
     setError(null)
     
     try {
-      const config = await externalServices.getExternalApiConfig(serviceType, locationId)
+      const config = await externalServices.getExternalApiConfig(serviceType)
+      const locationId = externalServices.getLocationId()
       
       // Update shared state
       const configKey = `${serviceType}_${locationId}`
@@ -47,15 +48,16 @@ export const useExternalApiConfig = () => {
     } finally {
       setLoading(false)
     }
-  }, [selectedLocationId])
+  }, [])
 
   // Save configuration for a specific service
-  const saveServiceConfig = useCallback(async (serviceType, config, locationId = selectedLocationId) => {
+  const saveServiceConfig = useCallback(async (serviceType, config) => {
     setLoading(true)
     setError(null)
     
     try {
-      const savedConfig = await externalServices.saveExternalApiConfig(serviceType, config, locationId)
+      const savedConfig = await externalServices.saveExternalApiConfig(serviceType, config)
+      const locationId = externalServices.getLocationId()
       
       // Update shared state
       const configKey = `${serviceType}_${locationId}`
@@ -70,22 +72,23 @@ export const useExternalApiConfig = () => {
     } finally {
       setLoading(false)
     }
-  }, [selectedLocationId])
+  }, [])
 
   // Get configuration from local state
-  const getLocalServiceConfig = useCallback((serviceType, locationId = selectedLocationId) => {
+  const getLocalServiceConfig = useCallback((serviceType) => {
+    const locationId = externalServices.getLocationId()
     const configKey = `${serviceType}_${locationId}`
     return configs[configKey] || externalServices.getDefaultServiceConfig(serviceType)
-  }, [configs, selectedLocationId])
+  }, [configs])
 
   // Load all service configurations
-  const loadAllConfigs = useCallback(async (locationId = selectedLocationId) => {
+  const loadAllConfigs = useCallback(async () => {
     setLoading(true)
     setError(null)
     
     try {
       const services = ['sms', 'email', 'voiceAgent', 'meta']
-      const promises = services.map(service => getServiceConfig(service, locationId))
+      const promises = services.map(service => getServiceConfig(service))
       await Promise.all(promises)
     } catch (err) {
       setError(err.message)
@@ -93,7 +96,7 @@ export const useExternalApiConfig = () => {
     } finally {
       setLoading(false)
     }
-  }, [selectedLocationId, getServiceConfig])
+  }, [getServiceConfig])
 
   // Check service authorization status
   const checkServiceStatus = useCallback(async (serviceName) => {
@@ -133,7 +136,8 @@ export const useExternalApiConfig = () => {
   }, [])
 
   // Update service configuration locally (optimistic update)
-  const updateLocalConfig = useCallback((serviceType, updates, locationId = selectedLocationId) => {
+  const updateLocalConfig = useCallback((serviceType, updates) => {
+    const locationId = externalServices.getLocationId()
     const configKey = `${serviceType}_${locationId}`
     const currentConfig = configs[configKey] || externalServices.getDefaultServiceConfig(serviceType)
     const updatedConfig = { ...currentConfig, ...updates }
@@ -142,10 +146,11 @@ export const useExternalApiConfig = () => {
     notifySubscribers()
     
     return updatedConfig
-  }, [configs, selectedLocationId])
+  }, [configs])
 
   // Reset configuration to default
-  const resetServiceConfig = useCallback((serviceType, locationId = selectedLocationId) => {
+  const resetServiceConfig = useCallback((serviceType) => {
+    const locationId = externalServices.getLocationId()
     const defaultConfig = externalServices.getDefaultServiceConfig(serviceType)
     const configKey = `${serviceType}_${locationId}`
     
@@ -153,15 +158,16 @@ export const useExternalApiConfig = () => {
     notifySubscribers()
     
     return defaultConfig
-  }, [selectedLocationId])
+  }, [])
 
   // Toggle SMS service
-  const toggleSMSService = useCallback(async (enabled, locationId = selectedLocationId) => {
+  const toggleSMSService = useCallback(async (enabled) => {
     setLoading(true)
     setError(null)
     
     try {
-      const updatedConfig = await externalServices.toggleSMSService(enabled, locationId)
+      const updatedConfig = await externalServices.toggleSMSService(enabled)
+      const locationId = externalServices.getLocationId()
       
       // Update shared state
       const configKey = `sms_${locationId}`
@@ -176,15 +182,16 @@ export const useExternalApiConfig = () => {
     } finally {
       setLoading(false)
     }
-  }, [selectedLocationId])
+  }, [])
 
   // Toggle Email service
-  const toggleEmailService = useCallback(async (enabled, locationId = selectedLocationId) => {
+  const toggleEmailService = useCallback(async (enabled) => {
     setLoading(true)
     setError(null)
     
     try {
-      const updatedConfig = await externalServices.toggleEmailService(enabled, locationId)
+      const updatedConfig = await externalServices.toggleEmailService(enabled)
+      const locationId = externalServices.getLocationId()
       
       // Update shared state
       const configKey = `email_${locationId}`
@@ -199,7 +206,7 @@ export const useExternalApiConfig = () => {
     } finally {
       setLoading(false)
     }
-  }, [selectedLocationId])
+  }, [])
 
   // Get available locations (placeholder - would come from business service)
   const getAvailableLocations = useCallback(() => {
@@ -208,7 +215,7 @@ export const useExternalApiConfig = () => {
 
   // Load configurations when location changes
   useEffect(() => {
-    loadAllConfigs(selectedLocationId)
+    loadAllConfigs()
   }, [selectedLocationId, loadAllConfigs])
 
   return {

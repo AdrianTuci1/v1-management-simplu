@@ -24,6 +24,7 @@ import {
   DrawerFooter 
 } from '../ui/drawer'
 import TeethChartTab from '../dental-chart/TeethChartTab'
+import { normalizePhoneNumber } from '../../utils/phoneUtils.js'
 
 const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, position = "side", externalCurrentMenu, onExternalMenuChange }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
@@ -130,10 +131,16 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     setError(null)
     
     try {
+      // Normalizează numărul de telefon înainte de salvare
+      const dataToSave = {
+        ...formData,
+        phone: normalizePhoneNumber(formData.phone)
+      }
+      
       if (isNewPatient) {
-        await addPatient(formData)
+        await addPatient(dataToSave)
       } else {
-        await updatePatient(patientData.id, formData)
+        await updatePatient(patientData.id, dataToSave)
       }
       onClose()
     } catch (err) {
@@ -237,14 +244,23 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       {/* Telefon */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Telefon *</label>
-        <div className="relative">
-          <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <div className="relative flex items-center">
+          <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" />
+          <span className="absolute left-9 top-1/2 -translate-y-1/2 text-sm text-foreground font-medium pointer-events-none z-10">
+            +40
+          </span>
           <input
             type="tel"
-            value={formData.phone}
-            onChange={(e) => handleInputChange('phone', e.target.value)}
-            placeholder="021 123 4567"
-            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            value={formData.phone.startsWith('+40') ? formData.phone.substring(3) : formData.phone.startsWith('0') ? formData.phone.substring(1) : formData.phone}
+            onChange={(e) => {
+              // Elimină caracterele non-numerice
+              const numericValue = e.target.value.replace(/[^\d]/g, '')
+              // Salvează cu +40
+              handleInputChange('phone', numericValue ? `+40${numericValue}` : '')
+            }}
+            placeholder="721 234 567"
+            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-[4.5rem] text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            maxLength="9"
           />
         </div>
       </div>
