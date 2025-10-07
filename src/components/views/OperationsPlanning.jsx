@@ -1,17 +1,21 @@
-import { Calendar, Plus, Edit, ChevronLeft, ChevronRight, Loader2, RotateCw, Trash2 } from 'lucide-react'
+import { Calendar, Plus, Edit, ChevronLeft, ChevronRight, Loader2, RotateCw, Trash2, ChartNoAxesGantt, CalendarDays, RefreshCcw } from 'lucide-react'
 
 import { useState, useMemo, useEffect } from 'react'
 import { useAppointments } from '../../hooks/useAppointments.js'
 import { useDrawer } from '../../contexts/DrawerContext'
+import { useUsers } from '../../hooks/useUsers.js'
+import Timeline from './Timeline.jsx'
 
 const OperationsPlanning = () => {
   const { openDrawer } = useDrawer();
 
   // State management
+  const [viewMode, setViewMode] = useState('list') // 'list' sau 'timeline'
   const [viewType, setViewType] = useState('week') // 'day', 'week', 'month'
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [currentViewDate, setCurrentViewDate] = useState(new Date())
   const [appointmentsLimit, setAppointmentsLimit] = useState(100)
+  const [timelineDate, setTimelineDate] = useState(new Date().toISOString().slice(0, 10))
 
   // Hook pentru gestionarea programărilor
   const {
@@ -24,6 +28,34 @@ const OperationsPlanning = () => {
     loadAppointments,
     getSortedAppointments
   } = useAppointments()
+
+  // Hook pentru gestionarea utilizatorilor (doctori)
+  const { users } = useUsers()
+
+  // Pregătește lista de doctori pentru Timeline
+  const doctors = useMemo(() => {
+    if (!users || users.length === 0) return []
+    // Toți utilizatorii din sistem sunt considerați doctori pentru Timeline
+    return users.map(user => ({
+      id: user.id || user.resourceId,
+      name: user.fullName || user.medicName || user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Doctor'
+    }))
+  }, [users])
+
+  // Toggle între list și timeline view
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'list' ? 'timeline' : 'list')
+  }
+
+  // Handler pentru când se schimbă data în Timeline
+  const handleTimelineeDateChange = (newDate) => {
+    setTimelineDate(newDate)
+  }
+
+  // Handler pentru când se face click pe o programare în Timeline
+  const handleTimelineAppointmentClick = (appointment) => {
+    openDrawer({ type: 'appointment', data: appointment })
+  }
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -265,6 +297,23 @@ const OperationsPlanning = () => {
     setAppointmentsLimit(prev => prev + 50)
   }
 
+  // Calculează numărul de zile afișate în funcție de viewType
+  const getDaysCount = () => {
+    switch (viewType) {
+      case 'day':
+        return 1
+      case 'week':
+        return 7
+      case 'month':
+        // Calculează numărul de zile din luna curentă
+        const year = currentViewDate.getFullYear()
+        const month = currentViewDate.getMonth()
+        return new Date(year, month + 1, 0).getDate()
+      default:
+        return 1
+    }
+  }
+
   const calendarDates = getCalendarDates()
 
   return (
@@ -278,20 +327,55 @@ const OperationsPlanning = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* Buton pentru comutare între List și Timeline View */}
           <button
-            onClick={cycleViewType}
-            className="btn btn-primary btn-sm"
-          >
-            {viewType === 'day' && 'Zi'}
-            {viewType === 'week' && 'Săptămână'}
-            {viewType === 'month' && 'Lună'}
-          </button>
-          <button
-            onClick={goToCurrent}
+            onClick={toggleViewMode}
             className="btn btn-outline btn-sm"
+            title={viewMode === 'list' ? 'Comută la Timeline' : 'Comută la Listă'}
           >
-            Astăzi
+            {viewMode === 'list' ? (
+              <>
+                <ChartNoAxesGantt className="h-4 w-4 mr-2" />
+                Timeline
+              </>
+            ) : (
+              <>
+                <CalendarDays className="h-4 w-4 mr-2" />
+                Listă
+              </>
+            )}
           </button>
+
+          {/* Când suntem în List View, afișăm butonul de cycle view type */}
+          {viewMode === 'list' && (
+            <>
+              <button
+                onClick={cycleViewType}
+                className="btn btn-primary btn-sm flex items-center gap-2"
+                title={`Afișează ${getDaysCount()} ${getDaysCount() === 1 ? 'zi' : 'zile'}`}
+              >
+                <CalendarDays className="h-4 w-4" />
+                {getDaysCount()} {getDaysCount() === 1 ? 'zi' : 'zile'}
+              </button>
+              <button
+                onClick={goToCurrent}
+                className="btn btn-outline btn-sm"
+              >
+                <RefreshCcw className="h-4 w-4" />
+              </button>
+            </>
+          )}
+
+          {/* Când suntem în Timeline View, afișăm datepicker */}
+          {viewMode === 'timeline' && (
+            <input
+              type="date"
+              value={timelineDate}
+              onChange={(e) => handleTimelineeDateChange(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400 cursor-pointer"
+            />
+          )}
+
           <button
             onClick={() => openDrawer({ type: 'appointment', isNew: true })}
             className="btn btn-primary"
@@ -302,169 +386,185 @@ const OperationsPlanning = () => {
         </div>
       </div>
 
-      {/* Calendar View */}
-      <div className="card">
-        <div className="card-content">
-          {/* Navigation arrows */}
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={goToPrevious} className="btn btn-ghost btn-sm">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <div className="text-sm font-medium">
-              {viewType === 'day' && 'Navigare zilnică'}
-              {viewType === 'week' && 'Navigare săptămânală'}
-              {viewType === 'month' && 'Navigare lunară'}
+      {/* Vizualizare condiționată: List View sau Timeline View */}
+      {viewMode === 'list' ? (
+        <>
+          {/* Calendar View */}
+          <div className="card">
+            <div className="card-content">
+              {/* Navigation arrows */}
+              <div className="flex items-center justify-between mb-4">
+                <button onClick={goToPrevious} className="btn btn-ghost btn-sm">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="text-sm font-medium">
+                  {viewType === 'day' && 'Navigare zilnică'}
+                  {viewType === 'week' && 'Navigare săptămânală'}
+                  {viewType === 'month' && 'Navigare lunară'}
+                </div>
+                <button onClick={goToNext} className="btn btn-ghost btn-sm">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Calendar grid */}
+              {viewType === 'month' && (
+                <div className="grid grid-cols-7 gap-1 mb-4">
+                  {['L', 'M', 'Mi', 'J', 'V', 'S', 'D'].map((day) => (
+                    <div key={day} className="p-2 text-center text-sm font-medium text-muted-foreground">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className={`grid gap-1 ${viewType === 'day' ? 'grid-cols-1' :
+                  viewType === 'week' ? 'grid-cols-7' :
+                    'grid-cols-7'
+                }`}>
+                {calendarDates.map((date, index) => {
+                  const isCurrent = isCurrentDate(date)
+                  const isSelected = isSelectedDate(date)
+                  const appointmentsCount = getAppointmentsCount(date)
+                  const isCurrentMonth = date.getMonth() === currentViewDate.getMonth()
+
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => setSelectedDate(date)}
+                      className={`
+                        p-2 text-center text-sm border rounded-md cursor-pointer relative
+                        ${isCurrent ? 'bg-blue-500 text-white' : ''}
+                        ${isSelected && !isCurrent ? 'bg-gray-200' : ''}
+                        ${!isCurrentMonth && viewType === 'month' ? 'text-gray-400' : ''}
+                        ${!isCurrent && !isSelected ? 'hover:bg-muted' : ''}
+                      `}
+                    >
+                      <div className="font-medium">{date.getDate()}</div>
+                      {appointmentsCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                          {appointmentsCount}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-            <button onClick={goToNext} className="btn btn-ghost btn-sm">
-              <ChevronRight className="h-4 w-4" />
-            </button>
           </div>
 
-          {/* Calendar grid */}
-          {viewType === 'month' && (
-            <div className="grid grid-cols-7 gap-1 mb-4">
-              {['L', 'M', 'Mi', 'J', 'V', 'S', 'D'].map((day) => (
-                <div key={day} className="p-2 text-center text-sm font-medium text-muted-foreground">
-                  {day}
-                </div>
-              ))}
+          {/* Appointments */}
+          <div className="card">
+            <div className="card-header">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                <h3 className="card-title">
+                  Programări {viewType === 'day' ? 'Astăzi' : viewType === 'week' ? 'Săptămâna Aceasta' : 'Luna Aceasta'}
+                </h3>
+                <span className="badge badge-default">{filteredAppointments.length}</span>
+              </div>
             </div>
-          )}
+            <div className="card-content">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span>Se încarcă programările...</span>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredAppointments.length > 0 ? (
+                    filteredAppointments.map((appointment, index) => (
+                      <div
+                        key={appointment.id || appointment._tempId || index}
+                        className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 ${appointment._isDeleting ? 'opacity-50' : ''
+                          }`}
+                        onClick={() => openDrawer({ type: 'appointment', data: appointment })}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="flex flex-col">
+                            <div className="text-sm font-medium w-16">{appointment.time}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {appointment.date ? new Date(appointment.date).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' }) : ''}
+                            </div>
+                          </div>
+                          <div>
+                            <div className={`font-medium ${appointment._isDeleting ? 'line-through' : ''}`}>
+                              {appointment.patient?.name || appointment.patient || 'Pacient necunoscut'}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {appointment.service?.name || appointment.service || 'Serviciu necunoscut'}
+                            </div>
 
-          <div className={`grid gap-1 ${viewType === 'day' ? 'grid-cols-1' :
-              viewType === 'week' ? 'grid-cols-7' :
-                'grid-cols-7'
-            }`}>
-            {calendarDates.map((date, index) => {
-              const isCurrent = isCurrentDate(date)
-              const isSelected = isSelectedDate(date)
-              const appointmentsCount = getAppointmentsCount(date)
-              const isCurrentMonth = date.getMonth() === currentViewDate.getMonth()
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm text-muted-foreground">
+                            {appointment.doctor?.name || appointment.doctor || 'Doctor necunoscut'}
+                          </div>
+                          <span className={`badge ${getStatusColor(appointment.status)}`}>
+                            {getStatusText(appointment.status)}
+                          </span>
 
-              return (
-                <div
-                  key={index}
-                  onClick={() => setSelectedDate(date)}
-                  className={`
-                    p-2 text-center text-sm border rounded-md cursor-pointer relative
-                    ${isCurrent ? 'bg-blue-500 text-white' : ''}
-                    ${isSelected && !isCurrent ? 'bg-gray-200' : ''}
-                    ${!isCurrentMonth && viewType === 'month' ? 'text-gray-400' : ''}
-                    ${!isCurrent && !isSelected ? 'hover:bg-muted' : ''}
-                  `}
-                >
-                  <div className="font-medium">{date.getDate()}</div>
-                  {appointmentsCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                      {appointmentsCount}
+                          {/* Indicator pentru optimistic updates */}
+                          {appointment._isOptimistic && !appointment._isDeleting && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                              <RotateCw className="h-3 w-3 mr-1 animate-spin" />
+                              Salvare...
+                            </span>
+                          )}
+
+                          {appointment._isDeleting && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Ștergere...
+                            </span>
+                          )}
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openDrawer({ type: 'appointment', data: appointment })
+                            }}
+                            className="btn btn-ghost btn-sm"
+                            disabled={appointment._isOptimistic}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nu există programări pentru perioada selectată
                     </div>
                   )}
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Appointments */}
-      <div className="card">
-        <div className="card-header">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            <h3 className="card-title">
-              Programări {viewType === 'day' ? 'Astăzi' : viewType === 'week' ? 'Săptămâna Aceasta' : 'Luna Aceasta'}
-            </h3>
-            <span className="badge badge-default">{filteredAppointments.length}</span>
-          </div>
-        </div>
-        <div className="card-content">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              <span>Se încarcă programările...</span>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredAppointments.length > 0 ? (
-                filteredAppointments.map((appointment, index) => (
-                  <div
-                    key={appointment.id || appointment._tempId || index}
-                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 ${appointment._isDeleting ? 'opacity-50' : ''
-                      }`}
-                    onClick={() => openDrawer({ type: 'appointment', data: appointment })}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex flex-col">
-                        <div className="text-sm font-medium w-16">{appointment.time}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {appointment.date ? new Date(appointment.date).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' }) : ''}
-                        </div>
-                      </div>
-                      <div>
-                        <div className={`font-medium ${appointment._isDeleting ? 'line-through' : ''}`}>
-                          {appointment.patient?.name || appointment.patient || 'Pacient necunoscut'}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {appointment.service?.name || appointment.service || 'Serviciu necunoscut'}
-                        </div>
-
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-sm text-muted-foreground">
-                        {appointment.doctor?.name || appointment.doctor || 'Doctor necunoscut'}
-                      </div>
-                      <span className={`badge ${getStatusColor(appointment.status)}`}>
-                        {getStatusText(appointment.status)}
-                      </span>
-
-                      {/* Indicator pentru optimistic updates */}
-                      {appointment._isOptimistic && !appointment._isDeleting && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
-                          <RotateCw className="h-3 w-3 mr-1 animate-spin" />
-                          Salvare...
-                        </span>
-                      )}
-
-                      {appointment._isDeleting && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-800">
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Ștergere...
-                        </span>
-                      )}
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openDrawer({ type: 'appointment', data: appointment })
-                        }}
-                        className="btn btn-ghost btn-sm"
-                        disabled={appointment._isOptimistic}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nu există programări pentru perioada selectată
-                </div>
               )}
             </div>
-          )}
-        </div>
-        {filteredAppointments.length >= appointmentsLimit && (
-          <div className="card-footer">
-            <button
-              onClick={loadMoreAppointments}
-              className="btn btn-outline btn-sm"
-            >
-              Încarcă mai multe
-            </button>
+            {filteredAppointments.length >= appointmentsLimit && (
+              <div className="card-footer">
+                <button
+                  onClick={loadMoreAppointments}
+                  className="btn btn-outline btn-sm"
+                >
+                  Încarcă mai multe
+                </button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        /* Timeline View */
+        <div className="card rounded-lg" style={{ height: 'calc(100vh - 200px)' }}>
+          <Timeline
+            date={timelineDate}
+            appointments={appointments}
+            doctors={doctors}
+            onDateChange={handleTimelineeDateChange}
+            onAppointmentClick={handleTimelineAppointmentClick}
+          />
+        </div>
+      )}
     </div>
   )
 }
