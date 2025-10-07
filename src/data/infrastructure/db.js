@@ -16,7 +16,9 @@ class AppDatabase extends Dexie {
       role: 'resourceId, name, description, status',
       permission: 'resourceId, resource, action, description',
       treatment: 'resourceId, treatmentType, category, duration, price',
-      statistic: 'id, timestamp',
+      statistics: 'id, timestamp',
+      report: 'resourceId, date, status',
+      setting: 'resourceId, settingType, value, status',
 
       // Keep technical stores
       appointmentCounts: 'date, count',
@@ -386,6 +388,38 @@ export const indexedDb = {
     return db.treatment
       .filter(treatment => 
         treatment.price >= minPrice && treatment.price <= maxPrice
+      )
+      .toArray();
+  },
+  
+  // Metode specifice pentru vânzări
+  async getSalesByDate(date) {
+    return db.sale
+      .where('date')
+      .equals(date)
+      .toArray();
+  },
+  
+  async getSalesByDateRange(startDate, endDate) {
+    return db.sale
+      .where('date')
+      .between(startDate, endDate)
+      .toArray();
+  },
+  
+  async getSalesByStatus(status) {
+    return db.sale
+      .where('status')
+      .equals(status)
+      .toArray();
+  },
+  
+  async searchSales(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    return db.sale
+      .filter(sale => 
+        sale.saleId?.toLowerCase().includes(term) ||
+        sale.cashierName?.toLowerCase().includes(term)
       )
       .toArray();
   },

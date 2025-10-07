@@ -16,6 +16,8 @@ import { useUsers } from '../../hooks/useUsers.js'
 import { useTreatments } from '../../hooks/useTreatments.js'
 import { useDrawer } from '../../contexts/DrawerContext.jsx'
 import { useSalesDrawerStore } from '../../stores/salesDrawerStore'
+import { useInvoiceDrawerStore } from '../../stores/invoiceDrawerStore'
+import { useSales } from '../../hooks/useSales.js'
 import PatientCombobox from '../combobox/PatientCombobox.jsx'
 import DoctorCombobox from '../combobox/DoctorCombobox.jsx'
 import TreatmentCombobox from '../combobox/TreatmentCombobox.jsx'
@@ -54,8 +56,10 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   const { patients } = usePatients()
   const { users } = useUsers()
   const { treatments } = useTreatments()
+  const { sales } = useSales()
   const { openDrawer } = useDrawer()
   const { openSalesDrawer } = useSalesDrawerStore()
+  const { openInvoiceDrawer } = useInvoiceDrawerStore()
   
   // Populăm cache-ul cu datele din combobox-uri
   useEffect(() => {
@@ -141,6 +145,38 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   useEffect(() => {
     setIsCompleted(formData.status === 'completed')
   }, [formData.status])
+
+  // Verifică dacă există deja o plată pentru această programare
+  const hasExistingPayment = () => {
+    if (!formData.id) return false
+    
+    // Căutăm în vânzări dacă există o vânzare cu notes care conține ID-ul programării
+    return sales.some(sale => {
+      // Verificăm în notes dacă se menționează programarea
+      if (sale.notes && sale.notes.includes(`Programare: ${formData.id}`)) {
+        return true
+      }
+      
+      // Verificăm dacă există un item cu ID-ul programării
+      if (sale.items && Array.isArray(sale.items)) {
+        return sale.items.some(item => 
+          item.id === `appointment-${formData.id}` || 
+          item.productId === `appointment-${formData.id}`
+        )
+      }
+      
+      return false
+    })
+  }
+
+  // Verifică dacă există deja o factură pentru această programare
+  const hasExistingInvoice = () => {
+    if (!formData.id) return false
+    
+    // Pentru moment, verificăm doar dacă există o plată
+    // În viitor, aici se poate adăuga verificarea pentru facturi
+    return hasExistingPayment()
+  }
 
 
 
@@ -245,6 +281,12 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   }
 
   const handlePayment = () => {
+    // Verifică dacă există deja o plată pentru această programare
+    if (hasExistingPayment()) {
+      alert('Plata pentru această programare a fost deja efectuată.')
+      return
+    }
+    
     // Găsim numele tratamentului - verificăm dacă este obiect sau string
     let treatmentName = ''
     if (typeof formData.service === 'object' && formData.service?.name) {
@@ -280,6 +322,50 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     
     // Deschidem SalesDrawer cu datele programării
     openSalesDrawer(paymentData)
+  }
+
+  const handleInvoice = () => {
+    // Verifică dacă există deja o factură pentru această programare
+    if (hasExistingInvoice()) {
+      alert('Factura pentru această programare a fost deja creată.')
+      return
+    }
+    
+    // Găsim numele tratamentului - verificăm dacă este obiect sau string
+    let treatmentName = ''
+    if (typeof formData.service === 'object' && formData.service?.name) {
+      treatmentName = formData.service.name
+    } else if (typeof formData.service === 'string') {
+      treatmentName = formData.service
+    } else {
+      // Căutăm în treatments array
+      const treatment = treatments.find(t => t.id === formData.service)
+      treatmentName = treatment?.treatmentType || treatment?.name || 'Tratament necunoscut'
+    }
+    
+    // Găsim numele pacientului - verificăm dacă este obiect sau string
+    let patientName = ''
+    if (typeof formData.patient === 'object' && formData.patient?.name) {
+      patientName = formData.patient.name
+    } else if (typeof formData.patient === 'string') {
+      patientName = formData.patient
+    } else {
+      patientName = 'Pacient necunoscut'
+    }
+    
+    const invoiceData = {
+      treatmentName: treatmentName,
+      price: formData.price || '0',
+      appointmentId: formData.id || '',
+      patientName: patientName
+    }
+    
+    // Debug: să vedem ce date se transmit către InvoiceDrawer
+    console.log('AppointmentDrawer - handleInvoice - invoiceData:', invoiceData)
+    console.log('AppointmentDrawer - handleInvoice - formData.price:', formData.price)
+    
+    // Deschidem InvoiceDrawer cu datele programării
+    openInvoiceDrawer(invoiceData)
   }
 
   const renderMenu1 = () => (
@@ -392,16 +478,34 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         </div>
       </div>
 
-      {/* Buton de plată */}
+      {/* Butoane de plată și factură */}
       {isCompleted && (
         <div className="space-y-2">
-          <button
-            onClick={handlePayment}
-            className="w-full flex items-center justify-center gap-2 h-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <CreditCard className="h-4 w-4" />
-            {formData.price ? `Plată - ${formData.price} RON` : 'Plată'}
-          </button>
+          {hasExistingPayment() ? (
+            <div className="space-y-2">
+              <div className="w-full flex items-center justify-center gap-2 h-10 rounded-md bg-green-100 text-green-800 border border-green-200">
+                <CreditCard className="h-4 w-4" />
+                Plată efectuată
+              </div>
+              {!hasExistingInvoice() && (
+                <button
+                  onClick={handleInvoice}
+                  className="w-full flex items-center justify-center gap-2 h-10 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Creează factură
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={handlePayment}
+              className="w-full flex items-center justify-center gap-2 h-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <CreditCard className="h-4 w-4" />
+              {formData.price ? `Plată - ${formData.price} RON` : 'Plată'}
+            </button>
+          )}
         </div>
       )}
     </div>

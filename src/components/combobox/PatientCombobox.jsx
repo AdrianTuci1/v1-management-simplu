@@ -74,7 +74,9 @@ const PatientCombobox = ({
                   onSelect={() => {
                     const patientData = {
                       id: (patient.resourceId || patient.id).toString(),
-                      name: patient.name
+                      name: patient.name,
+                      email: patient.email || '',
+                      phone: patient.phone || ''
                     };
                     onValueChange(patientData);
                     setOpen(false);

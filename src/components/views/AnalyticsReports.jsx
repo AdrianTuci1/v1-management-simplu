@@ -8,51 +8,77 @@ import {
   FileText,
   PieChart,
   Activity,
-  Loader2
+  Loader2,
+  Eye,
+  Trash2
 } from 'lucide-react'
 import { DatePicker } from '../ui/date-picker'
+import GenerateReportModal from '../modals/GenerateReportModal'
+import PDFViewer from './PDFViewer'
+import { useReports } from '../../hooks/useReports'
+import { useSales } from '../../hooks/useSales'
+import { useProducts } from '../../hooks/useProducts'
+import { useTreatments } from '../../hooks/useTreatments'
 
 const AnalyticsReports = () => {
-  const [reports, setReports] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedReport, setSelectedReport] = useState(null)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const [showPDFViewer, setShowPDFViewer] = useState(false)
+  const [currentPDFUrl, setCurrentPDFUrl] = useState(null)
+  const [currentReportData, setCurrentReportData] = useState(null)
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  // Load reports data
-  useEffect(() => {
-    const loadReports = async () => {
-      setLoading(true)
-      try {
-        // Simulate loading demo daily reports data
-        const today = new Date().toISOString().split('T')[0]
-        const demoReports = [
-          {
-            id: 'RPT-001',
-            title: `Raport Zilnic - ${today}`,
-            description: 'Sumar activitate zilnică',
-            category: 'daily',
-            type: 'daily_summary',
-            date: today,
-            data: {
-              appointments: 4,
-              revenue: 868.7,
-              newPatients: 2
-            },
-            status: 'completed',
-            generatedBy: 'Sistem automat'
-          }
-        ]
-        
-        setReports(demoReports)
-      } catch (error) {
-        console.error('Error loading reports:', error)
-      } finally {
-        setLoading(false)
-      }
+  // Hooks pentru date
+  const { reports, loading, generateReport, deleteReport } = useReports()
+  const { sales } = useSales()
+  const { products } = useProducts()
+  const { treatments } = useTreatments()
+
+  // Nu mai avem nevoie de useEffect pentru încărcarea rapoartelor
+  // Hook-ul useReports se ocupă de asta automat
+
+  // Funcție pentru generarea unui raport nou
+  const handleGenerateReport = async (date) => {
+    setIsGenerating(true)
+    try {
+      const report = await generateReport(sales, products, treatments, date)
+      setCurrentPDFUrl(report.pdfUrl)
+      setCurrentReportData(report)
+      setShowPDFViewer(true)
+    } catch (error) {
+      console.error('Error generating report:', error)
+    } finally {
+      setIsGenerating(false)
     }
+  }
 
-    loadReports()
-  }, [])
+  // Funcție pentru deschiderea unui raport existent
+  const handleViewReport = (report) => {
+    setCurrentPDFUrl(report.pdfUrl)
+    setCurrentReportData(report)
+    setShowPDFViewer(true)
+  }
+
+  // Funcție pentru ștergerea unui raport
+  const handleDeleteReport = async (reportId) => {
+    try {
+      await deleteReport(reportId)
+      if (currentReportData?.id === reportId) {
+        setShowPDFViewer(false)
+        setCurrentPDFUrl(null)
+        setCurrentReportData(null)
+      }
+    } catch (error) {
+      console.error('Error deleting report:', error)
+    }
+  }
+
+  // Funcție pentru închiderea PDF viewer-ului
+  const handleClosePDFViewer = () => {
+    setShowPDFViewer(false)
+    setCurrentPDFUrl(null)
+    setCurrentReportData(null)
+  }
 
   // Filter reports by selected date
   const filteredReports = reports.filter(report => report.date === selectedDate)
@@ -103,20 +129,24 @@ const AnalyticsReports = () => {
   }
 
   const renderReportPreview = (report) => {
-    if (report.type === 'daily_summary') {
+    if (report.type === 'daily_sales' && report.stats) {
       return (
         <div className="flex gap-6 text-sm">
           <div>
-            <span className="text-muted-foreground">Programări:</span>
-            <div className="font-medium">{report.data.appointments}</div>
+            <span className="text-muted-foreground">Vânzări:</span>
+            <div className="font-medium">{report.stats.totalSales}</div>
           </div>
           <div>
-            <span className="text-muted-foreground">Venit:</span>
-            <div className="font-medium">{report.data.revenue.toFixed(2)} RON</div>
+            <span className="text-muted-foreground">Venit total:</span>
+            <div className="font-medium">{report.stats.totalRevenue.toFixed(2)} RON</div>
           </div>
           <div>
-            <span className="text-muted-foreground">Pacienți noi:</span>
-            <div className="font-medium">{report.data.newPatients}</div>
+            <span className="text-muted-foreground">Cash:</span>
+            <div className="font-medium">{report.stats.cashRevenue.toFixed(2)} RON</div>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Card:</span>
+            <div className="font-medium">{report.stats.cardRevenue.toFixed(2)} RON</div>
           </div>
         </div>
       )
@@ -139,7 +169,10 @@ const AnalyticsReports = () => {
             placeholder="Selectează data"
             className="w-48"
           />
-          <button className="btn btn-primary flex items-center gap-2">
+          <button 
+            onClick={() => setShowGenerateModal(true)}
+            className="btn btn-primary flex items-center gap-2"
+          >
             <BarChart3 className="h-4 w-4" />
             Raport nou
           </button>
@@ -182,6 +215,7 @@ const AnalyticsReports = () => {
                     <th className="text-left p-3 font-medium">Data</th>
                     <th className="text-left p-3 font-medium">Raport</th>
                     <th className="text-left p-3 font-medium">Detalii</th>
+                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,6 +236,24 @@ const AnalyticsReports = () => {
                       <td className="p-3">
                         {renderReportPreview(report)}
                       </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewReport(report)}
+                            className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
+                            title="Vezi raportul"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReport(report.id)}
+                            className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                            title="Șterge raportul"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -210,6 +262,22 @@ const AnalyticsReports = () => {
           )}
         </div>
       </div>
+
+      {/* Generate Report Modal */}
+      <GenerateReportModal
+        isOpen={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        onGenerateReport={handleGenerateReport}
+      />
+
+      {/* PDF Viewer */}
+      <PDFViewer
+        isOpen={showPDFViewer}
+        onClose={handleClosePDFViewer}
+        pdfUrl={currentPDFUrl}
+        reportData={currentReportData}
+        onDelete={handleDeleteReport}
+      />
     </div>
   )
 }

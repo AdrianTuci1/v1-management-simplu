@@ -40,10 +40,10 @@ export const useSettings = () => {
   useEffect(() => {
     const handler = async (message) => {
       const { type, data, resourceType } = message
-      if (resourceType !== 'settings') return
+      if (resourceType !== 'setting') return
       
       const operation = type?.replace('resource_', '') || type
-      const settingId = data?.id || data?.resourceId
+      const settingId = data?.settingType || data?.resourceId
       if (!settingId) return
       
       if (operation === 'created' || operation === 'create') {
@@ -88,8 +88,8 @@ export const useSettings = () => {
       }
     }
 
-    // Abonează-te la mesajele WebSocket pentru settings
-    const unsub = onResourceMessage('settings', handler)
+    // Abonează-te la mesajele WebSocket pentru setting
+    const unsub = onResourceMessage('setting', handler)
 
     return () => {
       unsub()
@@ -134,7 +134,7 @@ export const useSettings = () => {
       // Încearcă să încarce din cache local dacă API-ul eșuează
       try {
         console.warn('API failed, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('settings')
+        const cachedData = await indexedDb.getAll('setting')
         
         // Aplică filtrele pe datele din cache
         let filteredSettings = cachedData
@@ -330,7 +330,7 @@ export const useSettings = () => {
       // Încearcă să încarce din cache local dacă API-ul eșuează
       try {
         console.warn('API failed, trying local cache:', err.message)
-        const cachedData = await indexedDb.getAll('settings')
+        const cachedData = await indexedDb.getAll('setting')
         
         const searchTermLower = query.toLowerCase()
         const filteredData = cachedData.filter(setting => 
@@ -405,7 +405,12 @@ export const useSettings = () => {
     // Utilitare
     getActiveSettings: () => settings.filter(s => s.isActive),
     getInactiveSettings: () => settings.filter(s => !s.isActive),
-    getSettingsByType: (settingType) => 
-      settings.filter(s => s.settingType === settingType)
+    getSettingsByType: (settingType) => {
+      console.log('🔍 useSettings - getSettingsByType pentru:', settingType)
+      console.log('🔍 useSettings - toate settings disponibile:', settings)
+      const filtered = settings.filter(s => s.settingType === settingType)
+      console.log('🔍 useSettings - settings filtrate:', filtered)
+      return filtered
+    }
   }
 }

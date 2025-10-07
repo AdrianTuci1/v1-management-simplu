@@ -10,114 +10,50 @@ import {
   Loader2
 } from 'lucide-react'
 import { useSalesDrawerStore } from '../../stores/salesDrawerStore'
+import { useSales } from '../../hooks/useSales'
 import { DatePicker } from '../ui/date-picker'
 
 const BusinessSales = () => {
   const { openSalesDrawer } = useSalesDrawerStore()
-  const [sales, setSales] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { 
+    sales, 
+    loading, 
+    stats, 
+    loadSalesByDate, 
+    salesManager 
+  } = useSales()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
-  // Load sales data
+  // Load sales data when date changes
   useEffect(() => {
-    const loadSales = async () => {
-      setLoading(true)
-      try {
-        // Simulate loading demo sales data
-        const today = new Date().toISOString().split('T')[0]
-        const demoSales = [
-          {
-            id: 'SALE00001',
-            date: today,
-            time: '09:30',
-            items: [
-              { productName: 'Consultație stomatologică', quantity: 1, price: 150.0, total: 150.0 }
-            ],
-            subtotal: 150.0,
-            tax: 28.5,
-            total: 178.5,
-            paymentMethod: 'card',
-            status: 'completed',
-            cashierName: 'Dr. Maria Popescu'
-          },
-          {
-            id: 'SALE00002',
-            date: today,
-            time: '11:15',
-            items: [
-              { productName: 'Detartraj', quantity: 1, price: 80.0, total: 80.0 }
-            ],
-            subtotal: 80.0,
-            tax: 15.2,
-            total: 95.2,
-            paymentMethod: 'cash',
-            status: 'completed',
-            cashierName: 'Dr. Ion Ionescu'
-          },
-          {
-            id: 'SALE00003',
-            date: today,
-            time: '14:30',
-            items: [
-              { productName: 'Tratament endodontic', quantity: 1, price: 450.0, total: 450.0 }
-            ],
-            subtotal: 450.0,
-            tax: 85.5,
-            total: 535.5,
-            paymentMethod: 'card',
-            status: 'completed',
-            cashierName: 'Dr. Elena Dumitrescu'
-          },
-          {
-            id: 'SALE00004',
-            date: today,
-            time: '16:45',
-            items: [
-              { productName: 'Consultație de control', quantity: 1, price: 50.0, total: 50.0 }
-            ],
-            subtotal: 50.0,
-            tax: 9.5,
-            total: 59.5,
-            paymentMethod: 'card',
-            status: 'pending',
-            cashierName: 'Dr. Alexandru Pop'
-          }
-        ]
-        
-        setSales(demoSales)
-      } catch (error) {
-        console.error('Error loading sales:', error)
-      } finally {
-        setLoading(false)
-      }
+    if (selectedDate) {
+      loadSalesByDate(selectedDate)
     }
-
-    loadSales()
-  }, [])
+  }, [selectedDate, loadSalesByDate])
 
   // Filter sales by selected date
   const filteredSales = sales.filter(sale => sale.date === selectedDate)
 
   // Calculate statistics for selected date
-  const stats = {
-    totalSales: filteredSales.length,
-    totalRevenue: filteredSales.reduce((sum, sale) => sum + sale.total, 0),
-    completedSales: filteredSales.filter(s => s.status === 'completed').length,
-    pendingSales: filteredSales.filter(s => s.status === 'pending').length
+  const currentStats = {
+    totalSales: filteredSales.filter(s => s.status === 'completed').length,
+    totalRevenue: filteredSales
+      .filter(s => s.status === 'completed')
+      .reduce((sum, sale) => sum + parseFloat(sale.total), 0),
+    cardSales: filteredSales.filter(s => s.status === 'completed' && s.paymentMethod === 'card').length,
+    cashSales: filteredSales.filter(s => s.status === 'completed' && s.paymentMethod === 'cash').length,
+    cardRevenue: filteredSales
+      .filter(s => s.status === 'completed' && s.paymentMethod === 'card')
+      .reduce((sum, sale) => sum + parseFloat(sale.total), 0),
+    cashRevenue: filteredSales
+      .filter(s => s.status === 'completed' && s.paymentMethod === 'cash')
+      .reduce((sum, sale) => sum + parseFloat(sale.total), 0)
   }
 
   const getStatusBadge = (status) => {
-    const statusConfig = {
-      completed: { color: 'bg-green-100 text-green-800', text: 'Completată' },
-      pending: { color: 'bg-yellow-100 text-yellow-800', text: 'În așteptare' },
-      cancelled: { color: 'bg-red-100 text-red-800', text: 'Anulată' }
-    }
-    
-    const config = statusConfig[status] || statusConfig.pending
-    
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.text}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${salesManager.getStatusClass(status)}`}>
+        {salesManager.getStatusLabel(status)}
       </span>
     )
   }
@@ -128,6 +64,10 @@ const BusinessSales = () => {
       case 'cash': return <DollarSign className="h-4 w-4" />
       default: return <Receipt className="h-4 w-4" />
     }
+  }
+
+  const getPaymentMethodLabel = (method) => {
+    return salesManager.getPaymentMethodLabel(method)
   }
 
   return (
@@ -161,8 +101,8 @@ const BusinessSales = () => {
           <div className="card-content p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Vânzări</p>
-                <p className="text-2xl font-bold">{stats.totalSales}</p>
+                <p className="text-sm font-medium text-muted-foreground">Vânzări Totale</p>
+                <p className="text-2xl font-bold">{currentStats.totalSales}</p>
               </div>
               <Receipt className="h-8 w-8 text-blue-600" />
             </div>
@@ -173,8 +113,8 @@ const BusinessSales = () => {
           <div className="card-content p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Venit Total</p>
-                <p className="text-2xl font-bold">{stats.totalRevenue.toFixed(2)} RON</p>
+                <p className="text-sm font-medium text-muted-foreground">Venit</p>
+                <p className="text-2xl font-bold">{currentStats.totalRevenue.toFixed(2)} RON</p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600" />
             </div>
@@ -185,10 +125,11 @@ const BusinessSales = () => {
           <div className="card-content p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Completate</p>
-                <p className="text-2xl font-bold">{stats.completedSales}</p>
+                <p className="text-sm font-medium text-muted-foreground">Card</p>
+                <p className="text-2xl font-bold">{currentStats.cardSales}</p>
+                <p className="text-xs text-muted-foreground">{currentStats.cardRevenue.toFixed(2)} RON</p>
               </div>
-              <Calendar className="h-8 w-8 text-purple-600" />
+              <CreditCard className="h-8 w-8 text-purple-600" />
             </div>
           </div>
         </div>
@@ -197,10 +138,11 @@ const BusinessSales = () => {
           <div className="card-content p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">În Așteptare</p>
-                <p className="text-2xl font-bold">{stats.pendingSales}</p>
+                <p className="text-sm font-medium text-muted-foreground">Cash</p>
+                <p className="text-2xl font-bold">{currentStats.cashSales}</p>
+                <p className="text-xs text-muted-foreground">{currentStats.cashRevenue.toFixed(2)} RON</p>
               </div>
-              <Clock className="h-8 w-8 text-orange-600" />
+              <DollarSign className="h-8 w-8 text-orange-600" />
             </div>
           </div>
         </div>
@@ -262,11 +204,11 @@ const BusinessSales = () => {
                         </div>
                       </td>
                       <td className="p-3">
-                        <div className="font-medium text-lg">{sale.total.toFixed(2)} RON</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="font-medium text-lg">{parseFloat(sale.total).toFixed(2)} RON</div>
+                        <div className="text-xs text-muted-foreground flex items-center">
                           {getPaymentMethodIcon(sale.paymentMethod)}
                           <span className="ml-1">
-                            {sale.paymentMethod === 'card' ? 'Card' : 'Numerar'}
+                            {getPaymentMethodLabel(sale.paymentMethod)}
                           </span>
                         </div>
                       </td>

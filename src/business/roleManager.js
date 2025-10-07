@@ -42,7 +42,7 @@ class RoleManager {
 
   // Transformare pentru API
   transformRoleForAPI(roleData) {
-    return {
+    const transformed = {
       name: roleData.name?.trim(),
       description: roleData.description?.trim(),
       permissions: roleData.permissions || [],
@@ -50,12 +50,23 @@ class RoleManager {
       createdAt: roleData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
+
+    // Preserve resourceId and id if they exist (needed for updates)
+    if (roleData.resourceId) {
+      transformed.resourceId = roleData.resourceId
+    }
+    if (roleData.id) {
+      transformed.id = roleData.id
+    }
+
+    return transformed
   }
 
   // Transformare pentru UI
   transformRoleForUI(roleData) {
     return {
-      id: roleData.resourceId,
+      id: roleData.resourceId || roleData.id,
+      resourceId: roleData.resourceId || roleData.id,
       name: roleData.name,
       description: roleData.description,
       permissions: roleData.permissions || [],
@@ -237,97 +248,6 @@ class RoleManager {
     return csvContent
   }
 
-  // Generare date de test
-  generateTestRoles(count = 5) {
-    const roleTemplates = [
-      {
-        name: 'Administrator',
-        description: 'Acces complet la toate funcționalitățile sistemului',
-        permissions: [
-          { resource: 'appointments', action: 'view' },
-          { resource: 'appointments', action: 'create' },
-          { resource: 'appointments', action: 'edit' },
-          { resource: 'appointments', action: 'delete' },
-          { resource: 'patients', action: 'view' },
-          { resource: 'patients', action: 'create' },
-          { resource: 'patients', action: 'edit' },
-          { resource: 'patients', action: 'delete' },
-          { resource: 'users', action: 'view' },
-          { resource: 'users', action: 'create' },
-          { resource: 'users', action: 'edit' },
-          { resource: 'users', action: 'delete' },
-          { resource: 'roles', action: 'view' },
-          { resource: 'roles', action: 'create' },
-          { resource: 'roles', action: 'edit' },
-          { resource: 'roles', action: 'delete' }
-        ]
-      },
-      {
-        name: 'Manager',
-        description: 'Acces la gestionarea operațională și rapoarte',
-        permissions: [
-          { resource: 'appointments', action: 'view' },
-          { resource: 'appointments', action: 'create' },
-          { resource: 'appointments', action: 'edit' },
-          { resource: 'patients', action: 'view' },
-          { resource: 'patients', action: 'create' },
-          { resource: 'patients', action: 'edit' },
-          { resource: 'users', action: 'view' },
-          { resource: 'users', action: 'edit' },
-          { resource: 'reports', action: 'view' },
-          { resource: 'reports', action: 'create' }
-        ]
-      },
-      {
-        name: 'Doctor',
-        description: 'Acces la programări și pacienți pentru activitatea medicală',
-        permissions: [
-          { resource: 'appointments', action: 'view' },
-          { resource: 'appointments', action: 'create' },
-          { resource: 'appointments', action: 'edit' },
-          { resource: 'patients', action: 'view' },
-          { resource: 'patients', action: 'create' },
-          { resource: 'patients', action: 'edit' }
-        ]
-      },
-      {
-        name: 'Asistent',
-        description: 'Acces limitat pentru activități de suport',
-        permissions: [
-          { resource: 'appointments', action: 'view' },
-          { resource: 'appointments', action: 'create' },
-          { resource: 'patients', action: 'view' },
-          { resource: 'patients', action: 'edit' }
-        ]
-      },
-      {
-        name: 'Recepționer',
-        description: 'Acces pentru activități de recepție și programări',
-        permissions: [
-          { resource: 'appointments', action: 'view' },
-          { resource: 'appointments', action: 'create' },
-          { resource: 'patients', action: 'view' },
-          { resource: 'patients', action: 'create' }
-        ]
-      }
-    ]
-
-    const roles = []
-    for (let i = 0; i < Math.min(count, roleTemplates.length); i++) {
-      const template = roleTemplates[i]
-      roles.push({
-        id: `role_${i + 1}`,
-        name: template.name,
-        description: template.description,
-        permissions: template.permissions,
-        status: 'active',
-        createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date().toISOString()
-      })
-    }
-
-    return roles
-  }
 }
 
 export const roleManager = new RoleManager()

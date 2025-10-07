@@ -1,39 +1,63 @@
 import { useState, useEffect } from 'react'
 import { X, Plus, Minus, Trash2, CreditCard, Receipt, Ticket, DollarSign, Check, XCircle } from 'lucide-react'
 import { useProducts } from '../../hooks/useProducts'
+import { useSales } from '../../hooks/useSales'
 import { useSalesDrawerStore } from '../../stores/salesDrawerStore'
+import useSettingsStore from '../../stores/settingsStore'
 
 const SalesDrawer = () => {
   const { isOpen, closeSalesDrawer, appointmentData } = useSalesDrawerStore()
   const { products, loading } = useProducts()
+  const { createSale, calculateSaleTotal, salesManager } = useSales()
+  const { taxSettings } = useSettingsStore()
   const [cart, setCart] = useState([])
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [currentAmount, setCurrentAmount] = useState('')
   const [filteredProducts, setFilteredProducts] = useState([])
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [showProducts, setShowProducts] = useState(false)
 
-  // Categorii disponibile
-  const categories = [
-    { id: 'all', name: 'Toate', icon: '📦' },
-    { id: 'Medicamente', name: 'Medicamente', icon: '💊' },
-    { id: 'Dispozitive Medicale', name: 'Dispozitive', icon: '🩺' },
-    { id: 'Produse de Îngrijire', name: 'Îngrijire', icon: '🧴' },
-    { id: 'Echipamente', name: 'Echipamente', icon: '🏥' },
-    { id: 'Consumabile', name: 'Consumabile', icon: '🩹' },
-    { id: 'Altele', name: 'Altele', icon: '📋' }
-  ]
+  // Extrage categoriile din produsele disponibile
+  const getCategories = () => {
+    const categorySet = new Set()
+    products.forEach(product => {
+      if (product.category) {
+        categorySet.add(product.category)
+      }
+    })
+    return Array.from(categorySet).sort()
+  }
+
+  const categories = getCategories()
 
   // Filtrează produsele după categorie
   useEffect(() => {
-    if (selectedCategory === 'all') {
-      setFilteredProducts(products)
-    } else {
+    if (selectedCategory) {
       setFilteredProducts(products.filter(product => product.category === selectedCategory))
     }
   }, [selectedCategory, products])
 
-  // Calculează totalul
-  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  // Gestionează selectarea categoriei
+  const handleCategorySelect = (categoryId) => {
+    setSelectedCategory(categoryId)
+    setShowProducts(true)
+  }
+
+  // Gestionează butonul înapoi
+  const handleBackToCategories = () => {
+    setShowProducts(false)
+    setSelectedCategory('')
+    setFilteredProducts([])
+  }
+
+  // Calculează totalul folosind salesManager cu TVA-ul din setări
+  const taxRate = taxSettings?.defaultVAT ? taxSettings.defaultVAT / 100 : 0.19
+  const totalCalculation = calculateSaleTotal(cart.map(item => ({
+    price: parseFloat(item.price),
+    quantity: item.quantity
+  })), taxRate)
+  const total = totalCalculation.total
 
   // Adaugă produs în coș
   const addToCart = (product) => {
@@ -89,21 +113,44 @@ const SalesDrawer = () => {
   }
 
   // Procesează plata
-  const processPayment = () => {
+  const processPayment = async () => {
     if (cart.length === 0) return
     
-    // Aici vei adăuga logica pentru procesarea plății
-    console.log('Procesare plată:', {
-      cart,
-      total,
-      paymentMethod,
-      amount: currentAmount || total
-    })
+    setIsProcessing(true)
     
-    // Reset după plată
-    setCart([])
-    setCurrentAmount('')
-    closeSalesDrawer()
+    try {
+      // Pregătește datele pentru vânzare
+      const saleData = {
+        items: cart.map(item => ({
+          productId: item.id || item.resourceId,
+          productName: item.name,
+          quantity: item.quantity,
+          price: parseFloat(item.price),
+          total: parseFloat(item.price) * item.quantity
+        })),
+        subtotal: totalCalculation.subtotal,
+        tax: totalCalculation.tax,
+        total: totalCalculation.total,
+        paymentMethod: paymentMethod,
+        status: 'completed',
+        cashierName: 'Sistem', // Aici poți adăuga numele casierului curent
+        notes: appointmentData ? `Programare: ${appointmentData.treatmentName} (ID: ${appointmentData.appointmentId})` : ''
+      }
+      
+      // Creează vânzarea
+      await createSale(saleData)
+      
+      // Reset după plată
+      setCart([])
+      setCurrentAmount('')
+      closeSalesDrawer()
+      
+    } catch (error) {
+      console.error('Error processing payment:', error)
+      // Aici poți adăuga notificări de eroare
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   // Anulează tranzacția
@@ -119,7 +166,9 @@ const SalesDrawer = () => {
       setCart([])
       setCurrentAmount('')
       setPaymentMethod('cash')
-      setSelectedCategory('all')
+      setSelectedCategory('')
+      setShowProducts(false)
+      setFilteredProducts([])
     }
   }, [isOpen])
 
@@ -216,9 +265,19 @@ const SalesDrawer = () => {
 
             {/* Total */}
             <div className="border-t p-4 bg-white shadow-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold text-gray-800">Total:</span>
-                <span className="text-2xl font-bold text-green-600">{total.toFixed(2)} RON</span>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Subtotal:</span>
+                  <span className="text-sm font-medium">{totalCalculation.subtotal.toFixed(2)} RON</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">TVA (19%):</span>
+                  <span className="text-sm font-medium">{totalCalculation.tax.toFixed(2)} RON</span>
+                </div>
+                <div className="flex justify-between items-center border-t pt-2">
+                  <span className="text-lg font-semibold text-gray-800">Total:</span>
+                  <span className="text-2xl font-bold text-green-600">{total.toFixed(2)} RON</span>
+                </div>
               </div>
             </div>
           </div>
@@ -341,15 +400,25 @@ const SalesDrawer = () => {
               <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={processPayment}
-                  disabled={cart.length === 0}
+                  disabled={cart.length === 0 || isProcessing}
                   className="p-3 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <Check className="h-4 w-4" />
-                  Validare
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Procesare...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Validare
+                    </>
+                  )}
                 </button>
                 <button 
                   onClick={cancelTransaction}
-                  className="p-3 bg-red-600 text-white rounded-lg flex items-center justify-center gap-2"
+                  disabled={isProcessing}
+                  className="p-3 bg-red-600 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <XCircle className="h-4 w-4" />
                   Anulare
@@ -358,58 +427,67 @@ const SalesDrawer = () => {
             </div>
           </div>
 
-          {/* Coloana 3: Categorii și produse (cea mai lată) */}
+          {/* Coloana 3: Categorii sau produse (cea mai lată) */}
           <div className="w-5/12 flex flex-col">
-            {/* Categorii */}
-            <div className="p-4 border-b">
-              <h3 className="text-lg font-semibold mb-4">Categorii</h3>
-              <div className="grid grid-cols-3 gap-2">
-                {categories.map(category => (
-                  <button
-                    key={category.id}
-                    onClick={() => setSelectedCategory(category.id)}
-                    className={`p-3 rounded-lg border flex items-center justify-center gap-2 ${
-                      selectedCategory === category.id 
-                        ? 'bg-blue-100 border-blue-500' : 'bg-white hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-lg">{category.icon}</span>
-                    <span className="text-sm">{category.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Produse din categoria selectată */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <h3 className="text-lg font-semibold mb-4">
-                Produse {selectedCategory !== 'all' ? `- ${categories.find(c => c.id === selectedCategory)?.name}` : ''}
-              </h3>
-              
-              {loading ? (
-                <div className="text-center text-gray-500 py-8">Se încarcă...</div>
-              ) : filteredProducts.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">
-                  Nu există produse în această categorie
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-3">
-                  {filteredProducts.map(product => (
+            {!showProducts ? (
+              /* Afișează categorii */
+              <div className="flex-1 overflow-y-auto p-4">
+                <h3 className="text-lg font-semibold mb-4">Selectează categoria</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {categories.map(category => (
                     <button
-                      key={product.id}
-                      onClick={() => addToCart(product)}
-                      className="p-3 border rounded-lg text-left hover:bg-gray-50 transition-colors"
+                      key={category}
+                      onClick={() => handleCategorySelect(category)}
+                      className="p-4 rounded-lg border flex items-center justify-center bg-white hover:bg-gray-50 transition-colors"
                     >
-                      <div className="font-medium text-sm mb-1">{product.name}</div>
-                      <div className="text-lg font-bold text-green-600">{product.price} RON</div>
-                      <div className="text-xs text-gray-500">
-                        Stoc: {product.stock}
-                      </div>
+                      <span className="text-sm font-medium text-center">{category}</span>
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              /* Afișează produse din categoria selectată */
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <button
+                    onClick={handleBackToCategories}
+                    className="p-2 hover:bg-gray-200 rounded-lg flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Înapoi
+                  </button>
+                  <h3 className="text-lg font-semibold">
+                    {selectedCategory}
+                  </h3>
+                </div>
+                
+                {loading ? (
+                  <div className="text-center text-gray-500 py-8">Se încarcă...</div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    Nu există produse în această categorie
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {filteredProducts.map(product => (
+                      <button
+                        key={product.id}
+                        onClick={() => addToCart(product)}
+                        className="p-3 border rounded-lg text-left hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="font-medium text-sm mb-1">{product.name}</div>
+                        <div className="text-lg font-bold text-green-600">{product.price} RON</div>
+                        <div className="text-xs text-gray-500">
+                          Stoc: {product.stock}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

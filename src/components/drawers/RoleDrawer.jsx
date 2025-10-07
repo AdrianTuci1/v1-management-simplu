@@ -24,20 +24,27 @@ const RoleDrawer = ({ onClose, roleData = null, position = "side" }) => {
 
   // Resurse disponibile pentru permisiuni
   const availableResources = [
-    { value: 'appointments', label: 'Programări' },
-    { value: 'users', label: 'Medici' },
-    { value: 'patients', label: 'Pacienți' },
-    { value: 'roles', label: 'Roluri' },
-    { value: 'products', label: 'Produse' },
-    { value: 'treatments', label: 'Tratamente' },
-    { value: 'sales', label: 'Vânzări' },
-    { value: 'reports', label: 'Rapoarte' }
+    { value: 'appointment', label: 'Programări' },
+    { value: 'patient', label: 'Pacienți' },
+    { value: 'medic', label: 'Medici' },
+    { value: 'treatment', label: 'Tratamente' },
+    { value: 'product', label: 'Produse' },
+    { value: 'role', label: 'Roluri' },
+    { value: 'report', label: 'Rapoarte' },
+    { value: 'sale', label: 'Vânzări' },
+    { value: 'dental-chart', label: 'Fișă Dentară' },
+    { value: 'plan', label: 'Plan Tratament' },
+    { value: 'setting', label: 'Setări' },
+    { value: 'invoice-client', label: 'Clienți Facturare' },
+    { value: 'statistics', label: 'Statistici' },
+    { value: 'recent-activities', label: 'Activități Recente' }
   ]
 
   const availableActions = [
-    { value: 'view', label: 'Vizualizare' },
+    { value: 'read', label: 'Citire' },
     { value: 'create', label: 'Creare' },
-    { value: 'edit', label: 'Editare' },
+    { value: 'update', label: 'Actualizare' },
+    { value: 'patch', label: 'Modificare Parțială' },
     { value: 'delete', label: 'Ștergere' }
   ]
 
@@ -47,10 +54,13 @@ const RoleDrawer = ({ onClose, roleData = null, position = "side" }) => {
   useEffect(() => {
     if (roleData) {
       setFormData({
+        resourceId: roleData.resourceId || roleData.id,
+        id: roleData.id || roleData.resourceId,
         name: roleData.name || '',
         description: roleData.description || '',
         status: roleData.status || 'active',
-        permissions: roleData.permissions || []
+        permissions: roleData.permissions || [],
+        createdAt: roleData.createdAt
       })
       setIsEditing(true)
     } else {

@@ -48,20 +48,26 @@ const AdminSettings = () => {
   ]
 
   const handleSettingClick = (settingId) => {
-    // Pentru working-hours, găsește setarea reală din server
-    if (settingId === 'working-hours') {
-      const workingHoursSettings = getSettingsByType('working-hours')
-      if (workingHoursSettings.length > 0) {
+    console.log('🔍 AdminSettings - handleSettingClick pentru:', settingId)
+    
+    // Pentru setări care necesită gestionare specială
+    if (['working-hours', 'currency-tax', 'cash-register'].includes(settingId)) {
+      const settings = getSettingsByType(settingId)
+      console.log(`🔍 AdminSettings - ${settingId} settings găsite:`, settings)
+      
+      if (settings.length > 0) {
+        console.log(`🔍 AdminSettings - Deschidem drawer cu date existente pentru ${settingId}:`, settings[0])
         // Deschide drawer-ul cu ID-ul real al setării
         openDrawer({ 
-          type: 'working-hours',
-          settingId: workingHoursSettings[0].id,
-          settingData: workingHoursSettings[0]
+          type: settingId,
+          settingId: settings[0].id,
+          settingData: settings[0]
         })
       } else {
+        console.log(`🔍 AdminSettings - Deschidem drawer pentru setare nouă ${settingId}`)
         // Dacă nu există setare, deschide drawer-ul pentru a crea una nouă
         openDrawer({ 
-          type: 'working-hours',
+          type: settingId,
           settingId: null,
           settingData: null
         })

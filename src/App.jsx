@@ -10,6 +10,8 @@ import LoadingScreen from './components/LoadingScreen'
 import AccessDenied from './components/AccessDenied'
 import QuickActionsDrawer from './components/drawers/QuickActionsDrawer'
 import SalesDrawer from './components/drawers/SalesDrawer'
+import InvoiceDrawer from './components/drawers/InvoiceDrawer'
+import InvoiceClientDrawer from './components/drawers/InvoiceClientDrawer'
 import authService from './services/authService'
 import cognitoAuthService from './services/cognitoAuthService'
 import { DrawerProvider, useDrawer } from './contexts/DrawerContext'
@@ -302,6 +304,12 @@ function AppContent() {
       
       {/* Sales Drawer */}
       <SalesDrawer />
+      
+      {/* Invoice Drawer */}
+      <InvoiceDrawer />
+      
+      {/* Invoice Client Drawer */}
+      <InvoiceClientDrawer />
     </div>
   )
 }

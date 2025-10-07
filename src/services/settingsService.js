@@ -3,14 +3,14 @@ import { DraftAwareResourceRepository } from '../data/repositories/DraftAwareRes
 
 class SettingsService {
   constructor() {
-    this.repository = new DraftAwareResourceRepository('settings', 'settings')
+    this.repository = new DraftAwareResourceRepository('setting', 'setting')
     this.dataFacade = dataFacade
   }
 
   // Obține toate setările
   async getSettings(filters = {}) {
     try {
-      const settings = await this.dataFacade.getAll('settings', filters)
+      const settings = await this.dataFacade.getAll('setting', filters)
       return this.transformSettingsForUI(settings)
     } catch (error) {
       console.error('Error getting settings:', error)
@@ -21,7 +21,7 @@ class SettingsService {
   // Obține o setare specifică după ID
   async getSettingById(id) {
     try {
-      const setting = await this.dataFacade.getById('settings', id)
+      const setting = await this.dataFacade.getById('setting', id)
       return setting ? this.transformSettingForUI(setting) : null
     } catch (error) {
       console.error('Error getting setting by ID:', error)
@@ -33,7 +33,7 @@ class SettingsService {
   async getWorkingHours() {
     try {
       // Caută în toate setările și filtrează după settingType din data
-      const allSettings = await this.dataFacade.getAll('settings')
+      const allSettings = await this.dataFacade.getAll('setting')
       const workingHoursSettings = allSettings.filter(setting => 
         setting.data && setting.data.settingType === 'working-hours'
       )
@@ -56,7 +56,7 @@ class SettingsService {
       // Transformare pentru API
       const apiData = this.transformSettingForAPI(settingData)
       
-      const result = await this.dataFacade.create('settings', apiData)
+      const result = await this.dataFacade.create('setting', apiData)
       
       return this.transformSettingForUI(result)
     } catch (error) {
@@ -76,7 +76,7 @@ class SettingsService {
       // Transformare pentru API
       const apiData = this.transformSettingForAPI(settingData)
       
-      const result = await this.dataFacade.update('settings', id, apiData)
+      const result = await this.dataFacade.update('setting', id, apiData)
       
       return this.transformSettingForUI(result)
     } catch (error) {
@@ -87,7 +87,7 @@ class SettingsService {
   // Șterge o setare
   async deleteSetting(id) {
     try {
-      await this.dataFacade.delete('settings', id)
+      await this.dataFacade.delete('setting', id)
       return true
     } catch (error) {
       throw error
@@ -128,7 +128,7 @@ class SettingsService {
       delete additionalFilters.limit
       
       const settings = await this.dataFacade.searchWithFallback(
-        'settings',
+        'setting',
         'name',
         query,
         limit,
@@ -138,7 +138,7 @@ class SettingsService {
               ...fallbackFilters,
               search: searchTerm
             }
-            const settings = await this.dataFacade.getAll('settings', searchFilters)
+            const settings = await this.dataFacade.getAll('setting', searchFilters)
             return Array.isArray(settings) ? settings : []
           } catch (error) {
             return []
@@ -214,17 +214,27 @@ class SettingsService {
   }
 
   transformSettingForUI(settingData) {
+    console.log('🔍 settingsService - transformSettingForUI input:', settingData)
+    
     // Extrage datele din câmpul data pentru UI
     const data = settingData.data || {}
-    return {
+    
+    // Verifică dacă datele sunt direct pe obiect sau în câmpul data
+    const hasDirectData = settingData.settingType || settingData.name || settingData.days
+    const sourceData = hasDirectData ? settingData : data
+    
+    console.log('🔍 settingsService - hasDirectData:', hasDirectData)
+    console.log('🔍 settingsService - sourceData:', sourceData)
+    
+    const result = {
       id: settingData.id || settingData.resourceId,
       resourceId: settingData.resourceId || settingData.id,
-      settingType: data.settingType,
-      name: data.name,
-      data: data,
-      isActive: data.isActive,
-      description: data.description,
-      metadata: data.metadata,
+      settingType: sourceData.settingType,
+      name: sourceData.name,
+      data: sourceData,
+      isActive: sourceData.isActive,
+      description: sourceData.description,
+      metadata: sourceData.metadata,
       createdAt: settingData.createdAt,
       updatedAt: settingData.updatedAt,
       lastUpdated: settingData.lastUpdated,
@@ -232,6 +242,9 @@ class SettingsService {
       locationId: settingData.locationId,
       resourceType: settingData.resourceType
     }
+    
+    console.log('🔍 settingsService - transformSettingForUI output:', result)
+    return result
   }
 
   transformSettingsForUI(settings) {
@@ -250,7 +263,7 @@ class SettingsService {
 
     const apiData = this.transformSettingForAPI(settingData)
     
-    return await this.dataFacade.createDraft('settings', apiData, sessionId)
+    return await this.dataFacade.createDraft('setting', apiData, sessionId)
   }
 
   async updateSettingDraft(draftId, settingData) {
@@ -276,7 +289,7 @@ class SettingsService {
     if (sessionId) {
       return await this.dataFacade.getDraftsBySession(sessionId)
     }
-    return await this.dataFacade.getDraftsByResourceType('settings')
+    return await this.dataFacade.getDraftsByResourceType('setting')
   }
 
   async getSettingsWithDrafts(params = {}) {

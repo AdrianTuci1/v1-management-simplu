@@ -8,100 +8,49 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Loader2
+  Loader2,
+  FileText,
+  Send
 } from 'lucide-react'
 import { DatePicker } from '../ui/date-picker'
+import { useInvoices } from '../../hooks/useInvoices'
+import { useInvoiceDrawerStore } from '../../stores/invoiceDrawerStore'
 
 const FinancialBilling = () => {
-  const [invoices, setInvoices] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { 
+    invoices, 
+    loading, 
+    loadInvoicesByDate, 
+    sendToEFactura,
+    invoiceManager 
+  } = useInvoices()
+  const { openInvoiceDrawer } = useInvoiceDrawerStore()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
   // Load invoices data
   useEffect(() => {
-    const loadInvoices = async () => {
-      setLoading(true)
-      try {
-        // Simulate loading demo invoices data
-        const today = new Date().toISOString().split('T')[0]
-        const demoInvoices = [
-          {
-            id: 'INV-2024-001',
-            invoiceNumber: 'F001/2024',
-            date: today,
-            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            patientName: 'Maria Popescu',
-            patientEmail: 'maria.popescu@email.com',
-            items: [
-              { description: 'Consultație stomatologică', quantity: 1, price: 150, total: 150 }
-            ],
-            subtotal: 150,
-            tax: 28.5,
-            total: 178.5,
-            status: 'paid',
-            paymentMethod: 'card',
-            createdAt: `${today}T10:30:00Z`
-          },
-          {
-            id: 'INV-2024-002',
-            invoiceNumber: 'F002/2024',
-            date: today,
-            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            patientName: 'Ion Ionescu',
-            patientEmail: 'ion.ionescu@email.com',
-            items: [
-              { description: 'Detartraj', quantity: 1, price: 80, total: 80 }
-            ],
-            subtotal: 80,
-            tax: 15.2,
-            total: 95.2,
-            status: 'pending',
-            paymentMethod: null,
-            createdAt: `${today}T14:20:00Z`
-          },
-          {
-            id: 'INV-2024-003',
-            invoiceNumber: 'F003/2024',
-            date: today,
-            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            patientName: 'Elena Dumitrescu',
-            patientEmail: 'elena.dumitrescu@email.com',
-            items: [
-              { description: 'Extracție dinte', quantity: 1, price: 350, total: 350 },
-              { description: 'Anestezie locală', quantity: 1, price: 50, total: 50 }
-            ],
-            subtotal: 400,
-            tax: 76,
-            total: 476,
-            status: 'overdue',
-            paymentMethod: null,
-            createdAt: '2024-01-13T09:15:00Z'
-          }
-        ]
-        
-        setInvoices(demoInvoices)
-      } catch (error) {
-        console.error('Error loading invoices:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadInvoices()
-  }, [])
+    loadInvoicesByDate(selectedDate)
+  }, [selectedDate, loadInvoicesByDate])
 
   // Filter invoices by selected date
-  const filteredInvoices = invoices.filter(invoice => invoice.date === selectedDate)
+  const filteredInvoices = invoices.filter(invoice => invoice.issueDate === selectedDate)
 
-  // Calculate statistics for selected date
-  const stats = {
-    totalInvoices: filteredInvoices.length,
-    totalAmount: filteredInvoices.reduce((sum, invoice) => sum + invoice.total, 0),
-    paidInvoices: filteredInvoices.filter(i => i.status === 'paid').length,
-    pendingInvoices: filteredInvoices.filter(i => i.status === 'pending').length,
-    overdueInvoices: filteredInvoices.filter(i => i.status === 'overdue').length,
-    paidAmount: filteredInvoices.filter(i => i.status === 'paid').reduce((sum, invoice) => sum + invoice.total, 0),
-    pendingAmount: filteredInvoices.filter(i => i.status === 'pending').reduce((sum, invoice) => sum + invoice.total, 0)
+
+
+  // Handle sending to eFactura
+  const handleSendToEFactura = async (invoiceId) => {
+    try {
+      await sendToEFactura(invoiceId)
+      // Refresh invoices after sending
+      loadInvoicesByDate(selectedDate)
+    } catch (error) {
+      console.error('Error sending to eFactura:', error)
+    }
+  }
+
+  // Handle creating new invoice
+  const handleCreateInvoice = () => {
+    openInvoiceDrawer()
   }
 
   const getStatusBadge = (status) => {
@@ -141,7 +90,10 @@ const FinancialBilling = () => {
             placeholder="Selectează data"
             className="w-48"
           />
-          <button className="btn btn-primary flex items-center gap-2">
+          <button 
+            onClick={handleCreateInvoice}
+            className="btn btn-primary flex items-center gap-2"
+          >
             <Plus className="h-4 w-4" />
             Factură nouă
           </button>
@@ -182,9 +134,11 @@ const FinancialBilling = () => {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-3 font-medium">Factură</th>
-                    <th className="text-left p-3 font-medium">Pacient</th>
+                    <th className="text-left p-3 font-medium">Client</th>
                     <th className="text-left p-3 font-medium">Data</th>
                     <th className="text-left p-3 font-medium">Suma</th>
+                    <th className="text-left p-3 font-medium">Status</th>
+                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -192,30 +146,56 @@ const FinancialBilling = () => {
                     <tr key={invoice.id} className="border-b hover:bg-muted/50">
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" />
+                          <FileText className="h-4 w-4" />
                           <span className="font-medium">{invoice.invoiceNumber}</span>
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <div className="font-medium">{invoice.patientName}</div>
-                          <div className="text-sm text-muted-foreground">{invoice.patientEmail}</div>
+                          <div className="font-medium">{invoice.clientName}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {invoice.clientCUI && `CUI: ${invoice.clientCUI}`}
+                            {invoice.clientCNP && `CNP: ${invoice.clientCNP}`}
+                          </div>
                         </div>
                       </td>
                       <td className="p-3">
                         <div className="text-sm">
-                          {invoice.date}
+                          <div>Emisă: {invoice.formattedIssueDate || invoice.issueDate}</div>
+                          <div>Scadentă: {invoice.formattedDueDate || invoice.dueDate}</div>
                           {isOverdue(invoice.dueDate) && invoice.status !== 'paid' && (
                             <div className="text-xs text-red-600">
-                              Scadentă: {invoice.dueDate}
+                              RESTANTĂ
                             </div>
                           )}
                         </div>
                       </td>
                       <td className="p-3">
-                        <div className="font-medium">{invoice.total.toFixed(2)} RON</div>
+                        <div className="font-medium">{(invoice.total || 0).toFixed(2)} RON</div>
                         <div className="text-xs text-muted-foreground">
-                          Subtotal: {invoice.subtotal.toFixed(2)} RON
+                          Subtotal: {(invoice.subtotal || 0).toFixed(2)} RON
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        {getStatusBadge(invoice.status)}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          {invoice.status !== 'sent' && invoice.status !== 'paid' && (
+                            <button
+                              onClick={() => handleSendToEFactura(invoice.id)}
+                              className="p-1 hover:bg-blue-100 rounded text-blue-600"
+                              title="Trimite la eFactura"
+                            >
+                              <Send className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            className="p-1 hover:bg-gray-100 rounded text-gray-600"
+                            title="Vezi detalii"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>

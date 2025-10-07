@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Receipt, Printer, Save } from 'lucide-react'
 import { 
   Drawer, 
@@ -6,10 +6,19 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
+import { useSettings } from '../../hooks/useSettings'
 
-const CashRegisterDrawer = ({ onClose, appointmentData = null }) => {
+const CashRegisterDrawer = ({ onClose, settingId, settingData }) => {
+  const { 
+    addSetting,
+    updateSetting,
+    loading: settingsLoading,
+    error: settingsError
+  } = useSettings()
+  
   // Debug: să vedem ce date primim
-  console.log('CashRegisterDrawer received:', appointmentData)
+  console.log('🔍 CashRegisterDrawer - Props primite:', { settingId, settingData })
+  
   const [cashRegisterSettings, setCashRegisterSettings] = useState({
     receiptSettings: {
       header: 'Cabinet Medical Dr. Popescu',
@@ -35,6 +44,19 @@ const CashRegisterDrawer = ({ onClose, appointmentData = null }) => {
   })
 
   const [loading, setLoading] = useState(false)
+
+  // Inițializează datele locale cu datele din server
+  useEffect(() => {
+    if (settingData) {
+      // Verifică dacă datele sunt în câmpul data sau direct în obiect
+      const sourceData = settingData.data || settingData
+      console.log('🔍 CashRegisterDrawer - sourceData:', sourceData)
+      
+      if (sourceData.cashRegisterSettings) {
+        setCashRegisterSettings(sourceData.cashRegisterSettings)
+      }
+    }
+  }, [settingData])
 
   const handleReceiptChange = (field, value) => {
     setCashRegisterSettings(prev => ({
@@ -69,9 +91,22 @@ const CashRegisterDrawer = ({ onClose, appointmentData = null }) => {
   const handleSave = async () => {
     setLoading(true)
     try {
-      console.log('Salvare setări casa de marcat:', cashRegisterSettings)
+      const settingData = {
+        settingType: 'cash-register',
+        name: 'Casa de marcat',
+        isActive: true,
+        cashRegisterSettings: cashRegisterSettings
+      }
+
+      if (settingId) {
+        // Actualizează setarea existentă
+        await updateSetting(settingId, settingData)
+      } else {
+        // Creează o setare nouă
+        await addSetting(settingData)
+      }
       
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      console.log('🔍 CashRegisterDrawer - Setări salvate:', cashRegisterSettings)
       onClose()
     } catch (error) {
       console.error('Eroare la salvarea setărilor:', error)
@@ -90,19 +125,19 @@ const CashRegisterDrawer = ({ onClose, appointmentData = null }) => {
       
       <DrawerContent padding="spacious">
         <div className="space-y-8">
-          {/* Date din programare */}
-          {appointmentData && (
+          {/* Informații despre setări */}
+          {settingData && (
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <Receipt className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold">Date programare</h3>
+                <h3 className="text-lg font-semibold">Setări existente</h3>
               </div>
               
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                <div><strong>Pacient:</strong> {appointmentData.patientName || 'N/A'}</div>
-                <div><strong>Tratament:</strong> {appointmentData.treatmentName || 'N/A'}</div>
-                <div><strong>Preț:</strong> {appointmentData.price ? `${appointmentData.price} RON` : 'N/A'}</div>
-                <div><strong>ID Programare:</strong> {appointmentData.appointmentId || 'N/A'}</div>
+                <div><strong>Nume setare:</strong> {settingData.name || 'Casa de marcat'}</div>
+                <div><strong>Tip:</strong> {settingData.settingType || 'cash-register'}</div>
+                <div><strong>Status:</strong> {settingData.isActive ? 'Activ' : 'Inactiv'}</div>
+                <div><strong>Ultima actualizare:</strong> {settingData.lastUpdated ? new Date(settingData.lastUpdated).toLocaleString('ro-RO') : 'N/A'}</div>
               </div>
             </div>
           )}

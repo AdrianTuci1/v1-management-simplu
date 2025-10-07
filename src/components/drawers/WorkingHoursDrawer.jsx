@@ -33,12 +33,38 @@ const WorkingHoursDrawer = ({ onClose, settingId, settingData }) => {
 
   // Inițializează datele locale cu datele din server
   useEffect(() => {
+    console.log('🔍 WorkingHoursDrawer - Props primite:', { settingId, settingData })
+    console.log('🔍 WorkingHoursDrawer - workingHours din hook:', workingHours)
+    
     // Prioritizează settingData dacă este furnizat (din AdminSettings)
     const sourceData = settingData || workingHours
+    console.log('🔍 WorkingHoursDrawer - sourceData final:', sourceData)
     
     if (sourceData) {
-      setLocalWorkingHours(sourceData.data || {})
-      setLocalLocationDetails(sourceData.data?.locationDetails || {})
+      // Verifică dacă datele sunt în câmpul data sau direct în obiect
+      const workingHoursData = sourceData.data || sourceData
+      const locationData = workingHoursData.locationDetails || sourceData.locationDetails || {}
+      
+      console.log('🔍 WorkingHoursDrawer - workingHoursData procesat:', workingHoursData)
+      console.log('🔍 WorkingHoursDrawer - locationData procesat:', locationData)
+      
+      // Procesează datele days pentru formatul așteptat de UI
+      if (workingHoursData.days && Array.isArray(workingHoursData.days)) {
+        const processedWorkingHours = {}
+        workingHoursData.days.forEach(day => {
+          processedWorkingHours[day.key] = {
+            enabled: day.isWorking,
+            start: day.startTime,
+            end: day.endTime
+          }
+        })
+        console.log('🔍 WorkingHoursDrawer - processedWorkingHours:', processedWorkingHours)
+        setLocalWorkingHours(processedWorkingHours)
+      } else {
+        setLocalWorkingHours(workingHoursData)
+      }
+      
+      setLocalLocationDetails(locationData)
     } else {
       // Inițializează cu datele default dacă nu există setări
       const defaultWorkingHours = {}

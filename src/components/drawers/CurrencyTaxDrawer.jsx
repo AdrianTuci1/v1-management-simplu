@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DollarSign, Percent, Save } from 'lucide-react'
 import { 
   Drawer, 
@@ -6,9 +6,17 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
+import { useSettings } from '../../hooks/useSettings'
 import useSettingsStore from '../../stores/settingsStore'
 
-const CurrencyTaxDrawer = ({ onClose }) => {
+const CurrencyTaxDrawer = ({ onClose, settingId, settingData }) => {
+  const { 
+    addSetting,
+    updateSetting,
+    loading: settingsLoading,
+    error: settingsError
+  } = useSettings()
+  
   const { 
     currency, 
     taxSettings, 
@@ -17,6 +25,26 @@ const CurrencyTaxDrawer = ({ onClose }) => {
   } = useSettingsStore()
   
   const [loading, setLoading] = useState(false)
+  const [localCurrency, setLocalCurrency] = useState(currency)
+  const [localTaxSettings, setLocalTaxSettings] = useState(taxSettings)
+
+  // Inițializează datele locale cu datele din server
+  useEffect(() => {
+    console.log('🔍 CurrencyTaxDrawer - Props primite:', { settingId, settingData })
+    
+    if (settingData) {
+      // Verifică dacă datele sunt în câmpul data sau direct în obiect
+      const sourceData = settingData.data || settingData
+      console.log('🔍 CurrencyTaxDrawer - sourceData:', sourceData)
+      
+      if (sourceData.currency) {
+        setLocalCurrency(sourceData.currency)
+      }
+      if (sourceData.taxSettings) {
+        setLocalTaxSettings(sourceData.taxSettings)
+      }
+    }
+  }, [settingData])
 
   const currencies = [
     { code: 'RON', name: 'Leu românesc', symbol: 'lei' },
@@ -26,37 +54,55 @@ const CurrencyTaxDrawer = ({ onClose }) => {
   ]
 
   const handleCurrencyChange = (selectedCurrency) => {
-    updateCurrency(selectedCurrency)
+    setLocalCurrency(selectedCurrency)
   }
 
   const handleTaxRateChange = (id, field, value) => {
-    const updatedRates = taxSettings.vatRates.map(rate => 
+    const updatedRates = localTaxSettings.vatRates.map(rate => 
       rate.id === id ? { ...rate, [field]: value } : rate
     )
-    updateTaxSettings({ vatRates: updatedRates })
+    setLocalTaxSettings({ ...localTaxSettings, vatRates: updatedRates })
   }
 
   const addTaxRate = () => {
-    const newId = Math.max(...taxSettings.vatRates.map(r => r.id)) + 1
-    const updatedRates = [...taxSettings.vatRates, {
+    const newId = Math.max(...localTaxSettings.vatRates.map(r => r.id)) + 1
+    const updatedRates = [...localTaxSettings.vatRates, {
       id: newId,
       name: 'TVA Nou',
       rate: 0,
       enabled: true
     }]
-    updateTaxSettings({ vatRates: updatedRates })
+    setLocalTaxSettings({ ...localTaxSettings, vatRates: updatedRates })
   }
 
   const removeTaxRate = (id) => {
-    const updatedRates = taxSettings.vatRates.filter(rate => rate.id !== id)
-    updateTaxSettings({ vatRates: updatedRates })
+    const updatedRates = localTaxSettings.vatRates.filter(rate => rate.id !== id)
+    setLocalTaxSettings({ ...localTaxSettings, vatRates: updatedRates })
   }
 
   const handleSave = async () => {
     setLoading(true)
     try {
-      // Setările sunt deja salvate în store
-      await new Promise(resolve => setTimeout(resolve, 500))
+      const settingData = {
+        settingType: 'currency-tax',
+        name: 'Monedă și cota TVA',
+        isActive: true,
+        currency: localCurrency,
+        taxSettings: localTaxSettings
+      }
+
+      if (settingId) {
+        // Actualizează setarea existentă
+        await updateSetting(settingId, settingData)
+      } else {
+        // Creează o setare nouă
+        await addSetting(settingData)
+      }
+      
+      // Actualizează și store-ul local
+      updateCurrency(localCurrency)
+      updateTaxSettings(localTaxSettings)
+      
       onClose()
     } catch (error) {
       console.error('Eroare la salvarea setărilor:', error)
@@ -86,7 +132,7 @@ const CurrencyTaxDrawer = ({ onClose }) => {
               <div>
                 <label className="block text-xs font-medium mb-1">Selectează moneda</label>
                 <select
-                  value={currency.code}
+                  value={localCurrency.code}
                   onChange={(e) => {
                     const selectedCurrency = currencies.find(c => c.code === e.target.value)
                     handleCurrencyChange(selectedCurrency)
@@ -103,7 +149,7 @@ const CurrencyTaxDrawer = ({ onClose }) => {
               
               <div className="p-2 bg-gray-50 rounded text-sm">
                 <span className="text-muted-foreground">Moneda selectată: </span>
-                <span className="font-medium">{currency.name} ({currency.symbol})</span>
+                <span className="font-medium">{localCurrency.name} ({localCurrency.symbol})</span>
               </div>
             </div>
           </div>
@@ -124,7 +170,7 @@ const CurrencyTaxDrawer = ({ onClose }) => {
             </div>
             
             <div className="space-y-2">
-              {taxSettings.vatRates.map((rate) => (
+              {localTaxSettings.vatRates.map((rate) => (
                 <div key={rate.id} className="flex items-center gap-2 p-2 border rounded">
                   <input
                     type="checkbox"
@@ -161,11 +207,11 @@ const CurrencyTaxDrawer = ({ onClose }) => {
             <div className="mt-3">
               <label className="block text-xs font-medium mb-1">TVA implicit pentru facturi noi</label>
               <select
-                value={taxSettings.defaultVAT}
-                onChange={(e) => updateTaxSettings({ defaultVAT: parseFloat(e.target.value) })}
+                value={localTaxSettings.defaultVAT}
+                onChange={(e) => setLocalTaxSettings({ ...localTaxSettings, defaultVAT: parseFloat(e.target.value) })}
                 className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
               >
-                {taxSettings.vatRates.filter(rate => rate.enabled).map(rate => (
+                {localTaxSettings.vatRates.filter(rate => rate.enabled).map(rate => (
                   <option key={rate.id} value={rate.rate}>
                     {rate.name} ({rate.rate}%)
                   </option>

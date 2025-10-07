@@ -215,33 +215,6 @@ class PermissionManager {
     return csvContent
   }
 
-  // Generare date de test
-  generateTestPermissions() {
-    const resources = [
-      'appointments', 'patients', 'users', 'roles', 'permissions',
-      'products', 'reports', 'settings', 'analytics', 'financial'
-    ]
-
-    const actions = ['view', 'create', 'edit', 'delete']
-
-    const permissions = []
-    let id = 1
-
-    resources.forEach(resource => {
-      actions.forEach(action => {
-        permissions.push({
-          id: `permission_${id++}`,
-          resource,
-          action,
-          description: `${this.getActionText(action)} ${this.getResourceText(resource).toLowerCase()}`,
-          createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString()
-        })
-      })
-    })
-
-    return permissions
-  }
 
   // Verifică dacă o permisiune există
   hasPermission(userPermissions, resource, action) {

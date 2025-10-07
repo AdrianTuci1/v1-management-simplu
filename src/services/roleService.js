@@ -4,7 +4,7 @@ import { roleManager } from '../business/roleManager.js'
 
 class RoleService {
   constructor() {
-    this.repository = new DraftAwareResourceRepository('roles', 'role')
+    this.repository = new DraftAwareResourceRepository('role', 'role')
     this.dataFacade = dataFacade
   }
 

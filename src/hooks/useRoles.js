@@ -1,18 +1,30 @@
 import { useState, useEffect, useCallback } from 'react'
 import { roleService } from '../services/roleService.js'
 import { roleManager } from '../business/roleManager.js'
+import { indexedDb } from '../data/infrastructure/db.js'
+import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
+
+// Shared state for all instances
+let sharedRoles = []
+let sharedStats = null
+let subscribers = new Set()
+
+function notifySubscribers() {
+  console.log('Notifying role subscribers. Count:', subscribers.size, 'Roles count:', sharedRoles.length)
+  subscribers.forEach(cb => cb([...sharedRoles]))
+}
 
 export const useRoles = () => {
-  const [roles, setRoles] = useState([])
+  const [roles, setRoles] = useState(sharedRoles)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [stats, setStats] = useState(null)
+  const [stats, setStats] = useState(sharedStats)
   const [filters, setFilters] = useState({})
   const [sortBy, setSortBy] = useState('name')
   const [sortOrder, setSortOrder] = useState('asc')
 
   // Cache pentru numărul de roluri
-  const [roleCount, setRoleCount] = useState(0)
+  const [roleCount, setRoleCount] = useState(sharedRoles.length)
 
   // Încarcă toate rolurile
   const loadRoles = useCallback(async (customFilters = {}) => {
@@ -27,11 +39,33 @@ export const useRoles = () => {
       let filteredRoles = roleManager.filterRoles(rolesData, allFilters)
       filteredRoles = roleManager.sortRoles(filteredRoles, sortBy, sortOrder)
       
-      setRoles(filteredRoles)
+      sharedRoles = filteredRoles
+      setRoles([...filteredRoles])
       setRoleCount(filteredRoles.length)
+      notifySubscribers()
     } catch (err) {
-      setError(err.message)
-      console.error('Error loading roles:', err)
+      // Încearcă să încarce din cache local
+      try {
+        console.warn('Roles API failed, trying local cache:', err.message)
+        const cachedData = await indexedDb.getAll('role')
+        
+        if (cachedData.length > 0) {
+          // Transformăm datele din cache pentru UI
+          const transformedData = cachedData.map(role => 
+            roleManager.transformRoleForUI(role)
+          )
+          sharedRoles = transformedData
+          setRoles([...transformedData])
+          setRoleCount(transformedData.length)
+          setError(null) // Nu setează eroarea când avem date din cache
+          notifySubscribers()
+        } else {
+          setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
+        }
+      } catch (cacheErr) {
+        setError('Nu s-au putut încărca datele. Verifică conexiunea la internet.')
+        console.error('Error loading roles:', err)
+      }
     } finally {
       setLoading(false)
     }
@@ -44,59 +78,67 @@ export const useRoles = () => {
 
   // Adaugă un rol nou
   const addRole = useCallback(async (roleData) => {
-    setLoading(true)
     setError(null)
     
     try {
       const newRole = await roleService.addRole(roleData)
-      setRoles(prev => [...prev, newRole])
-      setRoleCount(prev => prev + 1)
-      return newRole
+      const ui = roleManager.transformRoleForUI(newRole)
+      
+      // Adaugă optimistic update
+      if (ui._isOptimistic || ui._tempId) {
+        const idx = sharedRoles.findIndex(r => r._tempId === ui._tempId)
+        if (idx >= 0) {
+          sharedRoles[idx] = ui
+        } else {
+          sharedRoles = [ui, ...sharedRoles]
+        }
+        setRoles([...sharedRoles])
+        setRoleCount(sharedRoles.length)
+        notifySubscribers()
+      }
+      
+      return ui
     } catch (err) {
       setError(err.message)
       console.error('Error adding role:', err)
       throw err
-    } finally {
-      setLoading(false)
     }
   }, [])
 
   // Actualizează un rol
   const updateRole = useCallback(async (id, roleData) => {
-    setLoading(true)
     setError(null)
     
     try {
-      const updatedRole = await roleService.updateRole(id, roleData)
-      setRoles(prev => prev.map(role => 
-        role.id === id ? updatedRole : role
-      ))
-      return updatedRole
+      const updated = await roleService.updateRole(id, roleData)
+      const ui = roleManager.transformRoleForUI(updated)
+      const idx = sharedRoles.findIndex(r => r.id === id || r.resourceId === id)
+      if (idx >= 0) sharedRoles[idx] = { ...ui, _isOptimistic: false }
+      setRoles([...sharedRoles])
+      notifySubscribers()
+      return ui
     } catch (err) {
       setError(err.message)
       console.error('Error updating role:', err)
       throw err
-    } finally {
-      setLoading(false)
     }
   }, [])
 
   // Șterge un rol
   const deleteRole = useCallback(async (id) => {
-    setLoading(true)
     setError(null)
     
     try {
       await roleService.deleteRole(id)
-      setRoles(prev => prev.filter(role => role.id !== id))
-      setRoleCount(prev => prev - 1)
+      sharedRoles = sharedRoles.filter(r => (r.id !== id && r.resourceId !== id))
+      setRoles([...sharedRoles])
+      setRoleCount(sharedRoles.length)
+      notifySubscribers()
       return true
     } catch (err) {
       setError(err.message)
       console.error('Error deleting role:', err)
       throw err
-    } finally {
-      setLoading(false)
     }
   }, [])
 
@@ -119,19 +161,16 @@ export const useRoles = () => {
 
   // Încarcă statisticile
   const loadStats = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    
     try {
       const roleStats = await roleService.getRoleStats()
+      sharedStats = roleStats
       setStats(roleStats)
       return roleStats
     } catch (err) {
-      setError(err.message)
       console.error('Error loading role stats:', err)
+      // Fallback stats
+      sharedStats = null
       return null
-    } finally {
-      setLoading(false)
     }
   }, [])
 
@@ -200,14 +239,17 @@ export const useRoles = () => {
     
     try {
       // Șterge toate rolurile
-      const roleIds = roles.map(role => role.id)
+      const roleIds = sharedRoles.map(role => role.id)
       for (const id of roleIds) {
         await deleteRole(id)
       }
       
+      sharedRoles = []
+      sharedStats = null
       setRoles([])
       setRoleCount(0)
       setStats(null)
+      notifySubscribers()
       return true
     } catch (err) {
       setError(err.message)
@@ -216,12 +258,92 @@ export const useRoles = () => {
     } finally {
       setLoading(false)
     }
-  }, [roles, deleteRole])
+  }, [deleteRole])
 
-  // Încarcă rolurile la prima renderizare
+  // Încarcă datele la montarea componentei și subscribe to updates
   useEffect(() => {
+    // Initialize from shared state and subscribe to updates
+    setRoles([...sharedRoles])
+    setStats(sharedStats)
+    setRoleCount(sharedRoles.length)
+    
+    // Adaugă subscriber pentru actualizări
+    const subscriber = (newRoles) => {
+      console.log('Role subscriber called with roles count:', newRoles.length)
+      setRoles(newRoles)
+      setRoleCount(newRoles.length)
+    }
+    subscribers.add(subscriber)
+    const unsub = () => subscribers.delete(subscriber)
+    
+    // Initial data load
     loadRoles()
-  }, [loadRoles])
+    loadStats()
+    
+    // Subscribe la actualizări prin websocket
+    const handler = async (message) => {
+      const { type, data, resourceType } = message
+      if (resourceType !== 'role') return
+      const operation = type?.replace('resource_', '') || type
+      const id = data?.id || data?.resourceId
+      if (!id) return
+      
+      try {
+        if (operation === 'created' || operation === 'create') {
+          // Înlocuiește rolul optimist cu datele reale
+          const ui = roleManager.transformRoleForUI({ ...data, id, resourceId: id })
+          
+          // Caută în outbox pentru a găsi operația optimistă folosind ID-ul real
+          const outboxEntry = await indexedDb.outboxFindByResourceId(id, 'role')
+          
+          if (outboxEntry) {
+            const optimisticIndex = sharedRoles.findIndex(r => r._tempId === outboxEntry.tempId)
+            if (optimisticIndex >= 0) {
+              sharedRoles[optimisticIndex] = { ...ui, _isOptimistic: false }
+            }
+            await indexedDb.outboxDelete(outboxEntry.id)
+          } else {
+            // Dacă nu găsim în outbox, verificăm dacă există deja rolul
+            const existingIndex = sharedRoles.findIndex(r => 
+              (r.id === id || r.resourceId === id) && !r._isOptimistic
+            )
+            if (existingIndex < 0) {
+              // Nu există, adaugă-l
+              sharedRoles = [ui, ...sharedRoles]
+            }
+          }
+          
+          setRoles([...sharedRoles])
+          setRoleCount(sharedRoles.length)
+          notifySubscribers()
+        } else if (operation === 'updated' || operation === 'update') {
+          // Actualizează rolul existent
+          const ui = roleManager.transformRoleForUI({ ...data, id, resourceId: id })
+          const idx = sharedRoles.findIndex(r => r.id === id || r.resourceId === id)
+          if (idx >= 0) {
+            sharedRoles[idx] = { ...ui, _isOptimistic: false }
+            setRoles([...sharedRoles])
+            notifySubscribers()
+          }
+        } else if (operation === 'deleted' || operation === 'delete') {
+          // Șterge rolul
+          sharedRoles = sharedRoles.filter(r => r.id !== id && r.resourceId !== id)
+          setRoles([...sharedRoles])
+          setRoleCount(sharedRoles.length)
+          notifySubscribers()
+        }
+      } catch (err) {
+        console.error('Error handling WebSocket role update:', err)
+      }
+    }
+    
+    const unsubscribe = onResourceMessage('role', handler)
+    
+    return () => {
+      unsub()
+      unsubscribe()
+    }
+  }, [loadRoles, loadStats])
 
   return {
     // State
