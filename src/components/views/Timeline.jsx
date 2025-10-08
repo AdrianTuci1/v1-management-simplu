@@ -180,7 +180,7 @@ export default function Timeline({ date, appointments = [], doctors = [], onDate
           <div ref={containerRef} className="absolute inset-0 overflow-auto cursor-grab select-none">
             
             {/* Antetul fix (Doctorii) */}
-            <div className="sticky top-0 z-25 flex border-b bg-white" style={{ height: HEADER_HEIGHT, minWidth: layout.timeColWidth + (doctors.length * layout.colWidth) }}>
+            <div className="sticky top-0 z-35 flex border-b bg-white" style={{ height: HEADER_HEIGHT, minWidth: layout.timeColWidth + (doctors.length * layout.colWidth) }}>
               <div className="shrink-0 border-r flex items-center justify-center text-xs text-slate-600" style={{ width: layout.timeColWidth }}>Ore</div>
               {doctors.map((doc) => (
                 <div key={doc.id} className="shrink-0 flex items-center px-3 text-sm font-medium text-slate-800 border-r" style={{ width: layout.colWidth }}>
@@ -208,7 +208,7 @@ export default function Timeline({ date, appointments = [], doctors = [], onDate
             </div>
 
             {/* Zona Coloanelor de Doctori și Dungilor de Oră */}
-            <div className="absolute top-0 left-0 right-0" style={{ marginLeft: layout.timeColWidth, height: contentHeight, minWidth: doctors.length * layout.colWidth }}>
+            <div className="absolute top-0 left-0 right-0 z-10" style={{ marginLeft: layout.timeColWidth, height: contentHeight, minWidth: doctors.length * layout.colWidth }}>
               
               {/* 1. Dungile de Oră (Fundalul) - Se întind pe toată lățimea */}
               <div className="pointer-events-none absolute inset-0" style={{ minWidth: doctors.length * layout.colWidth }}>
@@ -240,18 +240,19 @@ export default function Timeline({ date, appointments = [], doctors = [], onDate
                           key={a.id || a.resourceId || i}
                           onDoubleClick={() => onOpenDetails(a)}
                           onClick={isTouchDevice ? () => onOpenDetails(a) : undefined}
-                          className="absolute left-2 right-2 rounded-md border bg-white shadow-card transition-shadow hover:shadow-sm hover:ring-1 hover:ring-slate-300 z-10 cursor-pointer"
+                          className="absolute left-2 right-2 rounded-md border bg-white shadow-card transition-shadow hover:shadow-sm hover:ring-1 hover:ring-slate-300 z-10 cursor-pointer outline outline-blue-500"
                           style={{ top, height }}
                         >
-                          <div className="grid h-full grid-rows-3 px-2 py-1 text-xs">
+                          <div className="grid h-fit grid-rows-3 px-2 py-1 text-xs">
+              
                             <div className="truncate font-medium text-slate-900">{a?.patient?.name || a?.patient || 'Pacient'}</div>
                             <div className="truncate text-slate-600">{a?.doctor?.name || a?.doctor || 'Medic'}</div>
                             <div className="flex items-center justify-between text-slate-600">
                               <span className="truncate">{a?.service?.name || a?.service || a?.treatmentType}</span>
                               <span className="ml-2 shrink-0 font-mono text-[10px]">{(a.time || a.startTime) ?? ''}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
                       )
                     })}
                   </div>

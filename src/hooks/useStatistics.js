@@ -49,7 +49,11 @@ export const useStatistics = () => {
     setError(null)
     
     try {
-      const data = await invoker.getRecentActivities()
+      const response = await invoker.getRecentActivities()
+      
+      // Extract data from new API format: { success, data, meta }
+      const data = response?.data || response || []
+      
       setRecentActivities(data)
       setLastUpdated(new Date().toISOString())
       return data
@@ -81,10 +85,26 @@ export const useStatistics = () => {
     setError(null)
     
     try {
-      const [statsData, activitiesData] = await Promise.all([
+      const [statsResponse, activitiesResponse] = await Promise.all([
         invoker.getBusinessStatistics(),
         invoker.getRecentActivities()
       ])
+      
+      // Extract data from new API format: { success, data, meta }
+      const statsData = statsResponse?.data || statsResponse
+      const activitiesData = activitiesResponse?.data || activitiesResponse || []
+      
+      // 🔍 DEBUG: Afișează răspunsurile în consolă
+      console.group('📊 Statistics Response')
+      console.log('Raw statsResponse:', statsResponse)
+      console.log('Processed statsData:', statsData)
+      console.groupEnd()
+      
+      console.group('📋 Activities Response')
+      console.log('Raw activitiesResponse:', activitiesResponse)
+      console.log('Processed activitiesData:', activitiesData)
+      console.log('Number of activities:', activitiesData.length)
+      console.groupEnd()
       
       setBusinessStatistics(statsData)
       setRecentActivities(activitiesData)

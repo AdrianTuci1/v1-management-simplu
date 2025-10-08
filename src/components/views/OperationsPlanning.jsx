@@ -489,8 +489,14 @@ const OperationsPlanning = () => {
                             <div className={`font-medium ${appointment._isDeleting ? 'line-through' : ''}`}>
                               {appointment.patient?.name || appointment.patient || 'Pacient necunoscut'}
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {appointment.service?.name || appointment.service || 'Serviciu necunoscut'}
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <div 
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: appointment.service?.color || '#3b82f6' }}
+                              />
+                              <span>
+                                {appointment.service?.name || appointment.service || 'Serviciu necunoscut'}
+                              </span>
                             </div>
 
                           </div>

@@ -130,28 +130,43 @@ const AdminUsers = () => {
     return statusClasses[status] || 'bg-gray-100 text-gray-800'
   }
 
-  // Obține eticheta pentru rol
+  // Obține eticheta pentru rol (simplu, direct din obiectul role)
   const getRoleLabel = (role) => {
-    const roleLabels = {
-      doctor: 'Medic',
-      nurse: 'Asistent',
-      specialist: 'Specialist',
-      resident: 'Rezident',
-      admin: 'Admin'
+    if (role && typeof role === 'object' && role.name) {
+      return role.name
     }
-    return roleLabels[role] || role
+    // Fallback pentru roluri hardcodate vechi (compatibilitate înapoi)
+    if (typeof role === 'string') {
+      const roleLabels = {
+        doctor: 'Medic',
+        nurse: 'Asistent',
+        specialist: 'Specialist',
+        resident: 'Rezident',
+        admin: 'Admin'
+      }
+      return roleLabels[role] || role
+    }
+    return 'Necunoscut'
   }
 
-  // Obține clasa pentru rol
+  // Obține clasa pentru rol (simplă, culoare consistentă)
   const getRoleClass = (role) => {
-    const roleClasses = {
-      doctor: 'bg-blue-100 text-blue-700',
-      nurse: 'bg-green-100 text-green-700',
-      specialist: 'bg-purple-100 text-purple-700',
-      resident: 'bg-orange-100 text-orange-700',
-      admin: 'bg-red-100 text-red-700'
+    if (role && typeof role === 'object') {
+      // Culoare consistentă pentru roluri noi
+      return 'bg-blue-100 text-blue-700'
     }
-    return roleClasses[role] || 'bg-gray-100 text-gray-700'
+    // Fallback pentru roluri hardcodate vechi (compatibilitate înapoi)
+    if (typeof role === 'string') {
+      const roleClasses = {
+        doctor: 'bg-blue-100 text-blue-700',
+        nurse: 'bg-green-100 text-green-700',
+        specialist: 'bg-purple-100 text-purple-700',
+        resident: 'bg-orange-100 text-orange-700',
+        admin: 'bg-red-100 text-red-700'
+      }
+      return roleClasses[role] || 'bg-gray-100 text-gray-700'
+    }
+    return 'bg-gray-100 text-gray-700'
   }
 
   return (

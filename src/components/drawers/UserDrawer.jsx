@@ -9,7 +9,7 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
-import { normalizePhoneNumber } from '../../utils/phoneUtils.js'
+
 
 const UserDrawer = ({ onClose, user = null, position = "side" }) => {
   const { addUser, updateUser, deleteUser, loading, error } = useUsers()
@@ -19,7 +19,7 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
     medicName: '',
     email: '',
     phone: '',
-    role: 'doctor',
+    role: null,
     dutyDays: []
   })
   
@@ -33,7 +33,7 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
         medicName: user.medicName || user.firstName + ' ' + user.lastName || '',
         email: user.email || '',
         phone: user.phone || '',
-        role: user.role || 'doctor',
+        role: user.role || null,
         dutyDays: user.dutyDays || []
       })
     } else {
@@ -42,12 +42,12 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
         medicName: '',
         email: '',
         phone: '',
-        role: 'doctor',
+        role: roles.length > 0 ? { id: roles[0].resourceId, name: roles[0].name } : null,
         dutyDays: []
       })
     }
     setValidationErrors({})
-  }, [user])
+  }, [user, roles])
 
   // Validare folosind userManager
   const validateField = (name, value) => {
@@ -60,8 +60,6 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
     
     // Găsește eroarea pentru câmpul curent
     const fieldError = validationResult.errors.find(error => {
-      if (name === 'medicName' && error.includes('Numele medicului')) return true
-      if (name === 'email' && error.includes('Email')) return true
       if (name === 'dutyDays' && error.includes('zi de serviciu')) return true
       if (name === 'role' && error.includes('Rol')) return true
       return false
@@ -121,9 +119,7 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
       // Convertește erorile în format pentru UI
       const errors = {}
       validationResult.errors.forEach(error => {
-        if (error.includes('Numele medicului')) errors.medicName = error
-        else if (error.includes('Email')) errors.email = error
-        else if (error.includes('zi de serviciu')) errors.dutyDays = error
+        if (error.includes('zi de serviciu')) errors.dutyDays = error
         else if (error.includes('Rol')) errors.role = error
       })
       
@@ -199,28 +195,23 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
             
             <div>
               <label className="block text-sm font-medium mb-2">
-                Nume medic *
+                Nume medic
               </label>
               <input
                 type="text"
                 name="medicName"
                 value={formData.medicName}
                 onChange={handleInputChange}
-                className={`w-full p-3 border rounded-lg ${
-                  validationErrors.medicName ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className="w-full p-3 border border-gray-300 rounded-lg"
                 placeholder="Numele complet al medicului"
                 disabled={isSubmitting}
               />
-              {validationErrors.medicName && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.medicName}</p>
-              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Email *
+                  Email
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -229,16 +220,11 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full p-3 pl-10 border rounded-lg ${
-                      validationErrors.email ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className="w-full p-3 pl-10 border border-gray-300 rounded-lg"
                     placeholder="email@example.com"
                     disabled={isSubmitting}
                   />
                 </div>
-                {validationErrors.email && (
-                  <p className="text-red-500 text-sm mt-1">{validationErrors.email}</p>
-                )}
               </div>
               
               <div>
@@ -280,8 +266,14 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
               </label>
               <select
                 name="role"
-                value={formData.role}
-                onChange={handleInputChange}
+                value={formData.role?.id || ''}
+                onChange={(e) => {
+                  const selectedRole = roles.find(r => r.resourceId === e.target.value || r.id === e.target.value)
+                  setFormData(prev => ({
+                    ...prev,
+                    role: selectedRole ? { id: selectedRole.resourceId || selectedRole.id, name: selectedRole.name } : null
+                  }))
+                }}
                 className={`w-full p-3 border rounded-lg ${
                   validationErrors.role ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -289,7 +281,7 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
               >
                 <option value="">Selectează un rol</option>
                 {roles.map((role) => (
-                  <option key={role.resourceId} value={role.resourceId}>
+                  <option key={role.resourceId || role.id} value={role.resourceId || role.id}>
                     {role.name}
                   </option>
                 ))}

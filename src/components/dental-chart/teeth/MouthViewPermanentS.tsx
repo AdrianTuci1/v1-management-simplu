@@ -13,7 +13,7 @@ export class MouthViewPermanentS extends React.Component<
 		{	
 		return (
 			<svg
-				style={{ maxHeight: "600px", width: "100%" }}
+				style={{ maxHeight: "500px", width: "100%" }}
 				version="1.1"
 				preserveAspectRatio="xMidYMid meet"
 				viewBox="0 0 560 1055"
@@ -1434,7 +1434,7 @@ export class MouthViewPermanentS extends React.Component<
 								</g>
 							</g>
 						</g>
-						<g className="2" onClick={() => this.props.onClick(22)}>
+						<g className="2" transform="translate(-10,150) rotate(-20)" onClick={() => this.props.onClick(22)}>
 							<g>
 								<use
 									xlinkHref="#iso-22"
@@ -1467,7 +1467,7 @@ export class MouthViewPermanentS extends React.Component<
 								</g>
 							</g>
 						</g>
-						<g className="3" onClick={() => this.props.onClick(23)}>
+						<g className="3" transform="translate(65,305) rotate(-45)" onClick={() => this.props.onClick(23)}>
 							<g>
 								<use
 									xlinkHref="#iso-23"
@@ -1500,217 +1500,217 @@ export class MouthViewPermanentS extends React.Component<
 								</g>
 							</g>
 						</g>
-						<g className="4" onClick={() => this.props.onClick(24)}>
+					<g className="4" transform="translate(140,390) rotate(-60)" onClick={() => this.props.onClick(24)}>
+						<g>
+							<use
+								xlinkHref="#iso-24"
+								fill={conditionToColor(
+									this.props.teeth[24].condition || "sound"
+								)}
+							/>
 							<g>
 								<use
 									xlinkHref="#iso-24"
-									fill={conditionToColor(
-										this.props.teeth[24].condition || "sound"
-									)}
+									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#iso-24"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
+						</g>
+						<g>
+							<use
+								xlinkHref="#d6p4ZsEBwV"
+								opacity="1"
+								fillOpacity="0"
+							/>
 							<g>
 								<use
 									xlinkHref="#d6p4ZsEBwV"
-									opacity="1"
 									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#d6p4ZsEBwV"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
+						</g>
+						<g>
+							<use
+								xlinkHref="#b2b6VhQYX9"
+								opacity="1"
+								fillOpacity="0"
+							/>
 							<g>
 								<use
 									xlinkHref="#b2b6VhQYX9"
-									opacity="1"
 									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#b2b6VhQYX9"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
 						</g>
-						<g className="5" onClick={() => this.props.onClick(25)}>
+					</g>
+					<g className="5" transform="translate(145,380) rotate(-60)" onClick={() => this.props.onClick(25)}>
+						<g>
+							<use
+								xlinkHref="#iso-25"
+								fill={conditionToColor(
+									this.props.teeth[25].condition || "sound"
+								)}
+							/>
 							<g>
 								<use
 									xlinkHref="#iso-25"
-									fill={conditionToColor(
-										this.props.teeth[25].condition || "sound"
-									)}
+									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#iso-25"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
+						</g>
+						<g>
+							<use
+								xlinkHref="#a1IjZsIm8S"
+								opacity="1"
+								fillOpacity="0"
+							/>
 							<g>
 								<use
 									xlinkHref="#a1IjZsIm8S"
-									opacity="1"
 									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#a1IjZsIm8S"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
+						</g>
+						<g>
+							<use
+								xlinkHref="#b2JgD7E2Kq"
+								opacity="1"
+								fillOpacity="0"
+							/>
 							<g>
 								<use
 									xlinkHref="#b2JgD7E2Kq"
-									opacity="1"
 									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#b2JgD7E2Kq"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
 						</g>
-						<g className="6" onClick={() => this.props.onClick(26)}>
+					</g>
+					<g className="6" transform="translate(250,480) rotate(-75)" onClick={() => this.props.onClick(26)}>
+						<g>
+							<use
+								xlinkHref="#iso-26"
+								fill={conditionToColor(
+									this.props.teeth[26].condition || "sound"
+								)}
+							/>
 							<g>
 								<use
 									xlinkHref="#iso-26"
-									fill={conditionToColor(
-										this.props.teeth[26].condition || "sound"
-									)}
+									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#iso-26"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
+						</g>
+						<g>
+							<use
+								xlinkHref="#aLBv0ngyf"
+								opacity="1"
+								fill="#000"
+							/>
 							<g>
 								<use
 									xlinkHref="#aLBv0ngyf"
-									opacity="1"
-									fill="#000"
+									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="0"
 								/>
-								<g>
-									<use
-										xlinkHref="#aLBv0ngyf"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="0"
-									/>
-								</g>
 							</g>
 						</g>
-						<g className="7" onClick={() => this.props.onClick(27)}>
+					</g>
+					<g className="7" transform="translate(255,470) rotate(-75)" onClick={() => this.props.onClick(27)}>
+						<g>
+							<use
+								xlinkHref="#iso-27"
+								fill={conditionToColor(
+									this.props.teeth[27].condition || "sound"
+								)}
+							/>
 							<g>
 								<use
 									xlinkHref="#iso-27"
-									fill={conditionToColor(
-										this.props.teeth[27].condition || "sound"
-									)}
+									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#iso-27"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
+						</g>
+						<g>
+							<use
+								xlinkHref="#lmVcyt8R"
+								opacity="1"
+								fill="#000"
+							/>
 							<g>
 								<use
 									xlinkHref="#lmVcyt8R"
-									opacity="1"
-									fill="#000"
+									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="0"
 								/>
-								<g>
-									<use
-										xlinkHref="#lmVcyt8R"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="0"
-									/>
-								</g>
 							</g>
 						</g>
-						<g className="8" onClick={() => this.props.onClick(28)}>
+					</g>
+					<g className="8" transform="translate(260,450) rotate(-75)" onClick={() => this.props.onClick(28)}>
+						<g>
+							<use
+								xlinkHref="#iso-28"
+								fill={conditionToColor(
+									this.props.teeth[28].condition || "sound"
+								)}
+							/>
 							<g>
 								<use
 									xlinkHref="#iso-28"
-									fill={conditionToColor(
-										this.props.teeth[28].condition || "sound"
-									)}
+									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#iso-28"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
+						</g>
+						<g>
+							<use
+								xlinkHref="#bsHecJRYc"
+								opacity="1"
+								fill="#000"
+							/>
 							<g>
 								<use
 									xlinkHref="#bsHecJRYc"
-									opacity="1"
-									fill="#000"
+									fillOpacity="0"
+									stroke="#000"
+									strokeWidth="2"
 								/>
-								<g>
-									<use
-										xlinkHref="#bsHecJRYc"
-										fillOpacity="0"
-										stroke="#000"
-										strokeWidth="2"
-									/>
-								</g>
 							</g>
 						</g>
-						<g className="text">
-							<g id="c2vG1vlZh4">
+					</g>
+						<g className="text" >
+							<g id="c2vG1vlZh4" transform="translate(-25, 60) rotate(0)">
 								<use
 									xlinkHref="#b1gODCfJB5"
 									opacity="1"
 									fill="#000"
 								/>
 							</g>
-							<g id="a1nYN9cpt">
+							<g id="a1nYN9cpt" transform="translate(25, 45) rotate(0)">
 								<use
 									xlinkHref="#a2KwBh9N1C"
 									opacity="1"
 									fill="#000"
 								/>
 							</g>
-							<g id="bAKpE8e15">
+							<g id="bAKpE8e15" transform="translate(50, 10) rotate(0)">
 								<use
 									xlinkHref="#avSr25PQ8"
 									opacity="1"

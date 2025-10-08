@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Statistics API</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            border-left: 4px solid #3b82f6;
+        }
+        .test-section h2 {
+            color: #3b82f6;
+            margin-top: 0;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .result {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .result .key {
+            color: #38bdf8;
+        }
+        .result .string {
+            color: #86efac;
+        }
+        .result .number {
+            color: #fbbf24;
+        }
+        .result .boolean {
+            color: #f472b6;
+        }
+        .result .null {
+            color: #ef4444;
+        }
+        .loading {
+            color: #3b82f6;
+            margin-top: 10px;
+        }
+        .error {
+            color: #ef4444;
+            background: #fee2e2;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .success {
+            color: #10b981;
+            background: #d1fae5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #4b5563;
+            font-weight: 500;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Statistics API</h1>
+        
+        <div class="test-section">
+            <h2>⚙️ Configurare</h2>
+            <div class="input-group">
+                <label for="apiUrl">API Base URL:</label>
+                <input type="text" id="apiUrl" placeholder="http://localhost:3000/api" value="http://localhost:3000/api">
+            </div>
+            <div class="input-group">
+                <label for="token">Authorization Token (opțional):</label>
+                <input type="text" id="token" placeholder="Bearer token...">
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Business Statistics</h2>
+            <button onclick="testBusinessStatistics()">Test Business Statistics</button>
+            <button onclick="clearResults('businessStats')">Clear</button>
+            <div id="businessStatsLoading" class="loading" style="display:none;">Loading...</div>
+            <div id="businessStatsError" class="error" style="display:none;"></div>
+            <div id="businessStatsSummary" class="stats-summary" style="display:none;"></div>
+            <div id="businessStatsResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 Recent Activities</h2>
+            <button onclick="testRecentActivities()">Test Recent Activities</button>
+            <button onclick="clearResults('activities')">Clear</button>
+            <div id="activitiesLoading" class="loading" style="display:none;">Loading...</div>
+            <div id="activitiesError" class="error" style="display:none;"></div>
+            <div id="activitiesSummary" class="success" style="display:none;"></div>
+            <div id="activitiesResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔄 Test Both</h2>
+            <button onclick="testAll()">Test All Endpoints</button>
+        </div>
+    </div>
+
+    <script>
+        function syntaxHighlight(json) {
+            json = JSON.stringify(json, null, 2);
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'key';
+                    } else {
+                        cls = 'string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        function getHeaders() {
+            const token = document.getElementById('token').value;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+            }
+            return headers;
+        }
+
+        function showLoading(id) {
+            document.getElementById(id + 'Loading').style.display = 'block';
+            document.getElementById(id + 'Error').style.display = 'none';
+            document.getElementById(id + 'Result').style.display = 'none';
+            if (document.getElementById(id + 'Summary')) {
+                document.getElementById(id + 'Summary').style.display = 'none';
+            }
+        }
+
+        function showError(id, message) {
+            document.getElementById(id + 'Loading').style.display = 'none';
+            document.getElementById(id + 'Error').style.display = 'block';
+            document.getElementById(id + 'Error').textContent = '❌ Error: ' + message;
+        }
+
+        function showResult(id, data) {
+            document.getElementById(id + 'Loading').style.display = 'none';
+            document.getElementById(id + 'Result').style.display = 'block';
+            document.getElementById(id + 'Result').innerHTML = syntaxHighlight(data);
+        }
+
+        async function testBusinessStatistics() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            showLoading('businessStats');
+
+            try {
+                const response = await fetch(`${apiUrl}/statistics/business`, {
+                    headers: getHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                showResult('businessStats', data);
+
+                // Show summary
+                const statsData = data.data || data;
+                const summary = document.getElementById('businessStatsSummary');
+                summary.style.display = 'grid';
+                summary.innerHTML = `
+                    <div class="stat-card">
+                        <h3>Total Programări</h3>
+                        <div class="value">${statsData.totalAppointments || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Pacienți</h3>
+                        <div class="value">${statsData.totalPatients || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Venit Lunar</h3>
+                        <div class="value">${statsData.revenue?.monthly || 0} RON</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Programări Website</h3>
+                        <div class="value">${statsData.websiteBookings || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Rating Clinică</h3>
+                        <div class="value">${statsData.clinicRating?.average || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Grad Ocupare</h3>
+                        <div class="value">${statsData.occupancyRate || 0}%</div>
+                    </div>
+                `;
+            } catch (error) {
+                showError('businessStats', error.message);
+            }
+        }
+
+        async function testRecentActivities() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            showLoading('activities');
+
+            try {
+                const response = await fetch(`${apiUrl}/statistics/recent-activities`, {
+                    headers: getHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                showResult('activities', data);
+
+                // Show summary
+                const activitiesData = data.data || data;
+                const summary = document.getElementById('activitiesSummary');
+                summary.style.display = 'block';
+                
+                const activityTypes = {};
+                activitiesData.forEach(activity => {
+                    const type = activity.activityType || activity.type || 'unknown';
+                    activityTypes[type] = (activityTypes[type] || 0) + 1;
+                });
+
+                summary.innerHTML = `
+                    <strong>✅ Succes!</strong> Găsite ${activitiesData.length} activități recente.
+                    <br><br>
+                    <strong>Tip activități:</strong>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        ${Object.entries(activityTypes).map(([type, count]) => 
+                            `<li>${type}: ${count}</li>`
+                        ).join('')}
+                    </ul>
+                `;
+            } catch (error) {
+                showError('activities', error.message);
+            }
+        }
+
+        async function testAll() {
+            await testBusinessStatistics();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testRecentActivities();
+        }
+
+        function clearResults(id) {
+            document.getElementById(id + 'Loading').style.display = 'none';
+            document.getElementById(id + 'Error').style.display = 'none';
+            document.getElementById(id + 'Result').style.display = 'none';
+            if (document.getElementById(id + 'Summary')) {
+                document.getElementById(id + 'Summary').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
+

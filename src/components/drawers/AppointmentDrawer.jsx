@@ -42,12 +42,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     }
   }, [externalCurrentMenu, onExternalMenuChange])
   
-  const handleMenuChange = (id) => {
-    setCurrentMenu(id)
-    if (onExternalMenuChange) {
-      onExternalMenuChange(id)
-    }
-  }
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -173,9 +168,10 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   const hasExistingInvoice = () => {
     if (!formData.id) return false
     
-    // Pentru moment, verificăm doar dacă există o plată
-    // În viitor, aici se poate adăuga verificarea pentru facturi
-    return hasExistingPayment()
+    // Pentru moment, returnăm false pentru a permite crearea de facturi
+    // În viitor, aici se poate adăuga verificarea reală pentru facturi existente
+    // de exemplu verificând în invoices dacă există o factură cu appointmentId
+    return false
   }
 
 

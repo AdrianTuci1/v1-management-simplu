@@ -87,6 +87,10 @@ export class DataFacade {
     this.repositories.set('permission', new DraftAwareResourceRepository('permission', 'permission'));
     this.repositories.set('setting', new DraftAwareResourceRepository('setting', 'setting'));
     
+    // Repository-uri pentru facturi și clienți
+    this.repositories.set('invoice', new DraftAwareResourceRepository('invoice', 'invoice'));
+    this.repositories.set('invoice-client', new DraftAwareResourceRepository('invoice-client', 'invoice-clients'));
+    
     // Repository-uri speciale pentru draft-uri și sesiuni
     this.repositories.set('draft', new DraftAwareResourceRepository('draft', 'drafts'));
     this.repositories.set('session', new DraftAwareResourceRepository('session', 'sessions'));

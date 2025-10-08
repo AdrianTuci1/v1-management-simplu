@@ -3,12 +3,8 @@ import {
   Plus, 
   Search, 
   Filter, 
-  Edit,
-  Trash2,
   Clock,
-  Stethoscope,
   Loader2,
-  Download,
   RotateCw
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
@@ -106,23 +102,19 @@ const OperationsTreatments = () => {
 
 
 
-  // Get treatment type icon
-  const getTreatmentTypeIcon = (type) => {
-    const iconMap = {
-      'Consultație stomatologică': Stethoscope,
-      'Detartraj': Activity,
-      'Plombă compozită': Activity,
-      'Extracție dinte': Activity,
-      'Radiografie panoramică': Activity,
-      'Tratament canal': Activity,
-      'Proteză mobilă': Activity,
-      'Implant dentar': Activity,
-      'Albire dentară': Activity,
-      'Ortodonție - bracket': Activity,
-      'default': Stethoscope
+  // Extrage inițialele tratamentului (max 2 cuvinte)
+  const getTreatmentInitials = (treatmentType) => {
+    if (!treatmentType) return '?'
+    
+    const words = treatmentType.trim().split(/\s+/)
+    
+    // Dacă e un singur cuvânt, ia prima literă (sau primele 2 dacă vrei)
+    if (words.length === 1) {
+      return words[0].charAt(0).toUpperCase()
     }
     
-    return iconMap[type] || iconMap.default
+    // Dacă sunt 2 sau mai multe cuvinte, ia inițialele primelor 2
+    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
   }
 
 
@@ -272,7 +264,8 @@ const OperationsTreatments = () => {
                 </thead>
                 <tbody>
                   {sortedTreatments.map((treatment) => {
-                    const TypeIcon = getTreatmentTypeIcon(treatment.treatmentType)
+                    const initials = getTreatmentInitials(treatment.treatmentType)
+                    const color = treatment.color || '#3b82f6'
                     
                     return (
                       <tr 
@@ -284,7 +277,12 @@ const OperationsTreatments = () => {
                       >
                         <td className="p-3">
                           <div className="flex items-center gap-2">
-                            <TypeIcon className="h-4 w-4 text-primary" />
+                            <div 
+                              className="w-8 h-8 rounded-md flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                              style={{ backgroundColor: color }}
+                            >
+                              {initials}
+                            </div>
                             <span className={`font-medium ${
                               treatment._isDeleting ? 'line-through' : ''
                             }`}>

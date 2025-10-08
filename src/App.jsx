@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Calendar, FileText, Image, User, Pill } from 'lucide-react'
+import { Calendar, FileText, Image, User, Pill, CircleChevronUp } from 'lucide-react'
 import NewSidebar from './components/NewSidebar'
+import MobileMenu from './components/MobileMenu'
 import DraftMainDrawer from './components/drawers/DraftMainDrawer'
 import { Drawer, DrawerExternalNavigation } from './components/ui/drawer'
 import Dashboard from './components/Dashboard'
@@ -23,6 +24,8 @@ function AppContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [userData, setUserData] = useState(null)
   const [accessDenied, setAccessDenied] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const { drawerOpen, drawerContent, closeDrawer } = useDrawer()
   
   // State pentru navigația externă
@@ -32,6 +35,17 @@ function AppContent() {
     'edit-person': 1
   })
 
+  // Detect mobile/desktop
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 650) // 768px is typical tablet/mobile breakpoint
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
   // Check if demo mode is enabled
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
 
@@ -234,23 +248,37 @@ function AppContent() {
 
   return (
     <div className="h-screen bg-background w-full relative">
+      {/* Mobile Menu */}
+      {isMobile && (
+        <MobileMenu
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          currentView={currentView}
+          onViewChange={handleViewChange}
+          currentLocation={selectedLocation}
+          onLocationChange={handleLocationChange}
+        />
+      )}
+
       {/* Main Content */}
       <div className="h-full flex overflow-hidden">
-        {/* Sidebar with padding */}
-        <div className="p-2">
-          <NewSidebar 
-            collapsed={sidebarCollapsed}
-            currentView={currentView}
-            onViewChange={handleViewChange}
-            onToggle={handleSidebarToggle}
-            currentLocation={selectedLocation}
-            onLocationChange={handleLocationChange}
-          />
-        </div>
+        {/* Desktop Sidebar with padding */}
+        {!isMobile && (
+          <div className="p-2">
+            <NewSidebar 
+              collapsed={sidebarCollapsed}
+              currentView={currentView}
+              onViewChange={handleViewChange}
+              onToggle={handleSidebarToggle}
+              currentLocation={selectedLocation}
+              onLocationChange={handleLocationChange}
+            />
+          </div>
+        )}
         
         {/* Content Area */}
         <main className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-auto p-6">
+          <div className={`flex-1 overflow-auto ${isMobile ? 'p-4 pb-20' : 'p-6'}`}>
             <Dashboard 
               currentView={currentView}
               currentLocation={selectedLocation}
@@ -291,6 +319,17 @@ function AppContent() {
         )}
 
       </div>
+
+      {/* Mobile Navigation Button */}
+      {isMobile && !mobileMenuOpen && (
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="fixed bottom-6 right-6 z-40 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+          aria-label="Deschide meniu"
+        >
+          <CircleChevronUp className="h-7 w-7" />
+        </button>
+      )}
       
       {/* Quick Actions Drawer */}
       <QuickActionsDrawer />

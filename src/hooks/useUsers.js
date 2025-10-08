@@ -47,34 +47,79 @@ export const useUsers = () => {
       const operation = type?.replace('resource_', '') || type
       const userId = data?.id || data?.resourceId
       if (!userId) return
-      if (operation === 'created' || operation === 'create') {
-        const ui = userManager.transformUserForUI({ ...data, id: userId, resourceId: userId })
-        const idx = sharedUsers.findIndex(u => u.id === userId || u.resourceId === userId)
-        if (idx >= 0) sharedUsers[idx] = { ...ui, _isOptimistic: false }
-        else sharedUsers = [{ ...ui, _isOptimistic: false }, ...sharedUsers]
-        sharedUserCount = sharedUsers.length
-        notifySubscribers()
-      } else if (operation === 'updated' || operation === 'update') {
-        const idx = sharedUsers.findIndex(u => u.id === userId || u.resourceId === userId)
-        if (idx >= 0) {
+      
+      try {
+        if (operation === 'created' || operation === 'create') {
+          // Înlocuiește utilizatorul optimist cu datele reale
           const ui = userManager.transformUserForUI({ ...data, id: userId, resourceId: userId })
-          sharedUsers[idx] = { ...ui, _isOptimistic: false }
+          
+          // Caută în outbox pentru a găsi operația optimistă folosind ID-ul real
+          const outboxEntry = await indexedDb.outboxFindByResourceId(userId, 'user')
+          
+          if (outboxEntry) {
+            const optimisticIndex = sharedUsers.findIndex(u => u._tempId === outboxEntry.tempId)
+            if (optimisticIndex >= 0) {
+              sharedUsers[optimisticIndex] = { ...ui, _isOptimistic: false }
+            }
+            await indexedDb.outboxDelete(outboxEntry.id)
+          } else {
+            // Dacă nu găsim în outbox, încercăm să găsim după euristică
+            const optimisticIndex = sharedUsers.findIndex(u => 
+              u._isOptimistic && 
+              u.email === data.email &&
+              u.firstName === data.firstName &&
+              u.lastName === data.lastName
+            )
+            if (optimisticIndex >= 0) {
+              sharedUsers[optimisticIndex] = { ...ui, _isOptimistic: false }
+            } else {
+              // Verifică dacă nu există deja (evită dubluri)
+              const existingIndex = sharedUsers.findIndex(u => u.id === userId || u.resourceId === userId)
+              if (existingIndex >= 0) {
+                sharedUsers[existingIndex] = { ...ui, _isOptimistic: false }
+              } else {
+                // Adaugă ca nou doar dacă nu există deloc
+                sharedUsers = [{ ...ui, _isOptimistic: false }, ...sharedUsers]
+              }
+            }
+          }
+          
+          sharedUserCount = sharedUsers.length
+          notifySubscribers()
+        } else if (operation === 'updated' || operation === 'update') {
+          // Dezactivează flag-ul optimistic
+          const ui = userManager.transformUserForUI({ ...data, id: userId, resourceId: userId })
+          const existingIndex = sharedUsers.findIndex(u => 
+            u.id === userId || u.resourceId === userId
+          )
+          if (existingIndex >= 0) {
+            sharedUsers[existingIndex] = { ...ui, _isOptimistic: false }
+          }
+          
+          notifySubscribers()
+        } else if (operation === 'deleted' || operation === 'delete') {
+          // Elimină utilizatorul din lista locală
+          sharedUsers = sharedUsers.filter(u => {
+            const matches = u.id === userId || u.resourceId === userId
+            return !matches
+          })
+          sharedUserCount = sharedUsers.length
           notifySubscribers()
         }
-      } else if (operation === 'deleted' || operation === 'delete') {
-        sharedUsers = sharedUsers.filter(u => (u.id !== userId && u.resourceId !== userId))
-        sharedUserCount = sharedUsers.length
-        notifySubscribers()
+      } catch (error) {
+        console.error('Error handling user WebSocket message:', error)
       }
     }
 
     // Abonează-te la mesajele WebSocket pentru utilizatori
     const unsubPlural = onResourceMessage('users', handler)
     const unsubSingular = onResourceMessage('user', handler)
+    const unsubMedic = onResourceMessage('medic', handler)
 
     return () => {
       unsubPlural()
       unsubSingular()
+      unsubMedic()
     }
   }, [])
 
@@ -108,7 +153,11 @@ export const useUsers = () => {
           filteredUsers = filteredUsers.filter(user => user.status === allFilters.status)
         }
         if (allFilters.role) {
-          filteredUsers = filteredUsers.filter(user => user.role === allFilters.role)
+          filteredUsers = filteredUsers.filter(user => {
+            // Suportă atât roluri noi (obiect) cât și vechi (string)
+            const userRoleId = typeof user.role === 'object' ? user.role?.id : user.role
+            return userRoleId === allFilters.role
+          })
         }
         if (allFilters.specialization) {
           filteredUsers = filteredUsers.filter(user => user.specialization === allFilters.specialization)

@@ -303,13 +303,23 @@ export const useRoles = () => {
             }
             await indexedDb.outboxDelete(outboxEntry.id)
           } else {
-            // Dacă nu găsim în outbox, verificăm dacă există deja rolul
-            const existingIndex = sharedRoles.findIndex(r => 
-              (r.id === id || r.resourceId === id) && !r._isOptimistic
+            // Dacă nu găsim în outbox, încercăm să găsim după euristică
+            const optimisticIndex = sharedRoles.findIndex(r => 
+              r._isOptimistic && 
+              r.name === data.name &&
+              r.description === data.description
             )
-            if (existingIndex < 0) {
-              // Nu există, adaugă-l
-              sharedRoles = [ui, ...sharedRoles]
+            if (optimisticIndex >= 0) {
+              sharedRoles[optimisticIndex] = { ...ui, _isOptimistic: false }
+            } else {
+              // Verifică dacă nu există deja (evită dubluri)
+              const existingIndex = sharedRoles.findIndex(r => r.id === id || r.resourceId === id)
+              if (existingIndex >= 0) {
+                sharedRoles[existingIndex] = { ...ui, _isOptimistic: false }
+              } else {
+                // Adaugă ca nou doar dacă nu există deloc
+                sharedRoles = [{ ...ui, _isOptimistic: false }, ...sharedRoles]
+              }
             }
           }
           

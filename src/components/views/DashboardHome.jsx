@@ -32,13 +32,178 @@ const DashboardHome = () => {
     businessStatistics, 
     recentActivities, 
     loading, 
-    error, 
-    refresh 
   } = useStatistics()
+
+  /**
+   * Exemple de structură pentru businessStatistics:
+   * {
+   *   totalAppointments: 150,
+   *   totalPatients: 423,
+   *   appointmentStats: {
+   *     completed: 120,
+   *     cancelled: 15,
+   *     pending: 15,
+   *     absent: 47
+   *   },
+   *   appointmentsToday: [
+   *     { id: 1, patientName: 'Ion Popescu', time: '10:00', status: 'confirmed' },
+   *     { id: 2, patientName: 'Maria Ionescu', time: '11:00', status: 'pending' }
+   *   ],
+   *   revenue: {
+   *     monthly: 12500,
+   *   },
+   *   websiteBookings: 200,
+   *   clinicRating: {
+   *     average: 4.8,
+   *     totalReviews: 127
+   *   },
+   *   smsStats: {
+   *     sent: 234,
+   *     limit: 300,
+   *     percentage: 78
+   *   },
+   *   occupancyRate: 85,
+   *   doctorProgress: [
+   *     { doctor: 'Dr. Popescu', progress: 75, appointments: 12 },
+   *     { doctor: 'Dr. Ionescu', progress: 60, appointments: 8 },
+   *     { doctor: 'Dr. Georgescu', progress: 85, appointments: 15 },
+   *     { doctor: 'Dr. Marinescu', progress: 45, appointments: 6 }
+   *   ],
+   *   popularTreatments: [
+   *     { treatment: 'Detartraj', count: 45 },
+   *     { treatment: 'Obturație', count: 38 },
+   *     { treatment: 'Consultație', count: 67 },
+   *     { treatment: 'Tratament canal', count: 23 },
+   *     { treatment: 'Albire dentară', count: 15 }
+   *   ]
+   * }
+   */
+
+  // Helper function to safely extract numeric value
+  const extractNumber = (value) => {
+    if (value === null || value === undefined) return 0
+    if (typeof value === 'number') return value
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value)
+      return isNaN(parsed) ? 0 : parsed
+    }
+    if (typeof value === 'object' && value.value !== undefined) return extractNumber(value.value)
+    if (typeof value === 'object' && value.count !== undefined) return extractNumber(value.count)
+    return 0
+  }
+
+  // Safe getters pentru datele din businessStatistics
+  const getTotalAppointments = () => {
+    return extractNumber(businessStatistics?.totalAppointments)
+  }
+
+  const getTotalPatients = () => {
+    return extractNumber(businessStatistics?.totalPatients)
+  }
+
+  const getCompletedAppointments = () => {
+    return extractNumber(businessStatistics?.appointmentStats?.completed)
+  }
+
+  const getCancelledAppointments = () => {
+    return extractNumber(businessStatistics?.appointmentStats?.cancelled)
+  }
+
+  const getPendingAppointments = () => {
+    return extractNumber(businessStatistics?.appointmentStats?.pending)
+  }
+
+  const getAppointmentsToday = () => {
+    return Array.isArray(businessStatistics?.appointmentsToday) 
+      ? businessStatistics.appointmentsToday 
+      : []
+  }
+
+  const getMonthlyRevenue = () => {
+    return extractNumber(businessStatistics?.revenue?.monthly)
+  }
+
+  const getAbsentAppointments = () => {
+    return extractNumber(businessStatistics?.appointmentStats?.absent)
+  }
+
+  const getWebsiteBookings = () => {
+    return extractNumber(businessStatistics?.websiteBookings)
+  }
+
+  const getClinicRating = () => {
+    return {
+      average: extractNumber(businessStatistics?.clinicRating?.average),
+      totalReviews: extractNumber(businessStatistics?.clinicRating?.totalReviews)
+    }
+  }
+
+  const getSmsStats = () => {
+    return {
+      sent: extractNumber(businessStatistics?.smsStats?.sent),
+      limit: extractNumber(businessStatistics?.smsStats?.limit),
+      percentage: extractNumber(businessStatistics?.smsStats?.percentage)
+    }
+  }
+
+  const getOccupancyRate = () => {
+    return extractNumber(businessStatistics?.occupancyRate)
+  }
+
+  const getDoctorProgress = () => {
+    if (!Array.isArray(businessStatistics?.doctorProgress) || businessStatistics.doctorProgress.length === 0) {
+      // Date default dacă nu există date din backend
+      return [
+        { doctor: "Dr. Popescu", progress: 75, appointments: 12, fill: "var(--chart-1)" },
+        { doctor: "Dr. Ionescu", progress: 60, appointments: 8, fill: "var(--chart-2)" },
+        { doctor: "Dr. Georgescu", progress: 85, appointments: 15, fill: "var(--chart-3)" },
+        { doctor: "Dr. Marinescu", progress: 45, appointments: 6, fill: "var(--chart-4)" },
+      ]
+    }
+    
+    // Elimină duplicate și adaugă culori pentru chart
+    const uniqueDoctors = new Map()
+    
+    businessStatistics.doctorProgress.forEach((doc) => {
+      const doctorName = typeof doc.doctor === 'string' ? doc.doctor : (doc.doctor?.name || doc.doctor?.id || 'Doctor')
+      
+      if (!uniqueDoctors.has(doctorName)) {
+        uniqueDoctors.set(doctorName, {
+          doctor: doctorName,
+          progress: extractNumber(doc.progress),
+          appointments: extractNumber(doc.appointments)
+        })
+      }
+    })
+    
+    // Convertește Map la array și adaugă culori
+    return Array.from(uniqueDoctors.values()).map((doc, index) => ({
+      ...doc,
+      fill: `var(--chart-${(index % 5) + 1})`
+    }))
+  }
+
+  const getPopularTreatments = () => {
+    if (!Array.isArray(businessStatistics?.popularTreatments) || businessStatistics.popularTreatments.length === 0) {
+      // Date default dacă nu există date din backend
+      return [
+        { treatment: "Consultație", count: 67 },
+        { treatment: "Detartraj", count: 45 },
+        { treatment: "Obturație", count: 38 },
+        { treatment: "Tratament canal", count: 23 },
+        { treatment: "Albire dentară", count: 15 },
+      ]
+    }
+    // Protejează valorile pentru a evita obiecte în JSX
+    return businessStatistics.popularTreatments.map(item => ({
+      treatment: typeof item.treatment === 'string' ? item.treatment : (item.treatment?.name || 'Tratament'),
+      count: extractNumber(item.count)
+    }))
+  }
 
   // Chart data and config for website bookings
   const websiteChartData = [
-    { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
+    { browser: "chrome", visitors: getWebsiteBookings(), fill: "var(--color-safari)" },
   ]
 
   const websiteChartConfig = {
@@ -51,13 +216,8 @@ const DashboardHome = () => {
     },
   }
 
-  // Chart data for doctor progress
-  const doctorProgressData = [
-    { doctor: "Dr. Popescu", progress: 75, fill: "var(--chart-1)" },
-    { doctor: "Dr. Ionescu", progress: 60, fill: "var(--chart-2)" },
-    { doctor: "Dr. Georgescu", progress: 85, fill: "var(--chart-3)" },
-    { doctor: "Dr. Marinescu", progress: 45, fill: "var(--chart-4)" },
-  ]
+  // Chart data for doctor progress - dynamic data
+  const doctorProgressData = getDoctorProgress()
 
   const doctorProgressConfig = {
     progress: {
@@ -74,88 +234,7 @@ const DashboardHome = () => {
     return months[new Date().getMonth()]
   }
 
-  // Transform business statistics to KPI format
-  const getKpiData = () => {
-    if (!businessStatistics) {
-      return [
-        {
-          title: 'Pacienți Înregistrați',
-          subtitle: `Luna ${getCurrentMonthName()}`,
-          value: '0',
-          icon: Users,
-          color: 'bg-blue-500',
-          change: '0',
-          changeType: 'neutral'
-        },
-        {
-          title: 'Vizite Programate',
-          subtitle: `Luna ${getCurrentMonthName()}`,
-          value: '0',
-          icon: Calendar,
-          color: 'bg-green-500',
-          change: '0',
-          changeType: 'neutral'
-        },
-        {
-          title: 'Vizite Finalizate',
-          subtitle: `Luna ${getCurrentMonthName()}`,
-          value: '0',
-          icon: CheckCircle,
-          color: 'bg-emerald-500',
-          change: '0',
-          changeType: 'neutral'
-        },
-        {
-          title: 'Vizite Anulate',
-          subtitle: `Luna ${getCurrentMonthName()}`,
-          value: '0',
-          icon: XCircle,
-          color: 'bg-red-500',
-          change: '0',
-          changeType: 'neutral'
-        }
-      ]
-    }
 
-    return [
-      {
-        title: 'Pacienți Înregistrați',
-        subtitle: `Total: ${businessStatistics.totalPatients || 0}`,
-        value: businessStatistics.activePatients?.toString() || '0',
-        icon: Users,
-        color: 'bg-blue-500',
-        change: '+0',
-        changeType: 'positive'
-      },
-      {
-        title: 'Programări Totale',
-        subtitle: `Luna ${getCurrentMonthName()}`,
-        value: businessStatistics.totalAppointments?.toString() || '0',
-        icon: Calendar,
-        color: 'bg-green-500',
-        change: '+0',
-        changeType: 'positive'
-      },
-      {
-        title: 'Programări Finalizate',
-        subtitle: `Luna ${getCurrentMonthName()}`,
-        value: businessStatistics.appointmentStats?.completed?.toString() || '0',
-        icon: CheckCircle,
-        color: 'bg-emerald-500',
-        change: '+0',
-        changeType: 'positive'
-      },
-      {
-        title: 'Programări Anulate',
-        subtitle: `Luna ${getCurrentMonthName()}`,
-        value: businessStatistics.appointmentStats?.cancelled?.toString() || '0',
-        icon: XCircle,
-        color: 'bg-red-500',
-        change: '0',
-        changeType: 'neutral'
-      }
-    ]
-  }
 
   // Transform recent activities from API format to display format
   const getRecentActivitiesData = () => {
@@ -178,20 +257,28 @@ const DashboardHome = () => {
         switch (activityType) {
           case 'appointment':
             return { icon: Calendar, color: 'text-blue-500' }
+          case 'treatment':
+            return { icon: Activity, color: 'text-indigo-500' }
           case 'patient':
             return { icon: Users, color: 'text-green-500' }
+          case 'user':
+          case 'medic':
+          case 'doctor':
+            return { icon: Users, color: 'text-purple-500' }
+          case 'invoice':
           case 'payment':
             return { icon: CreditCard, color: 'text-emerald-500' }
           case 'sale':
             return { icon: TrendingUp, color: 'text-green-500' }
           case 'inventory':
+          case 'product':
             return { icon: Package, color: 'text-orange-500' }
           default:
             return { icon: Activity, color: 'text-gray-500' }
         }
       }
 
-      const config = getActivityConfig(activity.type)
+      const config = getActivityConfig(activity.activityType || activity.type)
       
       // Format time
       const formatTime = (timestamp) => {
@@ -201,15 +288,142 @@ const DashboardHome = () => {
         
         if (diffInMinutes < 1) return 'Acum câteva secunde'
         if (diffInMinutes < 60) return `Acum ${diffInMinutes} minute`
+        if (diffInMinutes < 120) return `Acum 1 oră`
         if (diffInMinutes < 1440) return `Acum ${Math.floor(diffInMinutes / 60)} ore`
         return `Acum ${Math.floor(diffInMinutes / 1440)} zile`
       }
 
+      // Helper function to safely extract string value from object or string
+      const extractString = (value) => {
+        if (!value) return null
+        if (typeof value === 'string') return value
+        if (typeof value === 'object' && value.name) return value.name
+        if (typeof value === 'object' && value.title) return value.title
+        return null
+      }
+
+      // Build detailed description based on activity type and available data
+      const buildDescription = (activity) => {
+        const parts = []
+        
+        // Add action if available
+        if (activity.action) {
+          parts.push(activity.action)
+        }
+        
+        // Add user/medic/doctor name for user type activities
+        const userName = extractString(activity.userName)
+        const medicName = extractString(activity.medicName)
+        const doctorName = extractString(activity.doctorName)
+        
+        if (activity.activityType === 'user' || activity.activityType === 'medic' || activity.activityType === 'doctor') {
+          const name = userName || medicName || doctorName
+          if (name) {
+            parts.push(name)
+          }
+        }
+        
+        // Add patient name if available (safely extract from object or string)
+        const patientName = extractString(activity.patientName)
+        if (patientName && activity.activityType !== 'user' && activity.activityType !== 'medic' && activity.activityType !== 'doctor') {
+          parts.push(`Pacient: ${patientName}`)
+        }
+        
+        // Add service/treatment name for appointments and treatments (safely extract)
+        const serviceName = extractString(activity.serviceName) || extractString(activity.treatmentName) || extractString(activity.treatment)
+        if ((activity.activityType === 'appointment' || activity.activityType === 'treatment') && serviceName) {
+          parts.push(serviceName)
+        }
+        
+        // Add medic name for appointments (safely extract)
+        if (activity.activityType === 'appointment' && medicName) {
+          parts.push(medicName)
+        }
+        
+        // Add time for appointments
+        if (activity.activityType === 'appointment' && activity.time) {
+          parts.push(`Ora: ${activity.time}`)
+        }
+        
+        // Add product name for sales/inventory (check multiple field names)
+        const productName = extractString(activity.productName) || 
+                           extractString(activity.product) || 
+                           extractString(activity.itemName) ||
+                           (activity.activityType === 'product' && extractString(activity.serviceName))
+        if ((activity.activityType === 'sale' || activity.activityType === 'inventory' || activity.activityType === 'product') && productName) {
+          parts.push(productName)
+        }
+
+        
+        // Add quantity for sales/inventory
+        if ((activity.activityType === 'sale' || activity.activityType === 'inventory' || activity.activityType === 'product') && activity.quantity) {
+          parts.push(`${activity.quantity} buc`)
+        }
+        
+        // Add amount for invoices/payments/sales/treatments
+        const amount = activity.amount || activity.price
+        if ((activity.activityType === 'invoice' || activity.activityType === 'payment' || activity.activityType === 'sale' || activity.activityType === 'treatment') && amount) {
+          parts.push(`${amount} RON`)
+        }
+
+        
+        // Add status if available
+        if (activity.status) {
+          const statusLabels = {
+            'scheduled': 'Programat',
+            'confirmed': 'Confirmat',
+            'completed': 'Finalizat',
+            'cancelled': 'Anulat',
+            'paid': 'Plătit',
+            'unpaid': 'Neplătit',
+            'pending': 'În așteptare'
+          }
+          parts.push(statusLabels[activity.status] || activity.status)
+        }
+        
+        // Fallback to description or default (safely extract)
+        if (parts.length === 0) {
+          const description = extractString(activity.description) || extractString(activity.subtitle)
+          return description || 'Activitate în sistem'
+        }
+        
+        return parts.join(' • ')
+      }
+
+      // Generate appropriate title based on activity type
+      const getActivityTitle = (activity) => {
+        const activityType = activity.activityType || activity.type
+        
+        switch(activityType) {
+          case 'appointment':
+            return 'Programare'
+          case 'treatment':
+            return 'Tratament'
+          case 'patient':
+            return 'Pacient'
+          case 'invoice':
+            return 'Factură'
+          case 'payment':
+            return 'Plată'
+          case 'sale':
+            return 'Vânzare'
+          case 'product':
+          case 'inventory':
+            return 'Produs'
+          case 'user':
+          case 'medic':
+          case 'doctor':
+            return 'Medic'
+          default:
+            return extractString(activity.title) || 'Activitate'
+        }
+      }
+
       return {
-        type: activity.type,
-        title: activity.title || 'Activitate',
-        description: activity.subtitle || 'Activitate în sistem',
-        time: formatTime(activity.timestamp),
+        type: activity.activityType || activity.type,
+        title: getActivityTitle(activity),
+        description: buildDescription(activity),
+        time: formatTime(activity.updatedAt || activity.createdAt || activity.timestamp),
         icon: config.icon,
         color: config.color
       }
@@ -235,7 +449,7 @@ const DashboardHome = () => {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-blue-600">
-                    {loading ? '...' : businessStatistics?.totalAppointments || '0'}
+                    {loading ? '...' : getTotalAppointments()}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">Programate</p>
                 </div>
@@ -255,7 +469,7 @@ const DashboardHome = () => {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-green-600">
-                    {loading ? '...' : businessStatistics?.appointmentStats?.completed || '0'}
+                    {loading ? '...' : getCompletedAppointments()}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">Realizate</p>
                 </div>
@@ -275,7 +489,7 @@ const DashboardHome = () => {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-red-600">
-                    {loading ? '...' : businessStatistics?.appointmentStats?.cancelled || '0'}
+                    {loading ? '...' : getCancelledAppointments()}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">Anulate</p>
                 </div>
@@ -295,7 +509,7 @@ const DashboardHome = () => {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-purple-600">
-                    {loading ? '...' : businessStatistics?.totalPatients || '0'}
+                    {loading ? '...' : getTotalPatients()}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">Pacienți</p>
                 </div>
@@ -315,7 +529,7 @@ const DashboardHome = () => {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-emerald-600">
-                    {loading ? '...' : '12.5k'}
+                    {loading ? '...' : getMonthlyRevenue().toLocaleString('ro-RO')}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">Încasări RON</p>
                 </div>
@@ -323,7 +537,7 @@ const DashboardHome = () => {
             </div>
           </div>
 
-          {/* Tratamente Efectuate */}
+          {/* Absete */}
           <div className="card group hover:shadow-lg transition-shadow flex align-center justify-center">
             <div className="card-content p-4 flex align-center justify-center">
               <div className="flex flex-col gap-2 flex align-center justify-center">
@@ -335,9 +549,9 @@ const DashboardHome = () => {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-orange-600">
-                    {loading ? '...' : '47'}
+                    {loading ? '...' : getAbsentAppointments()}
                   </p>
-                  <p className="text-sm text-muted-foreground mt-1">Tratamente</p>
+                  <p className="text-sm text-muted-foreground mt-1">Absenti</p>
                 </div>
               </div>
             </div>
@@ -418,17 +632,17 @@ const DashboardHome = () => {
                       <Star className="h-4 w-4 text-yellow-500" />
                       <p className="text-sm font-medium">Rating</p>
                     </div>
-                    <p className="text-xl font-bold">4.8</p>
+                    <p className="text-xl font-bold">{getClinicRating().average.toFixed(1)}</p>
                   </div>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star 
                         key={star} 
-                        className={`h-4 w-4 ${star <= 4 ? 'fill-yellow-500 text-yellow-500' : 'text-gray-300'}`} 
+                        className={`h-4 w-4 ${star <= Math.floor(getClinicRating().average) ? 'fill-yellow-500 text-yellow-500' : 'text-gray-300'}`} 
                       />
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">127 recenzii</p>
+                  <p className="text-xs text-muted-foreground">{getClinicRating().totalReviews} recenzii</p>
                 </div>
 
                 {/* SMS-uri Trimise */}
@@ -438,12 +652,12 @@ const DashboardHome = () => {
                       <MessageSquare className="h-4 w-4 text-blue-500" />
                       <p className="text-sm font-medium">SMS-uri</p>
                     </div>
-                    <p className="text-xl font-bold">234</p>
+                    <p className="text-xl font-bold">{getSmsStats().sent}</p>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '78%' }}></div>
+                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${getSmsStats().percentage}%` }}></div>
                   </div>
-                  <p className="text-xs text-muted-foreground">78% limită</p>
+                  <p className="text-xs text-muted-foreground">{getSmsStats().percentage}% limită ({getSmsStats().sent}/{getSmsStats().limit})</p>
                 </div>
 
                 {/* Grad de Ocupare */}
@@ -453,12 +667,14 @@ const DashboardHome = () => {
                       <Percent className="h-4 w-4 text-green-500" />
                       <p className="text-sm font-medium">Ocupare</p>
                     </div>
-                    <p className="text-xl font-bold">85%</p>
+                    <p className="text-xl font-bold">{getOccupancyRate()}%</p>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: '85%' }}></div>
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `${getOccupancyRate()}%` }}></div>
                   </div>
-                  <p className="text-xs text-muted-foreground">Foarte bine</p>
+                  <p className="text-xs text-muted-foreground">
+                    {getOccupancyRate() >= 80 ? 'Foarte bine' : getOccupancyRate() >= 60 ? 'Bine' : 'Acceptabil'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -505,6 +721,9 @@ const DashboardHome = () => {
           <ChartBarLabelCustom 
             title="Tratamente populare" 
             description="Cele mai solicitate tratamente luna aceasta"
+            data={getPopularTreatments()}
+            dataKey="count"
+            nameKey="treatment"
           />
       </div>
 
@@ -522,7 +741,7 @@ const DashboardHome = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : (
-              <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2">
+              <div className="max-h-[700px] overflow-y-auto space-y-4 pr-2">
                 {getRecentActivitiesData().map((activity, index) => (
                   <div key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
                     <div className={`h-10 w-10 rounded-full bg-muted flex items-center justify-center ${activity.color}`}>

@@ -64,20 +64,65 @@ export const useSales = () => {
       const operation = type?.replace('resource_', '') || type
       const saleId = data?.id || data?.resourceId
       if (!saleId) return
-      const ui = salesManager.transformForUI ? salesManager.transformForUI({ ...data, id: saleId, resourceId: saleId }) : { ...data, id: saleId, resourceId: saleId }
-      if (operation === 'created' || operation === 'create') {
-        const idx = sharedSales.findIndex(s => s.id === saleId || s.resourceId === saleId)
-        if (idx >= 0) sharedSales[idx] = { ...ui, _isOptimistic: false }
-        else sharedSales = [{ ...ui, _isOptimistic: false }, ...sharedSales]
-        notifySubscribers()
-      } else if (operation === 'updated' || operation === 'update') {
-        const idx = sharedSales.findIndex(s => s.id === saleId || s.resourceId === saleId)
-        if (idx >= 0) sharedSales[idx] = { ...ui, _isOptimistic: false }
-        else sharedSales = [{ ...ui, _isOptimistic: false }, ...sharedSales]
-        notifySubscribers()
-      } else if (operation === 'deleted' || operation === 'delete') {
-        sharedSales = sharedSales.filter(s => (s.id !== saleId && s.resourceId !== saleId))
-        notifySubscribers()
+      
+      try {
+        if (operation === 'created' || operation === 'create') {
+          // Înlocuiește vânzarea optimistă cu datele reale
+          const ui = salesManager.transformForUI ? salesManager.transformForUI({ ...data, id: saleId, resourceId: saleId }) : { ...data, id: saleId, resourceId: saleId }
+          
+          // Caută în outbox pentru a găsi operația optimistă folosind ID-ul real
+          const outboxEntry = await indexedDb.outboxFindByResourceId(saleId, 'sale')
+          
+          if (outboxEntry) {
+            const optimisticIndex = sharedSales.findIndex(s => s._tempId === outboxEntry.tempId)
+            if (optimisticIndex >= 0) {
+              sharedSales[optimisticIndex] = { ...ui, _isOptimistic: false }
+            }
+            await indexedDb.outboxDelete(outboxEntry.id)
+          } else {
+            // Dacă nu găsim în outbox, încercăm să găsim după euristică
+            const optimisticIndex = sharedSales.findIndex(s => 
+              s._isOptimistic && 
+              s.total === data.total &&
+              s.date === data.date &&
+              s.items?.length === data.items?.length
+            )
+            if (optimisticIndex >= 0) {
+              sharedSales[optimisticIndex] = { ...ui, _isOptimistic: false }
+            } else {
+              // Verifică dacă nu există deja (evită dubluri)
+              const existingIndex = sharedSales.findIndex(s => s.id === saleId || s.resourceId === saleId)
+              if (existingIndex >= 0) {
+                sharedSales[existingIndex] = { ...ui, _isOptimistic: false }
+              } else {
+                // Adaugă ca nou doar dacă nu există deloc
+                sharedSales = [{ ...ui, _isOptimistic: false }, ...sharedSales]
+              }
+            }
+          }
+          
+          notifySubscribers()
+        } else if (operation === 'updated' || operation === 'update') {
+          // Dezactivează flag-ul optimistic
+          const ui = salesManager.transformForUI ? salesManager.transformForUI({ ...data, id: saleId, resourceId: saleId }) : { ...data, id: saleId, resourceId: saleId }
+          const existingIndex = sharedSales.findIndex(s => 
+            s.id === saleId || s.resourceId === saleId
+          )
+          if (existingIndex >= 0) {
+            sharedSales[existingIndex] = { ...ui, _isOptimistic: false }
+          }
+          
+          notifySubscribers()
+        } else if (operation === 'deleted' || operation === 'delete') {
+          // Elimină vânzarea din lista locală
+          sharedSales = sharedSales.filter(s => {
+            const matches = s.id === saleId || s.resourceId === saleId
+            return !matches
+          })
+          notifySubscribers()
+        }
+      } catch (error) {
+        console.error('Error handling sale WebSocket message:', error)
       }
     }
 

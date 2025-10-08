@@ -19,6 +19,10 @@ class AppDatabase extends Dexie {
       statistics: 'id, timestamp',
       report: 'resourceId, date, status',
       setting: 'resourceId, settingType, value, status',
+      
+      // Invoice stores
+      invoice: 'resourceId, invoiceNumber, clientName, issueDate, dueDate, status, total',
+      'invoice-clients': 'resourceId, clientName, clientCUI, clientCNP, clientEmail, clientType',
 
       // Keep technical stores
       appointmentCounts: 'date, count',
@@ -434,6 +438,51 @@ export const indexedDb = {
     } catch (error) {
       console.warn(`Failed to bulkAdd to ${storeName}:`, error);
     }
+  },
+  
+  // Metode specifice pentru facturi
+  async getInvoicesByStatus(status) {
+    return db.invoice
+      .where('status')
+      .equals(status)
+      .toArray();
+  },
+  
+  async getInvoicesByDateRange(startDate, endDate) {
+    return db.invoice
+      .where('issueDate')
+      .between(startDate, endDate)
+      .toArray();
+  },
+  
+  async searchInvoices(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    return db.invoice
+      .filter(invoice => 
+        invoice.invoiceNumber?.toLowerCase().includes(term) ||
+        invoice.clientName?.toLowerCase().includes(term)
+      )
+      .toArray();
+  },
+  
+  // Metode specifice pentru clienți de factură
+  async searchInvoiceClients(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    return db['invoice-clients']
+      .filter(client => 
+        client.clientName?.toLowerCase().includes(term) ||
+        client.clientCUI?.toLowerCase().includes(term) ||
+        client.clientCNP?.toLowerCase().includes(term) ||
+        client.clientEmail?.toLowerCase().includes(term)
+      )
+      .toArray();
+  },
+  
+  async getInvoiceClientsByType(clientType) {
+    return db['invoice-clients']
+      .where('clientType')
+      .equals(clientType)
+      .toArray();
   }
 };
 

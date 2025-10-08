@@ -18,7 +18,7 @@ import {
 
 export const description = "A bar chart with a custom label"
 
-const chartData = [
+const defaultChartData = [
   { month: "January", desktop: 186, mobile: 80 },
   { month: "February", desktop: 305, mobile: 200 },
   { month: "March", desktop: 237, mobile: 120 },
@@ -27,21 +27,38 @@ const chartData = [
   { month: "June", desktop: 214, mobile: 140 },
 ]
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--chart-2)",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--chart-2)",
-  },
-  label: {
-    color: "var(--background)",
-  },
-} satisfies ChartConfig
+interface ChartBarLabelCustomProps {
+  title?: string;
+  description?: string;
+  data?: Array<{ treatment: string; count: number }>;
+  dataKey?: string;
+  nameKey?: string;
+}
 
-export function ChartBarLabelCustom({ title = "Bar Chart - Custom Label", description = "January - June 2024" }) {
+export function ChartBarLabelCustom({ 
+  title = "Bar Chart - Custom Label", 
+  description = "January - June 2024",
+  data,
+  dataKey = "desktop",
+  nameKey = "month"
+}: ChartBarLabelCustomProps) {
+  // Transform treatment data to chart format if provided
+  const chartData = data 
+    ? data.map(item => ({
+        [nameKey]: item.treatment,
+        [dataKey]: item.count
+      }))
+    : defaultChartData
+
+  const chartConfig = {
+    [dataKey]: {
+      label: dataKey === "count" ? "Număr" : dataKey === "desktop" ? "Desktop" : "Valoare",
+      color: "hsl(221.2 83.2% 53.3%)",
+    },
+    label: {
+      color: "hsl(var(--background))",
+    },
+  } satisfies ChartConfig
   return (
     <Card>
       <CardHeader>
@@ -61,7 +78,7 @@ export function ChartBarLabelCustom({ title = "Bar Chart - Custom Label", descri
             >
               <CartesianGrid horizontal={false} />
               <YAxis
-                dataKey="month"
+                dataKey={nameKey}
                 type="category"
                 tickLine={false}
                 tickMargin={10}
@@ -69,21 +86,21 @@ export function ChartBarLabelCustom({ title = "Bar Chart - Custom Label", descri
                 tickFormatter={(value) => value.slice(0, 3)}
                 hide
               />
-              <XAxis dataKey="desktop" type="number" hide />
+              <XAxis dataKey={dataKey} type="number" hide />
               <Bar
-                dataKey="desktop"
-                fill="var(--color-desktop)"
+                dataKey={dataKey}
+                fill="hsl(221.2 83.2% 53.3%)"
                 radius={4}
               >
                 <LabelList
-                  dataKey="month"
+                  dataKey={nameKey}
                   position="insideLeft"
                   offset={8}
-                  className="fill-(--color-label)"
+                  className="fill-background"
                   fontSize={12}
                 />
                 <LabelList
-                  dataKey="desktop"
+                  dataKey={dataKey}
                   position="right"
                   offset={8}
                   className="fill-foreground"

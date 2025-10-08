@@ -3,7 +3,8 @@ import {
   Loader2,
   Trash2,
   Clock,
-  Stethoscope
+  Stethoscope,
+  Pipette
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTreatments } from '../../hooks/useTreatments.js'
@@ -14,6 +15,12 @@ import {
   DrawerFooter 
 } from '../ui/drawer'
 import CategoryCombobox from '../combobox/CategoryCombobox.jsx'
+import { ColorInput } from '../ui/color-input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '../ui/popover'
 
 const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null, position = "side" }) => {
   const [loading, setLoading] = useState(false)
@@ -27,6 +34,7 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
       return {
         treatmentType: treatmentData.treatmentType || '',
         category: treatmentData.category || '',
+        color: treatmentData.color || '#3b82f6',
         duration: treatmentData.duration?.toString() || '',
         price: treatmentData.price?.toString() || '',
         description: treatmentData.description || '',
@@ -36,6 +44,7 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
     return {
       treatmentType: '',
       category: '',
+      color: '#3b82f6',
       duration: '',
       price: '',
       description: '',
@@ -138,13 +147,60 @@ const TreatmentDrawer = ({ onClose, isNewTreatment = false, treatmentData = null
           {/* Category */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Categorie</label>
-            <CategoryCombobox
-              value={formData.category}
-              onValueChange={(category) => handleInputChange('category', category)}
-              onAddNewCategory={handleAddNewCategory}
-              categories={categories}
-              placeholder="Selectează sau adaugă o categorie"
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <CategoryCombobox
+                  value={formData.category}
+                  onValueChange={(category) => handleInputChange('category', category)}
+                  onAddNewCategory={handleAddNewCategory}
+                  categories={categories}
+                  placeholder="Selectează sau adaugă o categorie"
+                />
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-10 px-3 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors"
+                    title="Selectează culoare tratament"
+                  >
+                    <div 
+                      className="w-5 h-5 rounded-full border-2 border-zinc-300 dark:border-zinc-600 shadow-sm"
+                      style={{ backgroundColor: formData.color }}
+                    />
+                    <Pipette className="h-4 w-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-auto p-0">
+                  <ColorInput
+                    label=""
+                    defaultValue={formData.color}
+                    onChange={(color) => handleInputChange('color', color)}
+                    showOpacity={false}
+                    swatches={[
+                      "#ef4444", // red
+                      "#f97316", // orange
+                      "#f59e0b", // amber
+                      "#eab308", // yellow
+                      "#84cc16", // lime
+                      "#22c55e", // green
+                      "#10b981", // emerald
+                      "#14b8a6", // teal
+                      "#06b6d4", // cyan
+                      "#3b82f6", // blue
+                      "#6366f1", // indigo
+                      "#8b5cf6", // violet
+                      "#a855f7", // purple
+                      "#d946ef", // fuchsia
+                      "#ec4899", // pink
+                      "#f43f5e", // rose
+                      "#64748b", // slate
+                      "#78716c", // stone
+                    ]}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           {/* Duration */}

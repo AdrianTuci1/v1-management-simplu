@@ -3,23 +3,8 @@ class UserManager {
   validateUser(userData, existingId = null) {
     const errors = []
 
-    // Validări pentru câmpurile din UserDrawer
-    if (!userData.medicName?.trim()) {
-      errors.push('Numele medicului este obligatoriu')
-    } else if (userData.medicName.trim().length < 2) {
-      errors.push('Numele medicului trebuie să aibă cel puțin 2 caractere')
-    }
-
-    if (!userData.email?.trim()) {
-      errors.push('Email-ul este obligatoriu')
-    } else if (!this.isValidEmail(userData.email)) {
-      errors.push('Email-ul nu este valid')
-    }
-
-
-
     // Validare pentru rol
-    if (!userData.role?.trim()) {
+    if (!userData.role || (typeof userData.role === 'object' && !userData.role.id)) {
       errors.push('Rolul este obligatoriu')
     }
 
@@ -50,7 +35,7 @@ class UserManager {
       email: userData.email?.trim().toLowerCase(),
       phone: userData.phone?.trim(),
       dutyDays: userData.dutyDays || [],
-      role: userData.role || 'doctor',
+      role: userData.role || null, // Păstrăm structura role: { id, name } sau null
       createdAt: userData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }

@@ -36,6 +36,7 @@ const RoleDrawer = ({ onClose, roleData = null, position = "side" }) => {
     { value: 'plan', label: 'Plan Tratament' },
     { value: 'setting', label: 'Setări' },
     { value: 'invoice-client', label: 'Clienți Facturare' },
+    { value: 'invoice', label: 'Facturi' },
     { value: 'statistics', label: 'Statistici' },
     { value: 'recent-activities', label: 'Activități Recente' }
   ]
