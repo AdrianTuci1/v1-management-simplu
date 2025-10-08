@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Calendar, FileText, Image, User, Pill } from 'lucide-react'
-import Navbar from './components/Navbar'
 import NewSidebar from './components/NewSidebar'
 import DraftMainDrawer from './components/drawers/DraftMainDrawer'
 import { Drawer, DrawerExternalNavigation } from './components/ui/drawer'
@@ -235,12 +234,6 @@ function AppContent() {
 
   return (
     <div className="h-screen bg-background w-full relative">
-        {/* Floating Navbar */}
-        <Navbar 
-          currentView={currentView}
-          currentLocation={selectedLocation}
-        />
-      
       {/* Main Content */}
       <div className="h-full flex overflow-hidden">
         {/* Sidebar with padding */}
@@ -257,7 +250,7 @@ function AppContent() {
         
         {/* Content Area */}
         <main className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-auto p-6 pt-20">
+          <div className="flex-1 overflow-auto p-6">
             <Dashboard 
               currentView={currentView}
               currentLocation={selectedLocation}

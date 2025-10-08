@@ -319,30 +319,27 @@ const OperationsPlanning = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Planificare</h1>
-          <p className="text-muted-foreground">
-            Gestionează programările
-          </p>
+      <div className="flex items-center justify-start gap-3">
+        {/* Chip cu titlul */}
+        <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-sm">
+          <span className="font-semibold text-sm">Planificare</span>
         </div>
+
+        {/* Separator subtil */}
+        <div className="h-6 w-px bg-gray-200"></div>
+
+        {/* Butoane rotunde */}
         <div className="flex gap-2">
           {/* Buton pentru comutare între List și Timeline View */}
           <button
             onClick={toggleViewMode}
-            className="btn btn-outline btn-sm"
+            className="h-9 w-9 rounded-full bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center shadow-sm transition-all"
             title={viewMode === 'list' ? 'Comută la Timeline' : 'Comută la Listă'}
           >
             {viewMode === 'list' ? (
-              <>
-                <ChartNoAxesGantt className="h-4 w-4 mr-2" />
-                Timeline
-              </>
+              <ChartNoAxesGantt className="h-4 w-4 text-gray-700" />
             ) : (
-              <>
-                <CalendarDays className="h-4 w-4 mr-2" />
-                Listă
-              </>
+              <CalendarDays className="h-4 w-4 text-gray-700" />
             )}
           </button>
 
@@ -351,17 +348,18 @@ const OperationsPlanning = () => {
             <>
               <button
                 onClick={cycleViewType}
-                className="btn btn-primary btn-sm flex items-center gap-2"
+                className="h-9 px-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center gap-1.5 shadow-sm transition-all"
                 title={`Afișează ${getDaysCount()} ${getDaysCount() === 1 ? 'zi' : 'zile'}`}
               >
-                <CalendarDays className="h-4 w-4" />
-                {getDaysCount()} {getDaysCount() === 1 ? 'zi' : 'zile'}
+                <CalendarDays className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">{getDaysCount()}</span>
               </button>
               <button
                 onClick={goToCurrent}
-                className="btn btn-outline btn-sm"
+                className="h-9 w-9 rounded-full bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center shadow-sm transition-all"
+                title="Navighează la ziua curentă"
               >
-                <RefreshCcw className="h-4 w-4" />
+                <RefreshCcw className="h-4 w-4 text-gray-700" />
               </button>
             </>
           )}
@@ -372,16 +370,16 @@ const OperationsPlanning = () => {
               type="date"
               value={timelineDate}
               onChange={(e) => handleTimelineeDateChange(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400 cursor-pointer"
+              className="h-9 px-3 text-sm border border-gray-200 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
             />
           )}
 
           <button
             onClick={() => openDrawer({ type: 'appointment', isNew: true })}
-            className="btn btn-primary"
+            className="h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-all"
+            title="Programare nouă"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Programare nouă
+            <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -555,7 +553,7 @@ const OperationsPlanning = () => {
         </>
       ) : (
         /* Timeline View */
-        <div className="card rounded-lg" style={{ height: 'calc(100vh - 200px)' }}>
+        <div className="card rounded-lg" style={{ height: 'calc(100vh - 120px)' }}>
           <Timeline
             date={timelineDate}
             appointments={appointments}

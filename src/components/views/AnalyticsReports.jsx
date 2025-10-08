@@ -157,26 +157,31 @@ const AnalyticsReports = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Rapoarte</h1>
-          <p className="text-muted-foreground">Analize și rapoarte detaliate</p>
+      <div className="flex items-center justify-start gap-3">
+        {/* Chip cu titlul */}
+        <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-sm">
+          <span className="font-semibold text-sm">Rapoarte</span>
         </div>
-        <div className="flex items-center gap-3">
-          <DatePicker
-            value={selectedDate}
-            onChange={setSelectedDate}
-            placeholder="Selectează data"
-            className="w-48"
-          />
-          <button 
-            onClick={() => setShowGenerateModal(true)}
-            className="btn btn-primary flex items-center gap-2"
-          >
-            <BarChart3 className="h-4 w-4" />
-            Raport nou
-          </button>
-        </div>
+
+        {/* Separator subtil */}
+        <div className="h-6 w-px bg-gray-200"></div>
+
+        {/* Date picker */}
+        <DatePicker
+          value={selectedDate}
+          onChange={setSelectedDate}
+          placeholder="Selectează data"
+          className="w-48"
+        />
+
+        {/* Buton generare raport */}
+        <button 
+          onClick={() => setShowGenerateModal(true)}
+          className="h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-all"
+          title="Raport nou"
+        >
+          <BarChart3 className="h-4 w-4" />
+        </button>
       </div>
 
 
@@ -208,7 +213,7 @@ const AnalyticsReports = () => {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 210px)' }}>
               <table className="w-full">
                 <thead>
                   <tr className="border-b">

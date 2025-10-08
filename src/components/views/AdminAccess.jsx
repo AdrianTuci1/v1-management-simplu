@@ -101,11 +101,16 @@ const AdminAccess = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Control Acces</h1>
-          <p className="text-muted-foreground">Gestionează rolurile și permisiunile</p>
+      <div className="flex items-center justify-start gap-3">
+        {/* Chip cu titlul */}
+        <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-sm">
+          <span className="font-semibold text-sm">Control Acces</span>
         </div>
+
+        {/* Separator subtil */}
+        <div className="h-6 w-px bg-gray-200"></div>
+
+        {/* Buton adăugare rol */}
         <PermissionGate permission="roles:create">
           <button 
             onClick={() => {
@@ -113,10 +118,10 @@ const AdminAccess = () => {
                 type: 'role',
               })
             }} 
-            className="btn btn-primary"
+            className="h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-all"
+            title="Rol nou"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Rol nou
+            <Plus className="h-4 w-4" />
           </button>
         </PermissionGate>
       </div>
@@ -206,7 +211,7 @@ const AdminAccess = () => {
               </PermissionGate>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 550px)' }}>
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>

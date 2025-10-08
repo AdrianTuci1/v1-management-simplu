@@ -117,17 +117,61 @@ const BusinessInventory = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Inventar</h1>
-          <p className="text-muted-foreground">Gestionează stocul și produsele</p>
+      <div className="flex items-center justify-start gap-3">
+        {/* Chip cu titlul */}
+        <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-sm">
+          <span className="font-semibold text-sm">Inventar</span>
         </div>
+
+        {/* Separator subtil */}
+        <div className="h-6 w-px bg-gray-200"></div>
+
+        {/* Bara de căutare */}
+        <div className="flex-1 max-w-md relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Caută produse..."
+            value={searchTerm}
+            onChange={handleSearch}
+            className="w-full h-9 rounded-full border border-gray-200 bg-white px-3 py-2 pl-9 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Filtru categorie */}
+        <select
+          value={selectedCategory}
+          onChange={(e) => handleCategoryFilter(e.target.value)}
+          className="h-9 px-3 rounded-full border border-gray-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="">Toate</option>
+          {categories.map(category => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+
+        {/* Buton stoc scăzut */}
+        <button
+          onClick={handleLowStockFilter}
+          className={`h-9 w-9 rounded-full flex items-center justify-center shadow-sm transition-all ${
+            showLowStock 
+              ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+              : 'bg-white border border-gray-200 hover:bg-gray-50 text-gray-700'
+          }`}
+          title="Stoc scăzut"
+        >
+          <AlertTriangle className="h-4 w-4" />
+        </button>
+
+        {/* Buton adăugare produs */}
         <button 
           onClick={() => openDrawer({ type: 'product' })} 
-          className="btn btn-primary"
+          className="h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-all"
+          title="Produs nou"
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Produs nou
+          <Plus className="h-4 w-4" />
         </button>
       </div>
 
@@ -184,51 +228,6 @@ const BusinessInventory = () => {
         </div>
       )}
 
-      {/* Filtre și Căutare */}
-      <div className="card">
-        <div className="card-content">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Caută produse după nume..."
-                value={searchTerm}
-                onChange={handleSearch}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <select
-                value={selectedCategory}
-                onChange={(e) => handleCategoryFilter(e.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Toate categoriile</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              
-              <button
-                onClick={handleLowStockFilter}
-                className={`h-10 px-4 py-2 rounded-md border flex items-center gap-2 ${
-                  showLowStock 
-                    ? 'bg-orange-50 border-orange-300 text-orange-700' 
-                    : 'bg-background border-input text-foreground'
-                }`}
-              >
-                <AlertTriangle className="h-4 w-4" />
-                Stoc scăzut
-              </button>
-              
-            </div>
-          </div>
-        </div>
-      </div>
 
 
       {/* Lista Produse */}
@@ -261,7 +260,7 @@ const BusinessInventory = () => {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 240px)' }}>
               <table className="w-full">
                 <thead>
                   <tr className="border-b">

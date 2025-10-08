@@ -157,52 +157,46 @@ const AdminUsers = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Medici</h1>
-          <p className="text-muted-foreground">Gestionează medicii sistemului</p>
+      <div className="flex items-center justify-start gap-3">
+        {/* Chip cu titlul */}
+        <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-sm">
+          <span className="font-semibold text-sm">Medici</span>
         </div>
-        <div className="flex gap-2">
-          <PermissionGate permission="users:create">
-            <button 
-              onClick={() => openDrawer({ type: 'medic' })} 
-              className="btn btn-primary flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Medic nou
-            </button>
-          </PermissionGate>
-        </div>
-      </div>
 
+        {/* Separator subtil */}
+        <div className="h-6 w-px bg-gray-200"></div>
 
-      {/* Filters and Search */}
-      <div className="card flex">
-        <div className="card-conten p-2">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Caută medic"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className="btn btn-outline"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filtrează
-              </button>
-            </div>
-          </div>
+        {/* Bara de căutare */}
+        <div className="flex-1 max-w-md relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Caută medic..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full h-9 rounded-full border border-gray-200 bg-white px-3 py-2 pl-9 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
+
+        {/* Buton filtrare */}
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className="h-9 w-9 rounded-full bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center shadow-sm transition-all"
+          title="Filtrează"
+        >
+          <Filter className="h-4 w-4 text-gray-700" />
+        </button>
+
+        {/* Buton adăugare medic */}
+        <PermissionGate permission="users:create">
+          <button 
+            onClick={() => openDrawer({ type: 'medic' })} 
+            className="h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-all"
+            title="Medic nou"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </PermissionGate>
       </div>
 
 
@@ -250,7 +244,7 @@ const AdminUsers = () => {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 210px)' }}>
               <table className="w-full">
                 <thead>
                   <tr className="border-b">

@@ -139,43 +139,35 @@ const OperationsPeople = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Pacienti</h1>
-          <p className="text-muted-foreground">
-            Gestionează clienții
-          </p>
+      <div className="flex items-center justify-start gap-3">
+        {/* Chip cu titlul */}
+        <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-sm">
+          <span className="font-semibold text-sm">Pacienți</span>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => openDrawer({ type: 'new-person' })}
-            className="btn btn-primary"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Pacient nou
-          </button>
+
+        {/* Separator subtil */}
+        <div className="h-6 w-px bg-gray-200"></div>
+
+        {/* Bara de căutare */}
+        <div className="flex-1 max-w-md relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Caută pacienți..."
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-full h-9 rounded-full border border-gray-200 bg-white px-3 py-2 pl-9 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
-      </div>
 
-
-
-      {/* Filters and Search */}
-      <div className="card">
-        <div className="card-content">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Caută pacienți după nume, email, telefon..."
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-            </div>
-            
-          </div>
-        </div>
+        {/* Buton adăugare pacient */}
+        <button
+          onClick={() => openDrawer({ type: 'new-person' })}
+          className="h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-all"
+          title="Pacient nou"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
       </div>
 
 
@@ -221,7 +213,7 @@ const OperationsPeople = () => {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 210px)' }}>
               <table className="w-full">
                 <thead>
                   <tr className="border-b">

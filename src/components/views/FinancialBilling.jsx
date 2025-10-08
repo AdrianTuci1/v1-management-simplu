@@ -78,26 +78,31 @@ const FinancialBilling = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Facturare</h1>
-          <p className="text-muted-foreground">Gestionează facturile și plățile</p>
+      <div className="flex items-center justify-start gap-3">
+        {/* Chip cu titlul */}
+        <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-sm">
+          <span className="font-semibold text-sm">Facturare</span>
         </div>
-        <div className="flex items-center gap-3">
-          <DatePicker
-            value={selectedDate}
-            onChange={setSelectedDate}
-            placeholder="Selectează data"
-            className="w-48"
-          />
-          <button 
-            onClick={handleCreateInvoice}
-            className="btn btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Factură nouă
-          </button>
-        </div>
+
+        {/* Separator subtil */}
+        <div className="h-6 w-px bg-gray-200"></div>
+
+        {/* Date picker */}
+        <DatePicker
+          value={selectedDate}
+          onChange={setSelectedDate}
+          placeholder="Selectează data"
+          className="w-48"
+        />
+
+        {/* Buton adăugare factură */}
+        <button 
+          onClick={handleCreateInvoice}
+          className="h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-all"
+          title="Factură nouă"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
       </div>
 
 
@@ -129,7 +134,7 @@ const FinancialBilling = () => {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 400px)' }}>
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
