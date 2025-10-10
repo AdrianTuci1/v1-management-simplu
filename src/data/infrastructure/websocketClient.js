@@ -155,10 +155,26 @@ export function connectWebSocket(url) {
     createWorker();
     const channelName = buildResourcesChannel();
     
-    sendToWorker('connect', { url, channelName });
+    sendToWorker('connect', { url, channelName }).catch(error => {
+      console.error('[WebSocket] Connection failed:', error);
+      connectionStatus = 'error';
+      // Notify listeners about connection error
+      listeners.forEach((cb) => cb({ 
+        type: 'connection_error', 
+        status: 'error', 
+        message: 'WebSocket indisponibil. Verificați conexiunea la server.' 
+      }));
+    });
     
   } catch (error) {
+    console.error('[WebSocket] Failed to initialize:', error);
     connectionStatus = 'error';
+    // Notify listeners about initialization error
+    listeners.forEach((cb) => cb({ 
+      type: 'connection_error', 
+      status: 'error', 
+      message: 'WebSocket indisponibil. Verificați conexiunea la server.' 
+    }));
   }
 }
 

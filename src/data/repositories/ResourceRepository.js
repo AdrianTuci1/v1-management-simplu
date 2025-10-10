@@ -10,6 +10,17 @@ export class ResourceRepository {
     this.store = store;
   }
 
+  // Check if we're using a demo token
+  isDemoToken() {
+    const authToken = localStorage.getItem('auth-token');
+    return authToken === 'demo-jwt-token';
+  }
+
+  // Check if in demo mode
+  isInDemoMode() {
+    return import.meta.env.VITE_DEMO_MODE === 'true' || this.isDemoToken();
+  }
+
   // Remove all optimistic entries for this store once real data arrives
   async clearOptimisticEntries() {
     try {
@@ -32,7 +43,7 @@ export class ResourceRepository {
     // Verifică dacă sistemul poate face cereri
     // Permite cererile dacă nu s-a făcut încă health check sau dacă este în demo mode
     const healthStatus = healthRepository.getCurrentStatus();
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    const isDemoMode = this.isInDemoMode();
     
     // Blochează cererile doar dacă:
     // 1. Nu este în demo mode
@@ -48,7 +59,6 @@ export class ResourceRepository {
       const response = await apiRequest(this.resourceType, resourcesEndpoint, options);
       
       // Dacă cererea a reușit, actualizează starea de sănătate la 'healthy'
-      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
       if (!isDemoMode) {
         // Notifică health repository că serverul răspunde
         healthRepository.markServerHealthy();
@@ -57,7 +67,6 @@ export class ResourceRepository {
       return response;
     } catch (error) {
       // In demo mode, API calls are expected to fail - don't log as error
-      const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
       if (!isDemoMode) {
         console.error('API request failed:', error);
         // Notifică health repository că serverul nu răspunde
@@ -74,17 +83,17 @@ export class ResourceRepository {
   }
 
   async query(params) {
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    const isDemoMode = this.isInDemoMode();
 
     // In demo mode, get data from IndexedDB instead of API
     if (isDemoMode) {
-      console.log(`Demo mode: Getting ${this.resourceType} data from IndexedDB`);
+      console.log(`📦 Demo mode: Getting ${this.resourceType} data from IndexedDB`);
       try {
         const data = await db.table(this.store).toArray();
-        console.log(`Demo mode: Found ${data.length} ${this.resourceType} items in IndexedDB`);
+        console.log(`✅ Demo mode: Found ${data.length} ${this.resourceType} items in IndexedDB`);
         return data;
       } catch (error) {
-        console.warn(`Demo mode: Error getting ${this.resourceType} from IndexedDB:`, error);
+        console.warn(`⚠️ Demo mode: Error getting ${this.resourceType} from IndexedDB:`, error);
         return [];
       }
     }
@@ -189,7 +198,7 @@ export class ResourceRepository {
   }
 
   async getById(id) {
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    const isDemoMode = this.isInDemoMode();
     
     // In demo mode, get data from IndexedDB instead of API
     if (isDemoMode) {
@@ -254,7 +263,7 @@ export class ResourceRepository {
   }
 
   async add(resource) {
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    const isDemoMode = this.isInDemoMode();
     
     // In demo mode, add to IndexedDB directly
     if (isDemoMode) {
@@ -367,7 +376,7 @@ export class ResourceRepository {
   }
 
   async update(id, resource) {
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    const isDemoMode = this.isInDemoMode();
     
     // In demo mode, update IndexedDB directly
     if (isDemoMode) {
@@ -477,7 +486,7 @@ export class ResourceRepository {
   }
 
   async remove(id) {
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    const isDemoMode = this.isInDemoMode();
     
     // In demo mode, delete from IndexedDB directly
     if (isDemoMode) {

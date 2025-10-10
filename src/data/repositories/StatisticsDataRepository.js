@@ -7,14 +7,39 @@ export class StatisticsDataRepository {
     // No default resourceType - it will be set based on the request type
   }
 
+  // Check if we're using a demo token
+  isDemoToken() {
+    const authToken = localStorage.getItem('auth-token');
+    return authToken === 'demo-jwt-token';
+  }
+
+  // Check if in demo mode
+  isInDemoMode() {
+    return import.meta.env.VITE_DEMO_MODE === 'true' || this.isDemoToken();
+  }
+
   async query(params = {}) {
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    // Check if in demo mode (either from .env or from demo button)
+    const isDemoMode = this.isInDemoMode();
     
-    // In demo mode, generate statistics from demo data
+    // In demo mode, try to get from cache first, then generate if needed
     if (isDemoMode) {
-      console.log('Demo mode: Generating statistics from demo data');
+      console.log('📊 Demo mode detected: Loading statistics from cache...');
       const statisticsType = params.type || 'business-statistics';
       
+      // Try to load from cache first
+      try {
+        const cached = await db.table('statistics').get(statisticsType);
+        if (cached && cached.data) {
+          console.log(`✅ Loaded ${statisticsType} from cache:`, cached.data);
+          return cached.data;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Could not load ${statisticsType} from cache:`, error);
+      }
+      
+      // If no cache, generate from demo data
+      console.log(`📦 No cache found, generating ${statisticsType} from demo data...`);
       if (statisticsType === 'business-statistics') {
         return await this.generateBusinessStatisticsFromDemoData();
       } else if (statisticsType === 'recent-activities') {

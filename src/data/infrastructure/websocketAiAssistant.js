@@ -89,8 +89,11 @@ export class WebSocketAIAssistant {
       await this.connectWithWorker();
     } catch (error) {
       Logger.log('error', 'Failed to connect to AI WebSocket server', error);
-      this.onError?.(getConfig('ERRORS.CONNECTION_FAILED'), error);
-      this.scheduleReconnect();
+      this.isConnected = false;
+      this.onConnectionChange?.(false);
+      this.onError?.('WebSocket indisponibil. Verificați conexiunea la server.', error);
+      // Nu mai programăm reconectare automată
+      // this.scheduleReconnect();
     }
   }
 
@@ -208,13 +211,13 @@ export class WebSocketAIAssistant {
       case 'error':
         this.isConnected = false;
         this.onConnectionChange?.(false);
-        this.onError?.('WebSocket connection error', data.data);
+        this.onError?.('WebSocket indisponibil. Verificați conexiunea la server.', data.data);
         break;
         
       case 'timeout':
         this.isConnected = false;
         this.onConnectionChange?.(false);
-        this.onError?.('WebSocket connection timeout');
+        this.onError?.('WebSocket indisponibil. Verificați conexiunea la server.');
         break;
     }
   }
@@ -602,40 +605,28 @@ export class WebSocketAIAssistant {
       this.heartbeatInterval = null;
     }
     
-    // Schedule reconnection if not manually disconnected
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.scheduleReconnect();
-    } else {
-      Logger.log('error', 'Max reconnection attempts reached');
-      this.onError?.('Max reconnection attempts reached');
-    }
+    // Nu mai programăm reconectare automată - doar notificăm utilizatorul
+    Logger.log('warn', 'WebSocket disconnected - no automatic reconnection');
+    this.onError?.('WebSocket indisponibil. Verificați conexiunea la server.');
   }
 
   /**
-   * Programează reconectarea
+   * Programează reconectarea (DISABLED - nu mai reconectăm automat)
    */
   scheduleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      Logger.log('warn', 'Max reconnection attempts reached, stopping reconnection');
-      return;
-    }
+    Logger.log('info', 'Automatic reconnection is disabled. Please reconnect manually if needed.');
+    // Reconectarea automată este dezactivată
+    // Utilizatorul va fi notificat prin onError callback
+    return;
+  }
 
-    this.reconnectAttempts++;
-    let delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
-    
-    Logger.log('info', `Scheduling reconnection attempt ${this.reconnectAttempts} in ${delay}ms`);
-    
-    // Don't reconnect immediately for server errors (1011)
-    if (this.lastCloseCode === 1011) {
-      Logger.log('warn', 'Server error detected, waiting longer before reconnection');
-      delay = Math.max(delay, 30000); // Wait at least 30 seconds for server errors
-    }
-    
-    setTimeout(() => {
-      if (!this.isConnected) {
-        this.connect();
-      }
-    }, delay);
+  /**
+   * Reconectare manuală (apelată de utilizator)
+   */
+  manualReconnect() {
+    Logger.log('info', 'Manual reconnection requested');
+    this.reconnectAttempts = 0; // Reset attempts for manual reconnection
+    return this.connect();
   }
 
   // ========================================

@@ -35,22 +35,19 @@ const UserProfileDrawer = ({ onClose, position = "side" }) => {
       try {
         // Get user info from localStorage
         const savedCognitoData = localStorage.getItem('cognito-data')
-        const businessInfo = localStorage.getItem('business-info')
+        const selectedLocation = localStorage.getItem('selected-location')
         
         if (savedCognitoData) {
           const userData = JSON.parse(savedCognitoData)
           let userRole = 'Administrator' // Default role
           
-          // Try to get actual role from business info
-          if (businessInfo) {
+          // Try to get actual role from selected location
+          if (selectedLocation) {
             try {
-              const businessData = JSON.parse(businessInfo)
-              if (businessData.locations && businessData.locations.length > 0) {
-                const currentLocation = businessData.locations.find(loc => loc.isCurrent) || businessData.locations[0]
-                userRole = currentLocation.role || 'Administrator'
-              }
+              const locationData = JSON.parse(selectedLocation)
+              userRole = locationData.role || 'Administrator'
             } catch (e) {
-              console.warn('Error parsing business info:', e)
+              console.warn('Error parsing selected location:', e)
             }
           }
           

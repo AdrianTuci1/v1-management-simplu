@@ -1,13 +1,23 @@
 import { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { SignInPage } from '@/components/ui/sign-in'
+import BusinessSelector from './BusinessSelector'
 import cognitoAuthService from '../services/cognitoAuthService'
+import authRepository from '../data/repositories/AuthRepository.js'
 import { Building } from 'lucide-react'
 import { FaTooth } from 'react-icons/fa'
 
 
 const AuthScreen = () => {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showBusinessSelector, setShowBusinessSelector] = useState(false)
+  const [businesses, setBusinesses] = useState([])
+  
+  // Check if there's a message from registration
+  const registrationMessage = location.state?.message
 
   const handleSignIn = async (event) => {
     event.preventDefault()
@@ -25,6 +35,35 @@ const AuthScreen = () => {
       const userData = await cognitoAuthService.signIn(email, password, rememberMe)
       
       console.log('Sign in successful:', userData)
+      
+      // Get user's businesses from auth API
+      try {
+        const authInvoker = (await import('../data/invoker/AuthInvoker.js')).default
+        const authUserData = await authInvoker.getCurrentUser()
+        
+        console.log('Auth user data received:', authUserData)
+        
+        // Store auth data
+        authRepository.storeUserData(authUserData)
+        
+        // Check if user has multiple businesses
+        if (authUserData?.user?.businesses?.length > 1) {
+          console.log('👥 Multiple businesses detected, showing selector...')
+          setBusinesses(authUserData.user.businesses)
+          setShowBusinessSelector(true)
+          setIsLoading(false)
+          return
+        }
+        
+        // If only one business, auto-select it
+        if (authUserData?.user?.businesses?.length === 1) {
+          console.log('✅ Single business, auto-selecting...')
+          authRepository.setSelectedBusiness(authUserData.user.businesses[0].businessId)
+        }
+      } catch (authError) {
+        console.warn('Could not fetch auth user data:', authError)
+        // Continue with reload - will be handled by App.jsx
+      }
       
       // Reload the page to trigger App.jsx to re-initialize with the new auth data
       window.location.reload()
@@ -97,7 +136,87 @@ const AuthScreen = () => {
   }
 
   const handleCreateAccount = () => {
-    alert('Pentru a crea un cont nou, te rugăm să contactezi administratorul platformei.')
+    // For now, show alert. In the future, this could navigate to a contact form
+    // or show information about requesting an invitation
+    alert('Pentru a crea un cont nou, te rugăm să contactezi administratorul platformei pentru a primi o invitație.')
+  }
+
+  const handleDemoMode = async () => {
+    try {
+      setIsLoading(true)
+      console.log('🎭 Activating demo mode...')
+      
+      // Clear any existing data to start fresh
+      localStorage.clear()
+      
+      // Clear IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js')
+        await indexedDb.clearAllData()
+        console.log('✅ IndexedDB cleared')
+      } catch (error) {
+        console.error('Error clearing IndexedDB:', error)
+      }
+      
+      // Set demo mode flags
+      localStorage.setItem('auth-token', 'demo-jwt-token')
+      localStorage.setItem('user-email', 'demo@cabinet-popescu.ro')
+      
+      // Optional: Set this to test multiple businesses flow
+      const testMultipleBusinesses = false // Change to true to test
+      if (testMultipleBusinesses) {
+        localStorage.setItem('demo-multiple-businesses', 'true')
+      }
+      
+      // Populate IndexedDB with demo data
+      try {
+        const { demoDataSeeder } = await import('../utils/demoDataSeeder.js')
+        console.log('📦 Seeding demo data into IndexedDB...')
+        await demoDataSeeder.seedForDemo()
+        console.log('✅ Demo data seeded successfully')
+      } catch (error) {
+        console.error('❌ Error seeding demo data:', error)
+        setError('Eroare la popularea datelor demo: ' + error.message)
+        setIsLoading(false)
+        return
+      }
+      
+      // Get demo user data to check for multiple businesses
+      const demoUserData = authRepository.getDemoUserData(testMultipleBusinesses)
+      console.log('Demo user data:', demoUserData)
+      
+      // Check if demo has multiple businesses
+      if (demoUserData?.user?.businesses?.length > 1) {
+        console.log('👥 Multiple demo businesses, showing selector...')
+        setBusinesses(demoUserData.user.businesses)
+        setShowBusinessSelector(true)
+        setIsLoading(false)
+        return
+      }
+      
+      // If only one business, auto-select it
+      if (demoUserData?.user?.businesses?.length === 1) {
+        console.log('✅ Single demo business, auto-selecting...')
+        authRepository.setSelectedBusiness(demoUserData.user.businesses[0].businessId)
+      }
+      
+      console.log('🎭 Demo mode activated successfully')
+      
+      // Reload to initialize app with demo data
+      window.location.reload()
+    } catch (error) {
+      console.error('Error activating demo mode:', error)
+      setError('Eroare la activarea modului demo')
+      setIsLoading(false)
+    }
+  }
+
+  const handleBusinessSelect = (business) => {
+    console.log('Business selected in AuthScreen:', business.businessId)
+    authRepository.setSelectedBusiness(business.businessId)
+    
+    // Reload to initialize app with selected business
+    window.location.reload()
   }
 
   const title = (
@@ -109,8 +228,26 @@ const AuthScreen = () => {
 
   const description = "Autentifică-te pentru a accesa platforma de management medical"
 
+  // Show business selector if needed
+  if (showBusinessSelector) {
+    return <BusinessSelector businesses={businesses} onSelect={handleBusinessSelect} />
+  }
+
   return (
     <div className="bg-background text-foreground">
+      {registrationMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-blue-500 text-white px-6 py-4 rounded-lg shadow-lg max-w-md">
+          <div className="flex items-start gap-3">
+            <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <p className="font-medium">{registrationMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {error && (
         <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg max-w-md">
           <div className="flex items-start gap-3">
@@ -149,6 +286,7 @@ const AuthScreen = () => {
         onGoogleSignIn={handleGoogleSignIn}
         onResetPassword={handleResetPassword}
         onCreateAccount={handleCreateAccount}
+        onDemoMode={handleDemoMode}
       />
     </div>
   )

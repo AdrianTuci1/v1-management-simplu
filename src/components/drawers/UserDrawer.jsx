@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, User, Mail, Phone, AlertCircle } from 'lucide-react'
+import { X, Save, Trash2, User, Mail, Phone, AlertCircle, Send } from 'lucide-react'
 import { useUsers } from '../../hooks/useUsers.js'
 import { useRoles } from '../../hooks/useRoles.js'
+import { useInvitations } from '../../hooks/useInvitations.js'
 import { userManager } from '../../business/userManager.js'
 import { 
   Drawer, 
@@ -14,6 +15,7 @@ import {
 const UserDrawer = ({ onClose, user = null, position = "side" }) => {
   const { addUser, updateUser, deleteUser, loading, error } = useUsers()
   const { roles } = useRoles()
+  const { sendInvitation, loading: invitationLoading } = useInvitations()
   
   const [formData, setFormData] = useState({
     medicName: '',
@@ -25,6 +27,8 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
   
   const [validationErrors, setValidationErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [invitationStatus, setInvitationStatus] = useState(null)
+  const [showInvitationSuccess, setShowInvitationSuccess] = useState(false)
 
   // Populează formularul când se deschide pentru editare
   useEffect(() => {
@@ -36,6 +40,9 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
         role: user.role || null,
         dutyDays: user.dutyDays || []
       })
+      
+      // Setează status-ul invitației din datele utilizatorului
+      setInvitationStatus(user.invitationStatus || (user.cognitoUserId ? 'accepted' : 'not_sent'))
     } else {
       // Reset formular pentru utilizator nou
       setFormData({
@@ -45,8 +52,10 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
         role: roles.length > 0 ? { id: roles[0].resourceId, name: roles[0].name } : null,
         dutyDays: []
       })
+      setInvitationStatus('not_sent')
     }
     setValidationErrors({})
+    setShowInvitationSuccess(false)
   }, [user, roles])
 
   // Validare folosind userManager
@@ -130,11 +139,19 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
     setIsSubmitting(true)
     
     try {
+      let savedUser
       if (user) {
-        await updateUser(user.id, formData)
+        savedUser = await updateUser(user.id, formData)
       } else {
-        await addUser(formData)
+        // Creează utilizatorul
+        savedUser = await addUser(formData)
+        
+        // Trimite invitația automat pentru utilizatori noi
+        if (savedUser && formData.email && !user?.cognitoUserId) {
+          await handleSendInvitation(savedUser)
+        }
       }
+      
       // Închide drawer-ul după operație reușită
       // Optimistic update-ul va fi vizibil imediat în view
       onClose()
@@ -143,6 +160,65 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
       // Nu închide drawer-ul în caz de eroare pentru a permite utilizatorului să corecteze
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleSendInvitation = async (targetUser = null) => {
+    const userToInvite = targetUser || user
+    
+    if (!userToInvite || !userToInvite.email) {
+      console.error('Nu există email pentru trimiterea invitației')
+      return
+    }
+    
+    // Verifică dacă utilizatorul are deja cont Cognito
+    if (userToInvite.cognitoUserId) {
+      setValidationErrors(prev => ({
+        ...prev,
+        invitation: 'Acest utilizator are deja cont'
+      }))
+      return
+    }
+    
+    try {
+      // Obține businessId și locationId din localStorage
+      const selectedLocation = JSON.parse(localStorage.getItem('selected-location') || '{}')
+      const selectedBusinessId = localStorage.getItem('selected-business-id')
+      
+      const businessId = selectedBusinessId || 'B010001'
+      const locationId = selectedLocation.id || selectedLocation.locationId || 'L0100001'
+      
+      console.log('📧 Sending invitation to:', {
+        email: userToInvite.email,
+        medicResourceId: userToInvite.id || userToInvite.resourceId,
+        businessId,
+        locationId
+      })
+      
+      const result = await sendInvitation({
+        businessId,
+        locationId,
+        medicResourceId: userToInvite.id || userToInvite.resourceId,
+        email: userToInvite.email
+      })
+      
+      if (result.success) {
+        setInvitationStatus('sent')
+        setShowInvitationSuccess(true)
+        
+        // Ascunde mesajul după 3 secunde
+        setTimeout(() => {
+          setShowInvitationSuccess(false)
+        }, 3000)
+        
+        console.log('✅ Invitație trimisă cu succes:', result)
+      }
+    } catch (error) {
+      console.error('❌ Error sending invitation:', error)
+      setValidationErrors(prev => ({
+        ...prev,
+        invitation: error.message || 'Eroare la trimiterea invitației'
+      }))
     }
   }
 
@@ -181,6 +257,26 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
             <div className="flex items-center space-x-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
               <span className="text-red-700 text-sm">{error}</span>
+            </div>
+          </div>
+        )}
+        
+        {showInvitationSuccess && (
+          <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Send className="h-5 w-5 text-green-500" />
+              <span className="text-green-700 text-sm">
+                Invitație trimisă cu succes la {formData.email}
+              </span>
+            </div>
+          </div>
+        )}
+        
+        {validationErrors.invitation && (
+          <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <span className="text-amber-700 text-sm">{validationErrors.invitation}</span>
             </div>
           </div>
         )}
@@ -314,6 +410,51 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
               )}
             </div>
           </div>
+
+          {/* Invitation Section - Only for edit mode */}
+          {user && (
+            <div className="space-y-4 mt-6 pt-6 border-t">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Invitație Access
+              </h3>
+              
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700">
+                    Status invitație
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {invitationStatus === 'accepted' && '✓ Are cont Cognito'}
+                    {invitationStatus === 'sent' && '📧 Invitație trimisă'}
+                    {invitationStatus === 'not_sent' && '⚠ Invitație netrimisă'}
+                  </p>
+                </div>
+                
+                {!user.cognitoUserId && (
+                  <button
+                    type="button"
+                    onClick={() => handleSendInvitation()}
+                    disabled={invitationLoading || !formData.email}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Send className="h-4 w-4" />
+                    <span>
+                      {invitationLoading ? 'Se trimite...' : 
+                       invitationStatus === 'sent' ? '↻ Retrimite invitație' : 
+                       '📧 Trimite invitație'}
+                    </span>
+                  </button>
+                )}
+              </div>
+              
+              {invitationStatus === 'sent' && user.invitationSentAt && (
+                <p className="text-xs text-gray-500">
+                  Ultimă trimitere: {new Date(user.invitationSentAt).toLocaleDateString('ro-RO')}
+                </p>
+              )}
+            </div>
+          )}
         </form>
       </DrawerContent>
 

@@ -29,9 +29,9 @@ export class DraftAwareResourceRepository extends ResourceRepository {
    */
   canMakeServerRequests() {
     const healthStatus = healthRepository.getCurrentStatus();
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+    const isDemoMode = this.isInDemoMode();
     
-    // În demo mode, permite întotdeauna cererile
+    // În demo mode, permite întotdeauna cererile (dar de fapt nu le face)
     if (isDemoMode) return true;
     
     // Dacă health check-ul nu a fost executat încă, permite cererile

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Calendar, FileText, Image, User, Pill, CircleChevronUp } from 'lucide-react'
 import NewSidebar from './components/NewSidebar'
 import MobileMenu from './components/MobileMenu'
@@ -6,8 +7,10 @@ import DraftMainDrawer from './components/drawers/DraftMainDrawer'
 import { Drawer, DrawerExternalNavigation } from './components/ui/drawer'
 import Dashboard from './components/Dashboard'
 import AuthScreen from './components/AuthScreen'
+import RegisterPage from './components/RegisterPage'
 import LoadingScreen from './components/LoadingScreen'
 import AccessDenied from './components/AccessDenied'
+import BusinessSelector from './components/BusinessSelector'
 import QuickActionsDrawer from './components/drawers/QuickActionsDrawer'
 import SalesDrawer from './components/drawers/SalesDrawer'
 import InvoiceDrawer from './components/drawers/InvoiceDrawer'
@@ -26,6 +29,7 @@ function AppContent() {
   const [accessDenied, setAccessDenied] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [showBusinessSelector, setShowBusinessSelector] = useState(false)
   const { drawerOpen, drawerContent, closeDrawer } = useDrawer()
   
   // State pentru navigația externă
@@ -91,6 +95,13 @@ function AppContent() {
           }
         }
         
+        // Check if user is authenticated before initializing
+        if (!isDemoMode && !authService.isAuthenticated()) {
+          console.log('❌ User not authenticated, showing AuthScreen')
+          setIsLoading(false)
+          return
+        }
+        
         // Load saved UI state FIRST
         const savedView = localStorage.getItem('dashboard-view')
         const savedSidebarState = localStorage.getItem('sidebar-collapsed')
@@ -108,6 +119,7 @@ function AppContent() {
         }
         
         // Initialize authentication and business data
+        console.log('✅ User is authenticated, initializing...')
         const data = await authService.initialize()
         setUserData(data)
         
@@ -116,18 +128,38 @@ function AppContent() {
           cognitoAuthService.startTokenRefreshMonitoring()
         }
         
+        // Check if user needs to select a business
+        const businesses = authService.getBusinesses()
+        const isBusinessSelected = authService.isBusinessSelected()
+        
+        console.log('📊 Business selection check:', {
+          businessCount: businesses.length,
+          isBusinessSelected,
+          needsSelection: businesses.length > 1 && !isBusinessSelected
+        })
+        
+        if (businesses.length > 1 && !isBusinessSelected) {
+          // User has multiple businesses and hasn't selected one yet
+          console.log('🔄 Showing BusinessSelector - user needs to choose')
+          setShowBusinessSelector(true)
+          return
+        }
+        
         // Check access permissions
-        if (authService.shouldDenyAccess(data)) {
+        if (authService.shouldDenyAccess()) {
           setAccessDenied(true)
           return
         }
         
         // Set default location
         if (savedLocation) {
-          setSelectedLocation(JSON.parse(savedLocation))
+          const location = JSON.parse(savedLocation)
+          console.log('✅ Restored saved location:', location.name)
+          setSelectedLocation(location)
         } else {
-          const defaultLocation = authService.getDefaultLocation(data)
+          const defaultLocation = authService.getDefaultLocation()
           if (defaultLocation) {
+            console.log('✅ Set default location:', defaultLocation.name)
             setSelectedLocation(defaultLocation)
             localStorage.setItem('selected-location', JSON.stringify(defaultLocation))
           }
@@ -194,6 +226,15 @@ function AppContent() {
     localStorage.setItem('selected-location', JSON.stringify(location))
   }
 
+  const handleBusinessSelect = (business) => {
+    // Store selected business
+    authService.setSelectedBusiness(business.businessId)
+    setShowBusinessSelector(false)
+    
+    // Reload to reinitialize with selected business
+    window.location.reload()
+  }
+
   // Funcții pentru navigația externă
   const getExternalNavigationItems = (drawerType) => {
     switch (drawerType) {
@@ -236,9 +277,15 @@ function AppContent() {
     return <LoadingScreen message="Se încarcă aplicația..." />
   }
 
+  // Show business selector if user has multiple businesses and hasn't selected one
+  if (showBusinessSelector) {
+    const businesses = authService.getBusinesses()
+    return <BusinessSelector businesses={businesses} onSelect={handleBusinessSelect} />
+  }
+
   // Show access denied screen if user has insufficient permissions
   if (accessDenied) {
-    return <AccessDenied userEmail={userData?.profile?.email || userData?.user?.email || 'Necunoscut'} />
+    return <AccessDenied userEmail={userData?.user?.email || 'Necunoscut'} />
   }
 
   // Show loading screen if no location is selected yet
@@ -348,9 +395,17 @@ function AppContent() {
 
 function App() {
   return (
-    <DrawerProvider>
-        <AppContent />
-    </DrawerProvider>
+    <BrowserRouter>
+      <DrawerProvider>
+        <Routes>
+          {/* Register route - accessible without authentication */}
+          <Route path="/register" element={<RegisterPage />} />
+          
+          {/* Main app route */}
+          <Route path="/*" element={<AppContent />} />
+        </Routes>
+      </DrawerProvider>
+    </BrowserRouter>
   )
 }
 

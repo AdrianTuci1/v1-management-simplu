@@ -9,12 +9,8 @@ class ExternalApiService {
 
   // Get business and user IDs from storage (following existing patterns)
   getBusinessId() {
-    const businessInfo = localStorage.getItem('business-info');
-    if (businessInfo) {
-      const parsed = JSON.parse(businessInfo);
-      return parsed.businessId || 'B0100001';
-    }
-    return 'B0100001';
+    const selectedBusinessId = localStorage.getItem('selected-business-id');
+    return selectedBusinessId || 'B010001';
   }
 
   getUserId() {

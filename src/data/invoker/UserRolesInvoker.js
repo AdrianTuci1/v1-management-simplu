@@ -6,7 +6,20 @@ class UserRolesInvoker {
     this.basePath = '/api/me'
   }
 
+  // Check if we're using a demo token
+  isDemoToken() {
+    const authToken = localStorage.getItem('auth-token');
+    return authToken === 'demo-jwt-token';
+  }
+
   async getUserRoles(userId = null, businessId = null) {
+    // Check if in demo mode (either from .env or from demo button)
+    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true' || this.isDemoToken();
+    
+    if (isDemoMode) {
+      console.log('📊 Demo mode detected in UserRolesInvoker - skipping API call');
+      throw new Error('Demo mode - no API call needed');
+    }
     const actualUserId = userId || this.getUserIdFromAuth()
     const actualBusinessId = businessId || this.getBusinessIdFromStorage()
     
@@ -50,13 +63,9 @@ class UserRolesInvoker {
   }
 
   getBusinessIdFromStorage() {
-    // Try to get business ID from business info or use default
-    const businessInfo = localStorage.getItem('business-info')
-    if (businessInfo) {
-      const parsed = JSON.parse(businessInfo)
-      return parsed.businessId || 'B0100001'
-    }
-    return 'B0100001'
+    // Try to get business ID from selected business
+    const selectedBusinessId = localStorage.getItem('selected-business-id')
+    return selectedBusinessId || 'B010001'
   }
 }
 

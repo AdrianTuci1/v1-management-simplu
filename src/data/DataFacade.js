@@ -13,7 +13,6 @@
 // Import all repositories via barrel
 import {
   AuthRepository,
-  BusinessInfoRepository,
   ResourceRepository,
   StatisticsDataRepository,
   UserRolesRepository,
@@ -43,7 +42,6 @@ import { socketFacade } from './SocketFacade.js';
 // Import invokers via barrel
 import {
   AuthInvoker,
-  BusinessInfoInvoker,
   ResourceInvoker,
   StatisticsDataInvoker,
   UserRolesInvoker,
@@ -71,7 +69,6 @@ export class DataFacade {
   initializeRepositories() {
     // Repository-uri existente
     this.repositories.set('auth', AuthRepository);
-    this.repositories.set('businessInfo', BusinessInfoRepository);
     this.repositories.set('statistics', StatisticsDataRepository);
     this.repositories.set('userRoles', UserRolesRepository);
     this.repositories.set('aiAssistant', aiAssistantRepository);
@@ -98,7 +95,6 @@ export class DataFacade {
 
   initializeInvokers() {
     this.invokers.set('auth', AuthInvoker);
-    this.invokers.set('businessInfo', BusinessInfoInvoker);
     this.invokers.set('resource', ResourceInvoker);
     this.invokers.set('statistics', StatisticsDataInvoker);
     this.invokers.set('userRoles', UserRolesInvoker);

@@ -260,9 +260,10 @@ class CognitoAuthService {
    * @param {string} email 
    * @param {string} password 
    * @param {string} name 
+   * @param {Object} clientMetadata - Optional metadata to pass to Lambda triggers
    * @returns {Promise<Object>}
    */
-  async signUp(email, password, name) {
+  async signUp(email, password, name = null, clientMetadata = null) {
     return new Promise((resolve, reject) => {
       const attributeList = []
       
@@ -270,21 +271,31 @@ class CognitoAuthService {
         Name: 'email',
         Value: email
       }
-      
-      const dataName = {
-        Name: 'name',
-        Value: name
-      }
 
       attributeList.push(new CognitoUserAttribute(dataEmail))
-      attributeList.push(new CognitoUserAttribute(dataName))
+      
+      // Add name attribute if provided
+      if (name) {
+        const dataName = {
+          Name: 'name',
+          Value: name
+        }
+        attributeList.push(new CognitoUserAttribute(dataName))
+      }
 
-      userPool.signUp(email, password, attributeList, null, (err, result) => {
+      // Prepare validation data array for clientMetadata
+      const validationData = clientMetadata ? Object.entries(clientMetadata).map(([key, value]) => ({
+        Name: key,
+        Value: value
+      })) : null
+
+      userPool.signUp(email, password, attributeList, validationData, (err, result) => {
         if (err) {
           console.error('Sign up failed:', err)
           reject(err)
           return
         }
+        console.log('Sign up successful:', result)
         resolve(result.user)
       })
     })
@@ -375,7 +386,7 @@ class CognitoAuthService {
    * @returns {Promise<void>}
    */
   async signOut() {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       const cognitoUser = userPool.getCurrentUser()
       
       if (cognitoUser) {
@@ -385,8 +396,16 @@ class CognitoAuthService {
       // Stop token refresh monitoring
       this.stopTokenRefreshMonitoring()
       
-      // Clear localStorage (including Google auth)
+      // Clear localStorage (including Google auth and business data)
       this.clearAuthData()
+      
+      // Clear IndexedDB
+      try {
+        const { indexedDb } = await import('../data/infrastructure/db.js')
+        await indexedDb.clearAllData()
+      } catch (error) {
+        console.error('Error clearing IndexedDB:', error)
+      }
       
       this.currentUser = null
       resolve()
@@ -639,12 +658,24 @@ class CognitoAuthService {
    * Clear authentication data from localStorage
    */
   clearAuthData() {
+    // Clear old auth keys
     localStorage.removeItem('auth-token')
     localStorage.removeItem('user-email')
     localStorage.removeItem('cognito-data')
     localStorage.removeItem('auth-provider')
     localStorage.removeItem('remember-me')
     localStorage.removeItem('session-timestamp')
+    
+    // Clear new business selection keys
+    localStorage.removeItem('auth-user-data')
+    localStorage.removeItem('selected-business-id')
+    localStorage.removeItem('selected-location')
+    
+    // Clear UI state
+    localStorage.removeItem('dashboard-view')
+    localStorage.removeItem('sidebar-collapsed')
+    
+    console.log('🧹 All auth data cleared from localStorage')
   }
 
   /**

@@ -31,6 +31,7 @@ interface SignInPageProps {
   onGoogleSignIn?: () => void;
   onResetPassword?: () => void;
   onCreateAccount?: () => void;
+  onDemoMode?: () => void;
 }
 
 // --- SUB-COMPONENTS ---
@@ -63,6 +64,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   onGoogleSignIn,
   onResetPassword,
   onCreateAccount,
+  onDemoMode,
 }) => {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -117,6 +119,16 @@ export const SignInPage: React.FC<SignInPageProps> = ({
                 <GoogleIcon />
                 Continue with Google
             </button>
+
+            {onDemoMode && (
+              <button onClick={onDemoMode} className="animate-element animate-delay-850 w-full flex items-center justify-center gap-3 border border-dashed border-border rounded-2xl py-4 hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-pink-500/10 transition-all group">
+                <svg className="w-5 h-5 text-muted-foreground group-hover:text-purple-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-muted-foreground group-hover:text-foreground transition-colors">Continue with Demo</span>
+              </button>
+            )}
 
             <p className="animate-element animate-delay-900 text-center text-sm text-muted-foreground">
               New to our platform? <a href="#" onClick={(e) => { e.preventDefault(); onCreateAccount?.(); }} className="text-violet-400 hover:underline transition-colors">Create Account</a>

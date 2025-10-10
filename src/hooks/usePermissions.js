@@ -13,19 +13,16 @@ export const usePermissions = () => {
     setError(null)
     
     try {
-      // Get user role from localStorage
-      const businessInfo = localStorage.getItem('business-info')
+      // Get user role from localStorage using new auth structure
+      const selectedLocation = localStorage.getItem('selected-location')
       let userRole = 'Administrator' // Default role
       
-      if (businessInfo) {
+      if (selectedLocation) {
         try {
-          const businessData = JSON.parse(businessInfo)
-          if (businessData.locations && businessData.locations.length > 0) {
-            const currentLocation = businessData.locations.find(loc => loc.isCurrent) || businessData.locations[0]
-            userRole = currentLocation.role || 'Administrator'
-          }
+          const locationData = JSON.parse(selectedLocation)
+          userRole = locationData.role || 'Administrator'
         } catch (e) {
-          console.warn('Error parsing business info:', e)
+          console.warn('Error parsing selected location:', e)
         }
       }
 

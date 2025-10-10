@@ -303,6 +303,35 @@ export class SocketFacade {
   }
 
   /**
+   * Reconectare manuală AI Assistant (fără reconectare automată)
+   * @param {string} businessId - ID-ul business-ului
+   * @param {string} userId - ID-ul utilizatorului
+   * @param {string} locationId - ID-ul locației (opțional)
+   * @returns {Promise<Object>} Rezultatul reconectării
+   */
+  async reconnectAIAssistant(businessId, userId, locationId = null) {
+    const aiAssistant = this.createAIAssistant(businessId, userId, locationId);
+    
+    try {
+      await aiAssistant.manualReconnect();
+      Logger.log('info', 'AI Assistant manually reconnected', { businessId, userId, locationId });
+      
+      return {
+        success: true,
+        status: aiAssistant.getConnectionStatus(),
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      Logger.log('error', 'Failed to manually reconnect AI Assistant', error);
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
    * Trimite un mesaj prin AI Assistant
    * @param {string} businessId - ID-ul business-ului
    * @param {string} userId - ID-ul utilizatorului

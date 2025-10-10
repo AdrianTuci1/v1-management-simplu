@@ -379,6 +379,12 @@ async function seedCounts(appointments, products) {
 }
 
 export const demoDataSeeder = {
+  // Seed for demo button (force seed regardless of VITE_DEMO_MODE)
+  async seedForDemo() {
+    console.log('[demoSeeder] Force seeding demo data (from demo button)...')
+    return this._performSeed(true)
+  },
+
   // Seed only if stores are empty
   async seedIfEmpty() {
     try {
@@ -388,6 +394,17 @@ export const demoDataSeeder = {
         return
       }
 
+      console.log('[demoSeeder] Starting demo data seeding...')
+      return this._performSeed(false)
+    } catch (e) {
+      console.error('[demoSeeder] Demo data seeding failed:', e)
+      console.error('[demoSeeder] Error details:', e.message, e.stack)
+    }
+  },
+
+  // Internal method to perform the actual seeding
+  async _performSeed(force = false) {
+    try {
       console.log('[demoSeeder] Starting demo data seeding...')
       
       // Wait for database to be ready
@@ -414,18 +431,19 @@ export const demoDataSeeder = {
         roles: rolesCount 
       })
 
-      const needPatients = patientsCount === 0
-      const needUsers = usersCount === 0
-      const needTreatments = treatmentsCount === 0
-      const needProducts = productsCount === 0
-      const needAppointments = appointmentsCount === 0
-      const needSales = salesCount === 0
-      const needRoles = rolesCount === 0
+      const needPatients = force || patientsCount === 0
+      const needUsers = force || usersCount === 0
+      const needTreatments = force || treatmentsCount === 0
+      const needProducts = force || productsCount === 0
+      const needAppointments = force || appointmentsCount === 0
+      const needSales = force || salesCount === 0
+      const needRoles = force || rolesCount === 0
 
       // Always run a normalization pass to backfill missing fields in existing data
       await this.normalizeExistingData()
 
-      if (!(needPatients || needUsers || needTreatments || needProducts || needAppointments || needSales || needRoles)) {
+      if (!force && !(needPatients || needUsers || needTreatments || needProducts || needAppointments || needSales || needRoles)) {
+        console.log('[demoSeeder] All stores already have data, skipping seeding')
         return
       }
 
@@ -514,26 +532,127 @@ export const demoDataSeeder = {
       // Seed statistics cache for dashboard
       try {
         const today = new Date()
+        
+        // Appointment statistics breakdown
+        const appointmentStats = {
+          completed: appointments.filter(a => a.status === 'completed').length,
+          scheduled: appointments.filter(a => a.status === 'scheduled').length,
+          cancelled: appointments.filter(a => a.status === 'cancelled').length,
+          pending: appointments.filter(a => a.status === 'pending').length,
+          'in-progress': appointments.filter(a => a.status === 'in-progress').length,
+          absent: appointments.filter(a => a.status === 'absent').length
+        }
+        
+        // Revenue calculations
+        const monthlyRevenue = sales
+          .filter(s => new Date(s.createdAt).getMonth() === today.getMonth())
+          .reduce((sum, s) => sum + (s.total || 0), 0)
+        
+        const totalRevenue = sales.reduce((sum, s) => sum + (s.total || 0), 0)
+        
+        // Calculate doctor progress (appointments per doctor)
+        const doctorStats = {}
+        users.forEach(user => {
+          const doctorAppointments = appointments.filter(a => 
+            a.doctor?.id === user.id || a.doctor?.resourceId === user.resourceId
+          )
+          const completedToday = doctorAppointments.filter(a => 
+            a.status === 'completed' && a.date === formatDateYMD(today)
+          ).length
+          const scheduledToday = doctorAppointments.filter(a => 
+            a.date === formatDateYMD(today)
+          ).length
+          
+          if (scheduledToday > 0) {
+            const progress = scheduledToday > 0 ? Math.round((completedToday / scheduledToday) * 100) : 0
+            doctorStats[user.medicName] = {
+              doctor: user.medicName,
+              progress: Math.min(progress, 100),
+              appointments: scheduledToday
+            }
+          }
+        })
+        
+        const doctorProgress = Object.values(doctorStats).slice(0, 4)
+        
+        // Calculate popular treatments
+        const treatmentCounts = {}
+        appointments.forEach(a => {
+          const treatmentName = a.service?.name || 'Necunoscut'
+          treatmentCounts[treatmentName] = (treatmentCounts[treatmentName] || 0) + 1
+        })
+        
+        const popularTreatments = Object.entries(treatmentCounts)
+          .map(([treatment, count]) => ({ treatment, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5)
+        
+        // Calculate occupancy rate
+        const totalSlots = users.length * 8 * 22 // users * 8h/day * 22 days/month
+        const bookedSlots = appointments.filter(a => 
+          new Date(a.createdAt).getMonth() === today.getMonth()
+        ).length
+        const occupancyRate = totalSlots > 0 ? Math.round((bookedSlots / totalSlots) * 100) : 0
+        
+        // Generate complete statistics
         const stats = {
           totalPatients: patients.length,
           activePatients: patients.filter(p => p.status === 'active').length,
           totalAppointments: appointments.length,
-          scheduledToday: appointments.filter(a => a.date === formatDateYMD(today)).length,
-          revenueThisMonth: sales
-            .filter(s => new Date(s.createdAt).getMonth() === today.getMonth())
-            .reduce((sum, s) => sum + (s.total || 0), 0),
+          appointmentStats,
+          appointmentsToday: appointments
+            .filter(a => a.date === formatDateYMD(today))
+            .slice(0, 5)
+            .map(a => ({
+              id: a.id,
+              patientName: a.patient?.name || 'Pacient',
+              time: a.time,
+              status: a.status
+            })),
+          revenue: {
+            monthly: monthlyRevenue,
+            total: totalRevenue
+          },
+          websiteBookings: Math.round(appointments.length * 0.3), // 30% from website
+          clinicRating: {
+            average: 4.7 + Math.random() * 0.3, // Random between 4.7-5.0
+            totalReviews: Math.round(patients.length * 0.4) // 40% of patients left reviews
+          },
+          smsStats: {
+            sent: Math.round(appointments.length * 0.8), // 80% of appointments get SMS
+            limit: 500,
+            percentage: Math.min(Math.round((appointments.length * 0.8 / 500) * 100), 100)
+          },
+          occupancyRate,
+          doctorProgress,
+          popularTreatments,
           lowStockProducts: products.filter(p => p.stock <= p.reorderLevel).length
         }
-        await indexedDb.put('statistic', { id: 'business-statistics', data: stats, timestamp: new Date().toISOString() })
+        
+        console.log('[demoSeeder] Generated complete statistics:', stats)
+        await indexedDb.put('statistics', { id: 'business-statistics', data: stats, timestamp: new Date().toISOString() })
+        console.log('[demoSeeder] ✅ Statistics stored in IndexedDB')
 
         const activities = appointments.slice(0, 15).map(a => ({
+          activityType: 'appointment',
           type: 'appointment',
           title: `${a.patient.name} - ${a.service.name}`,
           subtitle: `${a.date} ${a.time} cu ${a.doctor.name}`,
-          createdAt: a.createdAt
+          patientName: a.patient.name,
+          serviceName: a.service.name,
+          medicName: a.doctor.name,
+          time: a.time,
+          status: a.status,
+          createdAt: a.createdAt,
+          updatedAt: a.updatedAt
         }))
-        await indexedDb.put('statistic', { id: 'recent-activities', data: activities, timestamp: new Date().toISOString() })
-      } catch (_) {}
+        
+        console.log('[demoSeeder] Generated recent activities:', activities.length)
+        await indexedDb.put('statistics', { id: 'recent-activities', data: activities, timestamp: new Date().toISOString() })
+        console.log('[demoSeeder] ✅ Recent activities stored in IndexedDB')
+      } catch (e) {
+        console.error('[demoSeeder] Error seeding statistics:', e)
+      }
 
       try { 
         await seedCounts(appointments, products); 
@@ -575,6 +694,7 @@ export const demoDataSeeder = {
     } catch (e) {
       console.error('[demoSeeder] Demo data seeding failed:', e)
       console.error('[demoSeeder] Error details:', e.message, e.stack)
+      throw e // Re-throw to be caught by caller
     }
   },
 

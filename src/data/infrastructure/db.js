@@ -483,6 +483,50 @@ export const indexedDb = {
       .where('clientType')
       .equals(clientType)
       .toArray();
+  },
+
+  // Clear all data from IndexedDB
+  async clearAllData() {
+    try {
+      console.log('🧹 Clearing all IndexedDB data...')
+      
+      // Get all table names
+      const tables = [
+        'appointment', 'patient', 'product', 'user', 'sale', 'role', 
+        'permission', 'treatment', 'statistics', 'report', 'setting',
+        'invoice', 'invoice-clients', 'appointmentCounts', 'productCounts',
+        'outbox', 'idMap', 'queue', 'meta', 'drafts'
+      ]
+      
+      // Clear each table
+      for (const tableName of tables) {
+        try {
+          await db.table(tableName).clear()
+          console.log(`  ✅ Cleared ${tableName}`)
+        } catch (error) {
+          console.warn(`  ⚠️  Could not clear ${tableName}:`, error.message)
+        }
+      }
+      
+      console.log('✅ IndexedDB cleared successfully')
+      return true
+    } catch (error) {
+      console.error('❌ Error clearing IndexedDB:', error)
+      return false
+    }
+  },
+
+  // Delete entire database (nuclear option)
+  async deleteDatabase() {
+    try {
+      console.log('💣 Deleting entire IndexedDB database...')
+      await db.delete()
+      console.log('✅ IndexedDB database deleted')
+      return true
+    } catch (error) {
+      console.error('❌ Error deleting IndexedDB database:', error)
+      return false
+    }
   }
 };
 

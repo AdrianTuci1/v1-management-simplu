@@ -1,5 +1,3 @@
-import businessInfoRepository from '../data/repositories/BusinessInfoRepository.js'
-import userRolesRepository from '../data/repositories/UserRolesRepository.js'
 import authRepository from '../data/repositories/AuthRepository.js'
 import { GetCommand } from '../data/commands/GetCommand.js'
 import { demoDataSeeder } from '../utils/demoDataSeeder.js'
@@ -40,117 +38,73 @@ class AuthService {
           // Continue with demo mode even if seeding fails
         }
         
-        const businessInfo = {
-          businessId: 'B0100001',
-          businessName: 'Cabinetul Dr. Popescu',
-          locationId: 'L0100001',
-          locationName: 'Premier Central',
-          address: 'Strada Exemplu 123, București',
-          phone: '+40 21 123 4567',
-          email: 'contact@cabinet-popescu.ro',
-          locations: [
-            {
-              id: 'L0100001',
-              name: 'Premier Central',
-              address: 'Strada Florilor, Nr. 15, București, Sector 1',
-              active: true,
-              timezone: 'Europe/Bucharest'
-            },
-            {
-              id: 'L0100002',
-              name: 'Filiala Pipera',
-              address: 'Bulevardul Pipera, Nr. 45, București, Sector 1',
-              active: true,
-              timezone: 'Europe/Bucharest'
-            },
-            {
-              id: 'L0100003',
-              name: 'Centrul Medical Militari',
-              address: 'Strada Militari, Nr. 123, București, Sector 6',
-              active: true,
-              timezone: 'Europe/Bucharest'
-            }
-          ]
-        }
-        
-        const userData = {
-          user: {
-            id: 'demo-user',
-            email: 'demo@cabinet-popescu.ro',
-            name: 'Demo User'
-          },
-          profile: {
-            name: 'Demo User',
-            email: 'demo@cabinet-popescu.ro'
-          },
-          locations: {
-            'L0100001': 'admin',
-            'L0100002': 'manager',
-            'L0100003': 'user'
-          }
-        }
-        
+        // Get or create demo auth data with new format
         const authUserData = {
           success: true,
           user: {
             userId: 'demo-user',
             userName: 'Demo User',
             email: 'demo@cabinet-popescu.ro',
-            businessId: 'B0100001',
-            locations: [
-              { locationId: 'L0100001', locationName: 'Premier Central', role: 'admin' },
-              { locationId: 'L0100002', locationName: 'Filiala Pipera', role: 'manager' },
-              { locationId: 'L0100003', locationName: 'Centrul Medical Militari', role: 'user' }
+            businesses: [
+              {
+                businessId: 'B010001',
+                businessName: 'Cabinetul Dr. Popescu',
+                locations: [
+                  { locationId: 'L0100001', locationName: 'Premier Central', role: 'admin' },
+                  { locationId: 'L0100002', locationName: 'Filiala Pipera', role: 'manager' },
+                  { locationId: 'L0100003', locationName: 'Centrul Medical Militari', role: 'user' }
+                ]
+              }
             ]
           }
         }
         
-        return {
-          ...userData,
-          businessInfo,
-          authUserData
+        // Store auth data
+        authRepository.storeUserData(authUserData)
+        console.log('✅ Auth data stored:', {
+          userId: authUserData.user.userId,
+          businessCount: authUserData.user.businesses.length
+        })
+        
+        // If there's only one business, auto-select it
+        if (authUserData.user.businesses.length === 1) {
+          const businessId = authUserData.user.businesses[0].businessId
+          authRepository.setSelectedBusiness(businessId)
+          console.log('✅ Business auto-selected (only 1 available):', businessId)
+        } else {
+          console.log('⏸️  Multiple businesses found, user will need to select:', 
+            authUserData.user.businesses.map(b => b.businessName))
         }
+        
+        return authUserData
       }
       
-      // First, get business info using command pattern
-      const getBusinessInfoCommand = new GetCommand(businessInfoRepository, {})
-      const businessInfo = await getBusinessInfoCommand.execute()
-      
-      // Then get user data (either from Cognito or demo mode)
-      const userData = await this.getUserData()
-      
-      // Get user roles for locations using new auth repository
+      // Get user data with businesses from auth API
       let authUserData = null
       try {
         const getAuthUserCommand = new GetCommand(authRepository, {})
         authUserData = await getAuthUserCommand.execute()
+        
+        // If there's only one business, auto-select it
+        if (authUserData?.user?.businesses?.length === 1) {
+          const businessId = authUserData.user.businesses[0].businessId
+          authRepository.setSelectedBusiness(businessId)
+          console.log('✅ Business auto-selected (only 1 available):', businessId)
+        } else if (authUserData?.user?.businesses?.length > 1) {
+          console.log('⏸️  Multiple businesses found, user will need to select:', 
+            authUserData.user.businesses.map(b => b.businessName))
+        }
       } catch (error) {
-        console.log('Could not fetch auth user data, using demo data:', error)
-        // In demo mode or if API fails, use demo roles
-        authUserData = userData.locations ? { 
-          success: true,
-          user: {
-            userId: userData.user?.id || 'demo-user',
-            userName: userData.profile?.name || 'Demo User',
-            email: userData.profile?.email || 'demo@cabinet-popescu.ro',
-            businessId: businessInfo?.businessId || 'B0100001',
-            locations: Object.entries(userData.locations || {}).map(([locationId, role]) => ({
-              locationId,
-              locationName: this.getLocationNameById(locationId, businessInfo),
-              role
-            }))
-          }
-        } : null
+        console.log('Could not fetch auth user data:', error)
+        // Return cached data if available
+        authUserData = authRepository.getStoredUserData()
+        if (!authUserData) {
+          // Use demo data as fallback
+          authUserData = authRepository.getDemoUserData()
+        }
       }
       
-      // Combine all data
-      const combinedData = {
-        ...userData,
-        businessInfo,
-        authUserData
-      }
-      
-      return combinedData
+      return authUserData
     } catch (error) {
       console.error('Error initializing auth service:', error)
       throw error
@@ -263,101 +217,43 @@ class AuthService {
     return mockCognitoData
   }
 
-  // Process authenticated user data
-  processUserData(userData, userRoles = null) {
-    const businessInfo = businessInfoRepository.getStoredBusinessInfo()
-    const locations = businessInfo?.locations || []
-    
-    // Use userRoles from API if available, otherwise fall back to userData.locations
-    const locationRoles = userRoles?.locations || userData.locations || {}
-    const accessibleLocations = locations.filter(location => {
-      const userRole = locationRoles[location.id]
-      return userRole && userRole !== 'user'
-    })
-    
-    return {
-      user: userData.user || userData.profile,
-      accessibleLocations,
-      userRoles: locationRoles,
-      businessInfo
-    }
+  // Get businesses for authenticated user
+  getBusinesses() {
+    return authRepository.getBusinesses()
   }
 
-  // Helper method to get location name by ID
-  getLocationNameById(locationId, businessInfo) {
-    const locations = businessInfo?.locations || []
-    const location = locations.find(loc => loc.id === locationId)
-    return location?.name || `Location ${locationId}`
+  // Get selected business
+  getSelectedBusiness() {
+    return authRepository.getSelectedBusiness()
   }
 
-  // Get user's accessible locations based on their roles for each location
-  getAccessibleLocations(userData) {
-    // Try to get data from new auth repository first
-    const authUserData = authRepository.getStoredUserData()
-    if (authUserData?.user?.locations) {
-      // Merge names/addresses from business-info
-      const businessInfo = businessInfoRepository.getStoredBusinessInfo()
-      const businessLocations = businessInfo?.locations || []
+  // Set selected business
+  setSelectedBusiness(businessId) {
+    authRepository.setSelectedBusiness(businessId)
+  }
 
-      const accessibleLocations = authUserData.user.locations
-        .filter(location => location.role && location.role !== 'user')
-        .map(location => {
-          const match = businessLocations.find(loc => loc.id === location.locationId)
-          return {
-            id: location.locationId,
-            name: match?.name || location.locationName || location.locationId,
-            address: match?.address || `Locația ${location.locationId}`,
-            role: location.role,
-            businessId: authUserData.user.businessId
-          }
-        })
-      console.log('Getting accessible locations from auth repository (merged with business-info):', accessibleLocations)
-      return accessibleLocations
-    }
-    
-    // Fallback to old format
-    const businessInfo = businessInfoRepository.getStoredBusinessInfo()
-    let locations = businessInfo?.locations || []
-    const userRoles = userData.locations || {}
-    
-    console.log('Getting accessible locations (fallback)')
-    console.log('Available locations:', locations)
-    console.log('User roles per location:', userRoles)
+  // Check if business is selected
+  isBusinessSelected() {
+    return authRepository.isBusinessSelected()
+  }
 
-    // If no locations in business info but user has roles, create locations from roles
-    if (locations.length === 0 && Object.keys(userRoles).length > 0) {
-      console.log('No locations in business info, creating from user roles')
-      locations = Object.keys(userRoles).map(locationId => ({
-        id: locationId,
-        name: this.getLocationNameById(locationId, businessInfo),
-        address: `Locația ${locationId}`,
-        active: true,
-        timezone: 'Europe/Bucharest'
-      }))
-      console.log('Generated locations from user roles:', locations)
-    }
-
-    const accessibleLocations = locations.filter(location => {
-      const userRoleForLocation = userRoles[location.id]
-      console.log(`Location ${location.id} (${location.name}): user role for this location = ${userRoleForLocation}`)
-      
-      // User can access location if they have any role for it (not 'user' role which means no access)
-      if (userRoleForLocation && userRoleForLocation !== 'user') {
-        console.log(`Access granted for location ${location.id} with role ${userRoleForLocation}`)
-        return true
-      }
-      
-      console.log(`Access denied for location ${location.id} - no valid role`)
-      return false
-    })
+  // Get user's accessible locations from selected business
+  getAccessibleLocations() {
+    const accessibleLocations = authRepository.getAccessibleLocations()
     
-    console.log('Final accessible locations:', accessibleLocations)
-    return accessibleLocations
+    // Transform to include full location data
+    return accessibleLocations.map(location => ({
+      id: location.locationId,
+      name: location.locationName,
+      address: location.address || `Locația ${location.locationName}`,
+      role: location.role,
+      businessId: authRepository.getSelectedBusiness()?.businessId
+    }))
   }
 
   // Get default location for user
-  getDefaultLocation(userData) {
-    const accessibleLocations = this.getAccessibleLocations(userData)
+  getDefaultLocation() {
+    const accessibleLocations = this.getAccessibleLocations()
     console.log('Getting default location from accessible locations:', accessibleLocations)
     
     // Return first accessible location
@@ -367,64 +263,33 @@ class AuthService {
   }
 
   // Check if user has admin access
-  hasAdminAccess(userData) {
-    // Try to get data from new auth repository first
-    const authUserData = authRepository.getStoredUserData()
-    if (authUserData?.user?.locations) {
-      return authUserData.user.locations.some(location => location.role === 'admin')
-    }
-    
-    // Fallback to old format
-    const userRoles = userData.locations || {}
-    return Object.values(userRoles).some(role => role === 'admin')
+  hasAdminAccess() {
+    return authRepository.hasAdminAccess()
   }
 
-  // Check if user should be denied access (no valid roles for any location)
-  shouldDenyAccess(userData) {
-    // Try to get data from new auth repository first
-    const authUserData = authRepository.getStoredUserData()
-    if (authUserData?.user?.locations) {
-      const hasValidRole = authUserData.user.locations.some(location => 
-        location.role && location.role !== 'user'
-      )
-      return !hasValidRole
+  // Check if user should be denied access (no valid roles for any location in selected business)
+  shouldDenyAccess() {
+    // First check if business is selected
+    if (!authRepository.isBusinessSelected()) {
+      // If no business selected but has businesses, don't deny access yet
+      const businesses = authRepository.getBusinesses()
+      if (businesses.length > 0) {
+        return false
+      }
+      return true
     }
     
-    // Fallback to old format
-    const userRoles = userData.locations || {}
-    const hasValidRole = Object.values(userRoles).some(role => role && role !== 'user')
-    return !hasValidRole
+    return authRepository.shouldDenyAccess()
   }
 
   // Check if user can access a specific location
-  canAccessLocation(userData, locationId) {
-    // Try to get data from new auth repository first
-    const authUserData = authRepository.getStoredUserData()
-    if (authUserData?.user?.locations) {
-      const location = authUserData.user.locations.find(loc => loc.locationId === locationId)
-      return location?.role && location.role !== 'user'
-    }
-    
-    // Fallback to old format
-    const userRoles = userData.locations || {}
-    const userRoleForLocation = userRoles[locationId]
-
-    // User can access location if they have any role for it (not 'user' role which means no access)
-    return userRoleForLocation && userRoleForLocation !== 'user'
+  canAccessLocation(locationId) {
+    return authRepository.canAccessLocation(locationId)
   }
 
   // Get user's role for a specific location
-  getUserRoleForLocation(userData, locationId) {
-    // Try to get data from new auth repository first
-    const authUserData = authRepository.getStoredUserData()
-    if (authUserData?.user?.locations) {
-      const location = authUserData.user.locations.find(loc => loc.locationId === locationId)
-      return location?.role || null
-    }
-    
-    // Fallback to old format
-    const userRoles = userData.locations || {}
-    return userRoles[locationId] || null
+  getUserRoleForLocation(locationId) {
+    return authRepository.getUserRoleForLocation(locationId)
   }
 
   // Store user data in localStorage
@@ -434,11 +299,31 @@ class AuthService {
     localStorage.setItem('cognito-data', JSON.stringify(userData))
   }
 
-  // Clear user data from localStorage
-  clearUserData() {
+  // Clear user data from localStorage and IndexedDB
+  async clearUserData() {
+    // Clear old auth keys
     localStorage.removeItem('auth-token')
     localStorage.removeItem('user-email')
     localStorage.removeItem('cognito-data')
+    
+    // Clear new business selection keys
+    localStorage.removeItem('auth-user-data')
+    localStorage.removeItem('selected-business-id')
+    localStorage.removeItem('selected-location')
+    
+    // Clear UI state
+    localStorage.removeItem('dashboard-view')
+    localStorage.removeItem('sidebar-collapsed')
+    
+    console.log('🧹 All user data cleared from localStorage')
+    
+    // Clear IndexedDB
+    try {
+      const { indexedDb } = await import('../data/infrastructure/db.js')
+      await indexedDb.clearAllData()
+    } catch (error) {
+      console.error('Error clearing IndexedDB:', error)
+    }
   }
 
   // Check if user is authenticated (has stored data)

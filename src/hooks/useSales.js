@@ -12,9 +12,7 @@ const subscribers = new Set()
 
 // Funcție pentru notificarea abonaților
 const notifySubscribers = () => {
-  subscribers.forEach((callback, index) => {
-    callback(sharedSales, sharedStats)
-  })
+  subscribers.forEach(callback => callback())
 }
 
 export const useSales = () => {
@@ -32,27 +30,28 @@ export const useSales = () => {
     console.log('useSales render - sales count:', sales.length, 'loading:', loading, 'error:', error)
   }
 
-  // Abonare la schimbările de stare partajată
+  // Funcție pentru actualizarea stării locale din shared state
+  const updateLocalState = useCallback(() => {
+    setSales([...sharedSales])
+    setStats(sharedStats)
+  }, [])
+
+  // Înregistrare ca subscriber
   useEffect(() => {
-    const handleStateChange = (newSales, newStats) => {
-      if (!isDemoMode) {
-        console.log('State change received, sales count:', newSales.length, 'newSales:', newSales)
-      }
-      setSales([...newSales]) // Forțează o nouă referință
-      setStats(newStats)
-    }
+    subscribers.add(updateLocalState)
+    updateLocalState() // Inițializare cu starea curentă
     
-    subscribers.add(handleStateChange)
     if (!isDemoMode) {
       console.log('Subscriber added, total subscribers:', subscribers.size)
     }
+    
     return () => {
-      subscribers.delete(handleStateChange)
+      subscribers.delete(updateLocalState)
       if (!isDemoMode) {
         console.log('Subscriber removed, total subscribers:', subscribers.size)
       }
     }
-  }, [isDemoMode])
+  }, [updateLocalState, isDemoMode])
 
   // WebSocket handling pentru vânzări (reflectă starea finală) - only in non-demo mode
   useEffect(() => {
@@ -77,6 +76,15 @@ export const useSales = () => {
             const optimisticIndex = sharedSales.findIndex(s => s._tempId === outboxEntry.tempId)
             if (optimisticIndex >= 0) {
               sharedSales[optimisticIndex] = { ...ui, _isOptimistic: false }
+            } else {
+              // Verifică dacă nu există deja cu ID-ul real
+              const existingIndex = sharedSales.findIndex(s => s.id === saleId || s.resourceId === saleId)
+              if (existingIndex >= 0) {
+                sharedSales[existingIndex] = { ...ui, _isOptimistic: false }
+              } else {
+                // Adaugă ca nou doar dacă nu există deloc
+                sharedSales = [{ ...ui, _isOptimistic: false }, ...sharedSales]
+              }
             }
             await indexedDb.outboxDelete(outboxEntry.id)
           } else {
@@ -237,17 +245,25 @@ export const useSales = () => {
     try {
       const result = await salesService.createSale(saleData);
       const ui = salesManager.transformForUI ? salesManager.transformForUI(result) : result
-      const idx = sharedSales.findIndex(s => s.id === ui.id || s.resourceId === ui.resourceId)
-      if (idx >= 0) sharedSales[idx] = { ...ui, _isOptimistic: false }
-      else sharedSales = [ui, ...sharedSales]
-      notifySubscribers()
+      
+      // Doar resursele optimistice sunt adăugate imediat în shared state
+      // Resursele cu ID real vor fi adăugate de WebSocket
+      if (ui._isOptimistic || ui._tempId) {
+        const idx = sharedSales.findIndex(s => s._tempId === ui._tempId)
+        if (idx >= 0) {
+          sharedSales[idx] = ui
+        } else {
+          sharedSales = [ui, ...sharedSales]
+        }
+        notifySubscribers()
+      }
       
       // Actualizează statisticile
       const salesStats = await salesService.getSalesStats();
       sharedStats = salesStats
       notifySubscribers()
       
-      return ui
+      return result
     } catch (err) {
       setError(err.message);
       console.error('Error creating sale:', err);
@@ -264,11 +280,18 @@ export const useSales = () => {
     
     try {
       const result = await salesService.updateSale(id, saleData);
-      const ui = salesManager.transformForUI ? salesManager.transformForUI(result) : result
-      const existingIndex = sharedSales.findIndex(s => s.id === id || s.resourceId === id)
-      if (existingIndex >= 0) sharedSales[existingIndex] = { ...ui, _isOptimistic: false }
-      notifySubscribers()
-      return ui;
+      
+      if (result) {
+        const ui = salesManager.transformForUI ? salesManager.transformForUI(result) : result
+        const existingIndex = sharedSales.findIndex(s => s.id === id || s.resourceId === id)
+        if (existingIndex >= 0) {
+          sharedSales[existingIndex] = { ...ui, _isOptimistic: false }
+        }
+        setSales([...sharedSales])
+        notifySubscribers()
+      }
+      
+      return result;
     } catch (err) {
       setError(err.message);
       console.error('Error updating sale:', err);
@@ -285,7 +308,10 @@ export const useSales = () => {
     
     try {
       await salesService.deleteSale(id);
+      
+      // Elimină din lista locală
       sharedSales = sharedSales.filter(s => (s.id !== id && s.resourceId !== id))
+      setSales([...sharedSales])
       notifySubscribers()
       return { success: true };
     } catch (err) {

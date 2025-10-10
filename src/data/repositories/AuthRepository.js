@@ -47,16 +47,26 @@ class AuthRepository {
     localStorage.removeItem(this.storageKey)
   }
 
-  // Get user's locations with roles
+  // Get user's locations with roles (from selected business)
   getLocationsWithRoles() {
-    const userData = this.getStoredUserData()
-    return userData?.user?.locations || []
+    const selectedBusiness = this.getSelectedBusiness()
+    return selectedBusiness?.locations || []
   }
 
   // Get user's accessible locations (filter out locations with 'user' role)
   getAccessibleLocations() {
     const locations = this.getLocationsWithRoles()
     return locations.filter(location => location.role && location.role !== 'user')
+  }
+
+  // Check if business is selected
+  isBusinessSelected() {
+    return !!this.getSelectedBusiness()
+  }
+
+  // Clear selected business
+  clearSelectedBusiness() {
+    localStorage.removeItem('selected-business-id')
   }
 
   // Get user's role for a specific location
@@ -96,26 +106,92 @@ class AuthRepository {
     return userData?.user || null
   }
 
-  // Get demo user data when API is not available
-  getDemoUserData() {
-    const demoUserData = {
+  // Get user's businesses from stored data
+  getBusinesses() {
+    const userData = this.getStoredUserData()
+    return userData?.user?.businesses || []
+  }
+
+  // Get selected business from localStorage
+  getSelectedBusiness() {
+    const selectedBusinessId = localStorage.getItem('selected-business-id')
+    if (!selectedBusinessId) return null
+    
+    const businesses = this.getBusinesses()
+    return businesses.find(b => b.businessId === selectedBusinessId) || null
+  }
+
+  // Store selected business ID
+  setSelectedBusiness(businessId) {
+    localStorage.setItem('selected-business-id', businessId)
+  }
+
+  // Get locations for selected business
+  getLocationsForSelectedBusiness() {
+    const selectedBusiness = this.getSelectedBusiness()
+    return selectedBusiness?.locations || []
+  }
+
+  // Get demo user data when API is not available (with new format)
+  getDemoUserData(multipleBusinesses = false) {
+    // Check if we should use multiple businesses demo
+    const useMultiple = multipleBusinesses || localStorage.getItem('demo-multiple-businesses') === 'true'
+    
+    const demoUserData = useMultiple ? {
       success: true,
       user: {
         userId: 'demo-user',
         userName: 'Demo User',
         email: 'demo@cabinet-popescu.ro',
-        businessId: 'B0100001',
-        locations: [
-          { locationId: 'L0100001', locationName: 'Premier Central', role: 'admin' },
-          { locationId: 'L0100002', locationName: 'Filiala Pipera', role: 'manager' },
-          { locationId: 'L0100003', locationName: 'Centrul Medical Militari', role: 'user' }
+        businesses: [
+          {
+            businessId: 'B010001',
+            businessName: 'Cabinetul Dr. Popescu',
+            locations: [
+              { locationId: 'L0100001', locationName: 'Premier Central', role: 'admin' },
+              { locationId: 'L0100002', locationName: 'Filiala Pipera', role: 'manager' }
+            ]
+          },
+          {
+            businessId: 'B010002',
+            businessName: 'Clinica Stomatologică Elite',
+            locations: [
+              { locationId: 'L0200001', locationName: 'Clinica Elite - Victoriei', role: 'admin' },
+              { locationId: 'L0200002', locationName: 'Clinica Elite - Dorobanți', role: 'manager' }
+            ]
+          },
+          {
+            businessId: 'B010003',
+            businessName: 'Cabinet Medical Dr. Ionescu',
+            locations: [
+              { locationId: 'L0300001', locationName: 'Cabinet - Unirii', role: 'manager' }
+            ]
+          }
+        ]
+      }
+    } : {
+      success: true,
+      user: {
+        userId: 'demo-user',
+        userName: 'Demo User',
+        email: 'demo@cabinet-popescu.ro',
+        businesses: [
+          {
+            businessId: 'B010001',
+            businessName: 'Cabinetul Dr. Popescu',
+            locations: [
+              { locationId: 'L0100001', locationName: 'Premier Central', role: 'admin' },
+              { locationId: 'L0100002', locationName: 'Filiala Pipera', role: 'manager' },
+              { locationId: 'L0100003', locationName: 'Centrul Medical Militari', role: 'user' }
+            ]
+          }
         ]
       }
     }
     
     // Store demo data in localStorage
     this.storeUserData(demoUserData)
-    console.log('Using demo user data:', demoUserData)
+    console.log(`Using demo user data (${useMultiple ? 'MULTIPLE' : 'SINGLE'} business):`, demoUserData)
     
     return demoUserData
   }

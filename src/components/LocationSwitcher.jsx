@@ -1,87 +1,39 @@
 import { useState, useEffect } from 'react'
 import { MapPin, ChevronDown, Building, Check } from 'lucide-react'
 import authRepository from '../data/repositories/AuthRepository.js'
-import businessInfoRepository from '../data/repositories/BusinessInfoRepository.js'
 
 const LocationSwitcher = ({ collapsed, currentLocation, onLocationChange }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [locations, setLocations] = useState([])
 
   useEffect(() => {
-    const loadLocations = async () => {
+    const loadLocations = () => {
       try {
-        console.log('LocationSwitcher: Loading locations...')
+        console.log('LocationSwitcher: Loading locations from selected business...')
         
-        // Get user's accessible locations from the new API format
-        const userData = authRepository.getStoredUserData()
-        console.log('LocationSwitcher: User data from localStorage:', userData)
+        // Get selected business
+        const selectedBusiness = authRepository.getSelectedBusiness()
+        console.log('LocationSwitcher: Selected business:', selectedBusiness)
 
-        // Get business info locations for names/addresses
-        let businessInfo = businessInfoRepository.getStoredBusinessInfo()
-        let businessLocations = businessInfo?.locations || []
-        
-        // If no business info is stored, try to load it
-        if (!businessInfo || !businessLocations.length) {
-          console.log('LocationSwitcher: No business info found, attempting to load...')
-          try {
-            businessInfo = await businessInfoRepository.getBusinessInfo(userData?.user?.businessId)
-            businessLocations = businessInfo?.locations || []
-            console.log('LocationSwitcher: Loaded business info:', businessInfo)
-          } catch (error) {
-            console.log('LocationSwitcher: Could not load business info, using fallback')
-          }
+        if (!selectedBusiness) {
+          console.warn('LocationSwitcher: No business selected')
+          setLocations([])
+          return
         }
 
-        if (userData?.user?.locations) {
-          console.log('LocationSwitcher: Raw locations from API:', userData.user.locations)
+        // Get accessible locations from selected business
+        const accessibleLocations = selectedBusiness.locations
+          .filter(location => location.role && location.role !== 'user')
+          .map(location => ({
+            id: location.locationId,
+            name: location.locationName,
+            address: location.address || `Locația ${location.locationName}`,
+            role: location.role,
+            businessId: selectedBusiness.businessId
+          }))
 
-          // Filter by role and merge with business-info by id
-          const accessibleLocations = userData.user.locations
-            .filter(location => location.role && location.role !== 'user')
-            .map(location => {
-              // Try to find matching business location
-              const match = businessLocations.find(loc => loc.id === location.locationId)
-              
-              // If no match found, create a basic location object
-              if (!match) {
-                console.log(`LocationSwitcher: No business info found for location ${location.locationId}`)
-                return {
-                  id: location.locationId,
-                  name: location.locationName || `Locația ${location.locationId}`,
-                  address: `Adresa pentru ${location.locationName || location.locationId}`,
-                  role: location.role,
-                  businessId: userData.user.businessId
-                }
-              }
-              
-              return {
-                id: location.locationId,
-                name: match.name || location.locationName || location.locationId,
-                address: match.address || `Locația ${location.locationId}`,
-                role: location.role,
-                businessId: userData.user.businessId
-              }
-            })
-
-          console.log('LocationSwitcher: Transformed locations (merged with business-info):', accessibleLocations)
-          setLocations(accessibleLocations)
-        } else {
-          console.log('LocationSwitcher: No user locations found in API response')
-          // Fallback: try to get locations from business info if available
-          if (businessLocations.length > 0) {
-            console.log('LocationSwitcher: Using business info locations as fallback')
-            const fallbackLocations = businessLocations.map(loc => ({
-              id: loc.id,
-              name: loc.name,
-              address: loc.address,
-              role: 'user', // Default role
-              businessId: userData?.user?.businessId
-            }))
-            setLocations(fallbackLocations)
-          } else {
-            setLocations([])
-          }
-        }
+        console.log('LocationSwitcher: Accessible locations:', accessibleLocations)
+        setLocations(accessibleLocations)
       } catch (error) {
         console.error('LocationSwitcher: Error loading locations:', error)
         setLocations([])
