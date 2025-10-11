@@ -18,6 +18,7 @@ import { useDrawer } from '../../contexts/DrawerContext.jsx'
 import { useSalesDrawerStore } from '../../stores/salesDrawerStore'
 import { useInvoiceDrawerStore } from '../../stores/invoiceDrawerStore'
 import { useSales } from '../../hooks/useSales.js'
+import { useInvoices } from '../../hooks/useInvoices.js'
 import PatientCombobox from '../combobox/PatientCombobox.jsx'
 import DoctorCombobox from '../combobox/DoctorCombobox.jsx'
 import TreatmentCombobox from '../combobox/TreatmentCombobox.jsx'
@@ -54,7 +55,8 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
   const { sales } = useSales()
   const { openDrawer } = useDrawer()
   const { openSalesDrawer } = useSalesDrawerStore()
-  const { openInvoiceDrawer } = useInvoiceDrawerStore()
+  const { openInvoiceDrawer, openInvoiceDrawerWithInvoice } = useInvoiceDrawerStore()
+  const { invoices } = useInvoices()
   
   // Populăm cache-ul cu datele din combobox-uri
   useEffect(() => {
@@ -164,14 +166,36 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     })
   }
 
+  // Verifică dacă există deja o factură pentru această programare și returnează factura
+  const getExistingInvoice = () => {
+    if (!formData.id) return null
+    
+    // Căutăm în facturi dacă există o factură cu notes care conține ID-ul programării
+    // sau cu items care conțin ID-ul programării
+    const invoice = invoices.find(inv => {
+      // Verificăm în notes dacă se menționează programarea
+      if (inv.notes && inv.notes.includes(`Programare: ${formData.id}`)) {
+        return true
+      }
+      
+      // Verificăm dacă există un item cu ID-ul programării
+      if (inv.items && Array.isArray(inv.items)) {
+        return inv.items.some(item => 
+          item.appointmentId === formData.id ||
+          item.id === `appointment-${formData.id}` ||
+          item.description?.includes(`Programare: ${formData.id}`)
+        )
+      }
+      
+      return false
+    })
+    
+    return invoice || null
+  }
+  
   // Verifică dacă există deja o factură pentru această programare
   const hasExistingInvoice = () => {
-    if (!formData.id) return false
-    
-    // Pentru moment, returnăm false pentru a permite crearea de facturi
-    // În viitor, aici se poate adăuga verificarea reală pentru facturi existente
-    // de exemplu verificând în invoices dacă există o factură cu appointmentId
-    return false
+    return getExistingInvoice() !== null
   }
 
 
@@ -322,11 +346,15 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
 
   const handleInvoice = () => {
     // Verifică dacă există deja o factură pentru această programare
-    if (hasExistingInvoice()) {
-      alert('Factura pentru această programare a fost deja creată.')
+    const existingInvoice = getExistingInvoice()
+    if (existingInvoice) {
+      // Deschide factura existentă în modul de vizualizare
+      console.log('AppointmentDrawer - Opening existing invoice:', existingInvoice)
+      openInvoiceDrawerWithInvoice(existingInvoice)
       return
     }
     
+    // Nu există factură - creează una nouă
     // Găsim numele tratamentului - verificăm dacă este obiect sau string
     let treatmentName = ''
     if (typeof formData.service === 'object' && formData.service?.name) {
@@ -360,7 +388,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     console.log('AppointmentDrawer - handleInvoice - invoiceData:', invoiceData)
     console.log('AppointmentDrawer - handleInvoice - formData.price:', formData.price)
     
-    // Deschidem InvoiceDrawer cu datele programării
+    // Deschidem InvoiceDrawer cu datele programării pentru creare
     openInvoiceDrawer(invoiceData)
   }
 
@@ -483,7 +511,15 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
                 <CreditCard className="h-4 w-4" />
                 Plată efectuată
               </div>
-              {!hasExistingInvoice() && (
+              {hasExistingInvoice() ? (
+                <button
+                  onClick={handleInvoice}
+                  className="w-full flex items-center justify-center gap-2 h-10 rounded-md bg-green-100 text-green-800 border border-green-200 hover:bg-green-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Vezi factură
+                </button>
+              ) : (
                 <button
                   onClick={handleInvoice}
                   className="w-full flex items-center justify-center gap-2 h-10 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

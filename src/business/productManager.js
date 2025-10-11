@@ -37,10 +37,6 @@ class ProductManager {
       errors.push('Stocul trebuie să fie un număr pozitiv sau zero');
     }
 
-    // Validare nivel de reîncărcare
-    if (!productData.reorderLevel || isNaN(productData.reorderLevel) || productData.reorderLevel < 0) {
-      errors.push('Nivelul de reîncărcare trebuie să fie un număr pozitiv sau zero');
-    }
 
     return {
       isValid: errors.length === 0,

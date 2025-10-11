@@ -1,16 +1,9 @@
 import { useState, useEffect } from 'react'
 import { 
-  CreditCard, 
   Plus, 
-  DollarSign, 
   Receipt, 
-  Calendar,
-  CheckCircle,
-  Clock,
-  AlertCircle,
   Loader2,
-  FileText,
-  Send
+  FileText
 } from 'lucide-react'
 import { DatePicker } from '../ui/date-picker'
 import { useInvoices } from '../../hooks/useInvoices'
@@ -20,11 +13,9 @@ const FinancialBilling = () => {
   const { 
     invoices, 
     loading, 
-    loadInvoicesByDate, 
-    sendToEFactura,
-    invoiceManager 
+    loadInvoicesByDate
   } = useInvoices()
-  const { openInvoiceDrawer } = useInvoiceDrawerStore()
+  const { openInvoiceDrawer, openInvoiceDrawerWithInvoice } = useInvoiceDrawerStore()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
   // Load invoices data
@@ -35,40 +26,14 @@ const FinancialBilling = () => {
   // Filter invoices by selected date
   const filteredInvoices = invoices.filter(invoice => invoice.issueDate === selectedDate)
 
-
-
-  // Handle sending to eFactura
-  const handleSendToEFactura = async (invoiceId) => {
-    try {
-      await sendToEFactura(invoiceId)
-      // Refresh invoices after sending
-      loadInvoicesByDate(selectedDate)
-    } catch (error) {
-      console.error('Error sending to eFactura:', error)
-    }
-  }
-
   // Handle creating new invoice
   const handleCreateInvoice = () => {
     openInvoiceDrawer()
   }
 
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      paid: { color: 'bg-green-100 text-green-800', text: 'Plătită', icon: CheckCircle },
-      pending: { color: 'bg-yellow-100 text-yellow-800', text: 'În așteptare', icon: Clock },
-      overdue: { color: 'bg-red-100 text-red-800', text: 'Restantă', icon: AlertCircle }
-    }
-    
-    const config = statusConfig[status] || statusConfig.pending
-    const Icon = config.icon
-    
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        <Icon className="h-3 w-3 mr-1" />
-        {config.text}
-      </span>
-    )
+  // Handle opening existing invoice
+  const handleOpenInvoice = (invoice) => {
+    openInvoiceDrawerWithInvoice(invoice)
   }
 
   const isOverdue = (dueDate) => {
@@ -142,13 +107,15 @@ const FinancialBilling = () => {
                     <th className="text-left p-3 font-medium">Client</th>
                     <th className="text-left p-3 font-medium">Data</th>
                     <th className="text-left p-3 font-medium">Suma</th>
-                    <th className="text-left p-3 font-medium">Status</th>
-                    <th className="text-left p-3 font-medium">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredInvoices.map((invoice) => (
-                    <tr key={invoice.id} className="border-b hover:bg-muted/50">
+                    <tr 
+                      key={invoice.id} 
+                      className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => handleOpenInvoice(invoice)}
+                    >
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
@@ -179,28 +146,6 @@ const FinancialBilling = () => {
                         <div className="font-medium">{(invoice.total || 0).toFixed(2)} RON</div>
                         <div className="text-xs text-muted-foreground">
                           Subtotal: {(invoice.subtotal || 0).toFixed(2)} RON
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        {getStatusBadge(invoice.status)}
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          {invoice.status !== 'sent' && invoice.status !== 'paid' && (
-                            <button
-                              onClick={() => handleSendToEFactura(invoice.id)}
-                              className="p-1 hover:bg-blue-100 rounded text-blue-600"
-                              title="Trimite la eFactura"
-                            >
-                              <Send className="h-4 w-4" />
-                            </button>
-                          )}
-                          <button
-                            className="p-1 hover:bg-gray-100 rounded text-gray-600"
-                            title="Vezi detalii"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </button>
                         </div>
                       </td>
                     </tr>

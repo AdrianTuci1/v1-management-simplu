@@ -13,9 +13,11 @@ import {
   Clock,
   Star,
   MessageSquare,
-  Percent
+  Percent,
+  WifiOff
 } from 'lucide-react'
 import { useStatistics } from '../../hooks/useStatistics.js'
+import { useHealthRepository } from '../../hooks/useHealthRepository'
 import { ChartBarLabelCustom } from '../analytics/BarChartCustomLabel'
 import {
   Label,
@@ -33,6 +35,7 @@ const DashboardHome = () => {
     recentActivities, 
     loading, 
   } = useStatistics()
+  const { isOffline } = useHealthRepository()
 
   /**
    * Exemple de structură pentru businessStatistics:
@@ -151,14 +154,14 @@ const DashboardHome = () => {
   }
 
   const getDoctorProgress = () => {
+    // Dacă suntem offline, returnează array gol
+    if (isOffline) {
+      return []
+    }
+    
     if (!Array.isArray(businessStatistics?.doctorProgress) || businessStatistics.doctorProgress.length === 0) {
-      // Date default dacă nu există date din backend
-      return [
-        { doctor: "Dr. Popescu", progress: 75, appointments: 12, fill: "var(--chart-1)" },
-        { doctor: "Dr. Ionescu", progress: 60, appointments: 8, fill: "var(--chart-2)" },
-        { doctor: "Dr. Georgescu", progress: 85, appointments: 15, fill: "var(--chart-3)" },
-        { doctor: "Dr. Marinescu", progress: 45, appointments: 6, fill: "var(--chart-4)" },
-      ]
+      // Returnează array gol dacă nu există date din backend
+      return []
     }
     
     // Elimină duplicate și adaugă culori pentru chart
@@ -184,15 +187,14 @@ const DashboardHome = () => {
   }
 
   const getPopularTreatments = () => {
+    // Dacă suntem offline, returnează array gol
+    if (isOffline) {
+      return []
+    }
+    
     if (!Array.isArray(businessStatistics?.popularTreatments) || businessStatistics.popularTreatments.length === 0) {
-      // Date default dacă nu există date din backend
-      return [
-        { treatment: "Consultație", count: 67 },
-        { treatment: "Detartraj", count: 45 },
-        { treatment: "Obturație", count: 38 },
-        { treatment: "Tratament canal", count: 23 },
-        { treatment: "Albire dentară", count: 15 },
-      ]
+      // Returnează array gol dacă nu există date din backend
+      return []
     }
     // Protejează valorile pentru a evita obiecte în JSX
     return businessStatistics.popularTreatments.map(item => ({
@@ -689,42 +691,70 @@ const DashboardHome = () => {
               <h3 className="card-title">Progresul medicilor azi</h3>
             </div>
             <div className="card-content pb-0">
-              <ChartContainer
-                config={doctorProgressConfig}
-                className="mx-auto aspect-square h-[250px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart data={doctorProgressData} innerRadius={30} outerRadius={110}>
-                    <RadialBar dataKey="progress" background />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </div>
-            {/* Legendă cu medici */}
-            <div className="card-footer">
-              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm width-full align-center justify-center">
-                {doctorProgressData.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div 
-                      className="h-3 w-3 rounded-full" 
-                      style={{ backgroundColor: `var(--chart-${index + 1})` }}
-                    />
-                    <span className="text-muted-foreground">{item.doctor}</span>
-                    <span className="font-medium">{item.progress}%</span>
-          </div>
-        ))}
-              </div>
+              {isOffline || doctorProgressData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <WifiOff className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-sm text-muted-foreground">
+                    {isOffline ? 'Date indisponibile offline' : 'Nu există date despre progresul medicilor'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <ChartContainer
+                    config={doctorProgressConfig}
+                    className="mx-auto aspect-square h-[250px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart data={doctorProgressData} innerRadius={30} outerRadius={110}>
+                        <RadialBar dataKey="progress" background />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                  {/* Legendă cu medici */}
+                  <div className="card-footer">
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm width-full align-center justify-center">
+                      {doctorProgressData.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <div 
+                            className="h-3 w-3 rounded-full" 
+                            style={{ backgroundColor: `var(--chart-${index + 1})` }}
+                          />
+                          <span className="text-muted-foreground">{item.doctor}</span>
+                          <span className="font-medium">{item.progress}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Chart Bar - Tratamente Populare */}
-          <ChartBarLabelCustom 
-            title="Tratamente populare" 
-            description="Cele mai solicitate tratamente luna aceasta"
-            data={getPopularTreatments()}
-            dataKey="count"
-            nameKey="treatment"
-          />
+          {isOffline || getPopularTreatments().length === 0 ? (
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Tratamente populare</h3>
+                <p className="text-sm text-muted-foreground">Cele mai solicitate tratamente luna aceasta</p>
+              </div>
+              <div className="card-content">
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <WifiOff className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-sm text-muted-foreground">
+                    {isOffline ? 'Date indisponibile offline' : 'Nu există date despre tratamente populare'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <ChartBarLabelCustom 
+              title="Tratamente populare" 
+              description="Cele mai solicitate tratamente luna aceasta"
+              data={getPopularTreatments()}
+              dataKey="count"
+              nameKey="treatment"
+            />
+          )}
       </div>
 
         {/* CASETA 4: Activități Recente */}

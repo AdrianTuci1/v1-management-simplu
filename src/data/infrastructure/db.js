@@ -448,6 +448,13 @@ export const indexedDb = {
       .toArray();
   },
   
+  async getInvoicesByDate(date) {
+    return db.invoice
+      .where('issueDate')
+      .equals(date)
+      .toArray();
+  },
+  
   async getInvoicesByDateRange(startDate, endDate) {
     return db.invoice
       .where('issueDate')

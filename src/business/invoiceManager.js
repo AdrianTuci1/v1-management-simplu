@@ -97,7 +97,7 @@ class InvoiceManager {
     };
   }
 
-  // Calculează subtotalul
+  // Calculează subtotalul (suma prețurilor care conțin deja TVA)
   calculateSubtotal(items) {
     if (!items || !Array.isArray(items)) return 0;
     return items.reduce((sum, item) => {
@@ -106,17 +106,34 @@ class InvoiceManager {
     }, 0);
   }
 
-  // Calculează TVA-ul
+  // Calculează TVA-ul (extras din prețurile cu TVA inclus)
   calculateTax(items, taxRate = 0.19) {
-    const subtotal = this.calculateSubtotal(items);
-    return subtotal * taxRate;
+    const totalWithVAT = this.calculateSubtotal(items);
+    // Formula pentru extragerea TVA: Total cu TVA - (Total cu TVA / (1 + taxRate))
+    const totalWithoutVAT = totalWithVAT / (1 + taxRate);
+    return totalWithVAT - totalWithoutVAT;
   }
 
-  // Calculează totalul
+  // Calculează TVA-ul pentru items cu cote individuale
+  calculateTaxWithIndividualRates(items) {
+    if (!items || !Array.isArray(items)) return 0;
+    
+    return items.reduce((totalTax, item) => {
+      const itemTotal = (item.price || 0) * (item.quantity || 0);
+      const vatRate = item.vatRate || 0.19; // Fiecare item are propria cotă
+      
+      // Extrage TVA-ul din prețul cu TVA inclus
+      const itemWithoutVAT = itemTotal / (1 + vatRate);
+      const itemTax = itemTotal - itemWithoutVAT;
+      
+      return totalTax + itemTax;
+    }, 0);
+  }
+
+  // Calculează totalul (care este egal cu subtotal-ul deoarece prețurile conțin deja TVA)
   calculateTotal(items, taxRate = 0.19) {
-    const subtotal = this.calculateSubtotal(items);
-    const tax = this.calculateTax(items, taxRate);
-    return subtotal + tax;
+    // Total-ul este suma prețurilor cu TVA inclus
+    return this.calculateSubtotal(items);
   }
 
   // Formatează data pentru afișare

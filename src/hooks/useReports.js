@@ -174,12 +174,13 @@ export const useReports = () => {
   }, []);
 
   // Generează un raport nou
-  const generateReport = useCallback(async (sales, products, treatments, date) => {
+  // Parametrii sales, products, treatments sunt opționali - dacă lipsesc, se încarcă automat din DataFacade
+  const generateReport = useCallback(async (date, sales = null, products = null, treatments = null) => {
     setLoading(true);
     setError(null);
     
     try {
-      const result = await reportService.generateDailyReport(sales, products, treatments, date);
+      const result = await reportService.generateDailyReport(date, sales, products, treatments);
       const ui = reportService.transformForUI ? reportService.transformForUI(result) : result
       const idx = sharedReports.findIndex(r => r.id === ui.id || r.resourceId === ui.resourceId)
       if (idx >= 0) sharedReports[idx] = { ...ui, _isOptimistic: false }

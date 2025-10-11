@@ -90,7 +90,10 @@ export class DataFacade {
     
     // Repository-uri speciale pentru draft-uri și sesiuni
     this.repositories.set('draft', new DraftAwareResourceRepository('draft', 'drafts'));
-    this.repositories.set('session', new DraftAwareResourceRepository('session', 'sessions'));
+    this.repositories.set('session', new DraftAwareResourceRepository('session', 'session'));
+    
+    // Repository pentru rapoarte
+    this.repositories.set('report', new DraftAwareResourceRepository('report', 'report'));
   }
 
   initializeInvokers() {

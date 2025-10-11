@@ -58,7 +58,7 @@ export const useInvoices = () => {
 
     const handler = async (message) => {
       const { type, data, resourceType } = message
-      if (resourceType !== 'invoices' && resourceType !== 'invoice') return
+      if (resourceType !== 'invoice') return
       const operation = type?.replace('resource_', '') || type
       const invoiceId = data?.id || data?.resourceId
       if (!invoiceId) return
@@ -80,12 +80,10 @@ export const useInvoices = () => {
     }
 
     // Abonează-te la mesajele WebSocket pentru facturi
-    const unsubPlural = onResourceMessage('invoices', handler)
-    const unsubSingular = onResourceMessage('invoice', handler)
+    const unsub = onResourceMessage('invoice', handler)
 
     return () => {
-      unsubPlural()
-      unsubSingular()
+      unsub()
     }
   }, [isDemoMode])
 
@@ -187,12 +185,27 @@ export const useInvoices = () => {
     setError(null);
     
     try {
+      console.log('🔵 useInvoices.createInvoice - Starting with data:', invoiceData);
       const result = await invoiceService.createInvoice(invoiceData);
+      console.log('🔵 useInvoices.createInvoice - Result from service:', result);
+      
       const ui = invoiceManager.transformForUI ? invoiceManager.transformForUI(result) : result
+      console.log('🔵 useInvoices.createInvoice - UI transformed:', ui);
+      console.log('🔵 useInvoices.createInvoice - Current sharedInvoices count:', sharedInvoices.length);
+      
       const idx = sharedInvoices.findIndex(i => i.id === ui.id || i.resourceId === ui.resourceId)
-      if (idx >= 0) sharedInvoices[idx] = { ...ui, _isOptimistic: false }
-      else sharedInvoices = [ui, ...sharedInvoices]
+      console.log('🔵 useInvoices.createInvoice - Found at index:', idx);
+      
+      if (idx >= 0) {
+        sharedInvoices[idx] = { ...ui, _isOptimistic: false }
+        console.log('🔵 useInvoices.createInvoice - Updated existing invoice at index', idx);
+      } else {
+        sharedInvoices = [ui, ...sharedInvoices]
+        console.log('🔵 useInvoices.createInvoice - Added new invoice, new count:', sharedInvoices.length);
+      }
+      
       notifySubscribers()
+      console.log('🔵 useInvoices.createInvoice - Notified subscribers');
       
       // Actualizează statisticile
       const invoiceStats = await invoiceService.getInvoiceStats();
@@ -202,7 +215,7 @@ export const useInvoices = () => {
       return ui
     } catch (err) {
       setError(err.message);
-      console.error('Error creating invoice:', err);
+      console.error('❌ Error creating invoice in hook:', err);
       throw err;
     } finally {
       setLoading(false);

@@ -263,7 +263,9 @@ export class ResourceRepository {
   }
 
   async add(resource) {
+    console.log(`🟢 ResourceRepository.add - Starting for ${this.store}:`, resource);
     const isDemoMode = this.isInDemoMode();
+    console.log(`🟢 ResourceRepository.add - isDemoMode: ${isDemoMode}`);
     
     // In demo mode, add to IndexedDB directly
     if (isDemoMode) {
@@ -291,13 +293,17 @@ export class ResourceRepository {
     
     // Trimite cererea dar tratează și cazul când serverul răspunde 201/202 fără body util
     try {
+      console.log(`🟢 ResourceRepository.add - Making POST request for ${this.store}`);
       const response = await this.request("", {
         method: "POST",
         body: JSON.stringify(resource),
       });
+      console.log(`🟢 ResourceRepository.add - Response received:`, response);
       
       // Dacă serverul a acceptat procesarea asincronă fără body util
       if (response && response.accepted === true) {
+        console.log(`🟢 ResourceRepository.add - Async accepted response, creating optimistic entry`);
+
         const tempId = makeTempId(`${this.store}_`)
         const optimisticEntry = applyOptimistic({ ...resource, id: tempId, resourceId: tempId }, "create", tempId)
         await db.table(this.store).put(optimisticEntry)
@@ -356,9 +362,11 @@ export class ResourceRepository {
       }
       return normalized;
     } catch (error) {
+      console.log(`🟢 ResourceRepository.add - Request FAILED, creating optimistic entry. Error:`, error);
       // Dacă serverul a răspuns fără body util sau cererea e acceptată async, generăm un ID temporar
       const tempId = makeTempId(`${this.store}_`)
       const optimisticEntry = applyOptimistic({ ...resource, id: tempId, resourceId: tempId }, "create", tempId)
+      console.log(`🟢 ResourceRepository.add - Optimistic entry created:`, optimisticEntry);
       // Salvează în store local
       await db.table(this.store).put(optimisticEntry)
       // Pune în outbox pentru reconciliere când vine evenimentul de pe websocket
@@ -371,6 +379,7 @@ export class ResourceRepository {
         status: 'pending'
       })
       await enqueue({ resourceType: this.store, action: "create", payload: resource, tempId })
+      console.log(`🟢 ResourceRepository.add - Optimistic entry queued for sync`);
       return optimisticEntry
     }
   }

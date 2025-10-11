@@ -11,6 +11,7 @@ import {
   LogOut
 } from 'lucide-react'
 import { useAppointments } from '../../hooks/useAppointments.js'
+import { useDrawer } from '../../contexts/DrawerContext'
 import cognitoAuthService from '../../services/cognitoAuthService'
 import { 
   Drawer, 
@@ -21,6 +22,7 @@ import {
 
 const UserProfileDrawer = ({ onClose, position = "side" }) => {
   const { appointments, loading: appointmentsLoading } = useAppointments()
+  const { openDrawer } = useDrawer()
   const [userInfo, setUserInfo] = useState(null)
   const [userNotes, setUserNotes] = useState([])
   const [newNote, setNewNote] = useState('')
@@ -34,11 +36,11 @@ const UserProfileDrawer = ({ onClose, position = "side" }) => {
       setLoading(true)
       try {
         // Get user info from localStorage
-        const savedCognitoData = localStorage.getItem('cognito-data')
+        const savedAuthData = localStorage.getItem('auth-user-data')
         const selectedLocation = localStorage.getItem('selected-location')
         
-        if (savedCognitoData) {
-          const userData = JSON.parse(savedCognitoData)
+        if (savedAuthData) {
+          const authData = JSON.parse(savedAuthData)
           let userRole = 'Administrator' // Default role
           
           // Try to get actual role from selected location
@@ -52,8 +54,8 @@ const UserProfileDrawer = ({ onClose, position = "side" }) => {
           }
           
           setUserInfo({
-            name: userData.profile?.name || userData.user?.name || 'Utilizator',
-            email: userData.profile?.email || userData.user?.email || '',
+            name: authData.user?.name, 
+            email: authData.user?.email || '',
             role: userRole
           })
         }
@@ -304,7 +306,17 @@ const UserProfileDrawer = ({ onClose, position = "side" }) => {
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {upcomingAppointments.map((appointment) => (
-                  <div key={appointment.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div 
+                    key={appointment.id} 
+                    className="p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+                    onClick={() => {
+                      openDrawer({ 
+                        type: 'appointment', 
+                        isNew: false,
+                        data: appointment 
+                      })
+                    }}
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       <Calendar className="h-4 w-4 text-blue-600" />
                       <span className="font-medium text-sm">

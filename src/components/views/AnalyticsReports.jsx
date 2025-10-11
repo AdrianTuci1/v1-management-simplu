@@ -41,7 +41,9 @@ const AnalyticsReports = () => {
   const handleGenerateReport = async (date) => {
     setIsGenerating(true)
     try {
-      const report = await generateReport(sales, products, treatments, date)
+      // Trimite data ca prim parametru, urmat de datele opționale
+      // Dacă datele sunt disponibile, le trimite; altfel, reportService le va încărca automat
+      const report = await generateReport(date, sales, products, treatments)
       setCurrentPDFUrl(report.pdfUrl)
       setCurrentReportData(report)
       setShowPDFViewer(true)
@@ -130,23 +132,27 @@ const AnalyticsReports = () => {
 
   const renderReportPreview = (report) => {
     if (report.type === 'daily_sales' && report.stats) {
+      // Calculează totalul cash și card din paymentMethodBreakdown
+      const cashRevenue = report.stats.paymentMethodBreakdown?.cash?.revenue || 0;
+      const cardRevenue = report.stats.paymentMethodBreakdown?.card?.revenue || 0;
+      
       return (
         <div className="flex gap-6 text-sm">
           <div>
             <span className="text-muted-foreground">Vânzări:</span>
-            <div className="font-medium">{report.stats.totalSales}</div>
+            <div className="font-medium">{report.stats.totalSales || 0}</div>
           </div>
           <div>
             <span className="text-muted-foreground">Venit total:</span>
-            <div className="font-medium">{report.stats.totalRevenue.toFixed(2)} RON</div>
+            <div className="font-medium">{(report.stats.totalRevenue || 0).toFixed(2)} RON</div>
           </div>
           <div>
-            <span className="text-muted-foreground">Cash:</span>
-            <div className="font-medium">{report.stats.cashRevenue.toFixed(2)} RON</div>
+            <span className="text-muted-foreground">Servicii:</span>
+            <div className="font-medium">{(report.stats.servicesRevenue || 0).toFixed(2)} RON</div>
           </div>
           <div>
-            <span className="text-muted-foreground">Card:</span>
-            <div className="font-medium">{report.stats.cardRevenue.toFixed(2)} RON</div>
+            <span className="text-muted-foreground">Produse:</span>
+            <div className="font-medium">{(report.stats.productsRevenue || 0).toFixed(2)} RON</div>
           </div>
         </div>
       )

@@ -18,10 +18,14 @@ const useSettingsStore = create(
       // Location Details
       locationDetails: {
         name: '',
+        companyName: '', // Numele companiei pentru facturi
         address: '',
         phone: '',
         email: '',
-        description: ''
+        description: '',
+        cif: '',
+        iban: '',
+        banca: ''
       },
 
       // Currency Settings
@@ -34,9 +38,11 @@ const useSettingsStore = create(
       // Tax Settings
       taxSettings: {
         defaultVAT: 19,
+        serviceVATRateId: 1, // ID-ul cotei pentru servicii din vatRates (ex: TVA Standard)
+        productVATRateId: 1, // ID-ul cotei pentru produse din vatRates (ex: TVA Standard)
         vatRates: [
-          { id: 1, name: 'TVA Standard', rate: 19, enabled: true },
-          { id: 2, name: 'TVA Redus', rate: 9, enabled: true },
+          { id: 1, name: 'Servicii', rate: 19, enabled: true },
+          { id: 2, name: 'Produse', rate: 9, enabled: true },
           { id: 3, name: 'TVA Zero', rate: 0, enabled: true },
           { id: 4, name: 'Scutit de TVA', rate: 0, enabled: true }
         ]
@@ -220,10 +226,14 @@ const useSettingsStore = create(
         },
         locationDetails: {
           name: '',
+          companyName: '',
           address: '',
           phone: '',
           email: '',
-          description: ''
+          description: '',
+          cif: '',
+          iban: '',
+          banca: ''
         },
         currency: {
           code: 'RON',
@@ -232,6 +242,8 @@ const useSettingsStore = create(
         },
         taxSettings: {
           defaultVAT: 19,
+          serviceVATRateId: 1, // ID-ul cotei pentru servicii din vatRates
+          productVATRateId: 1, // ID-ul cotei pentru produse din vatRates
           vatRates: [
             { id: 1, name: 'TVA Standard', rate: 19, enabled: true },
             { id: 2, name: 'TVA Redus', rate: 9, enabled: true },

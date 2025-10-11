@@ -39,6 +39,7 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
   const [messages, setMessages] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [sessionHistory, setSessionHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
@@ -193,6 +194,7 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     
     setMessages([]);
     setCurrentSessionId(null);
+    setSessionHistory([]);
     setIsConnected(false);
     setConnectionStatus('disconnected');
     setError(null);
@@ -389,6 +391,14 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
         webSocketRef.current.setCurrentSessionId(newSessionId);
       }
       
+      // Optionally reload session history to include the new session
+      try {
+        const history = await aiServiceRef.current.loadSessionHistory(20);
+        setSessionHistory(Array.isArray(history) ? history : []);
+      } catch (historyError) {
+        Logger.log('warn', 'Could not reload session history after creating new session', historyError);
+      }
+      
       Logger.log('info', '✅ New session started', { sessionId: newSessionId });
       
       return result;
@@ -455,10 +465,25 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     }
 
     try {
-      return await aiServiceRef.current.loadSessionHistory(limit);
+      Logger.log('info', '📜 Loading session history', { limit });
+      setIsLoading(true);
+      
+      const history = await aiServiceRef.current.loadSessionHistory(limit);
+      
+      // Save to state
+      setSessionHistory(Array.isArray(history) ? history : []);
+      
+      Logger.log('info', '✅ Session history loaded', { 
+        count: history?.length || 0 
+      });
+      
+      return history;
     } catch (error) {
+      Logger.log('error', '❌ Failed to load session history', error);
       setError({ message: 'Failed to load session history', error });
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -581,6 +606,7 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     messages,
     isConnected,
     currentSessionId,
+    sessionHistory,
     isLoading,
     error,
     connectionStatus,

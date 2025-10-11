@@ -11,7 +11,7 @@ import { useSettings } from '../../hooks/useSettings'
 const WorkingHoursDrawer = ({ onClose, settingId, settingData }) => {
   const { 
     workingHours, 
-    saveWorkingHours, 
+    addSetting,
     updateSetting,
     loading: settingsLoading, 
     error: settingsError 
@@ -19,7 +19,17 @@ const WorkingHoursDrawer = ({ onClose, settingId, settingData }) => {
   
   const [loading, setLoading] = useState(false)
   const [localWorkingHours, setLocalWorkingHours] = useState({})
-  const [localLocationDetails, setLocalLocationDetails] = useState({})
+  const [localLocationDetails, setLocalLocationDetails] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    description: '',
+    companyName: '',
+    cif: '',
+    iban: '',
+    banca: ''
+  })
 
   const days = [
     { key: 'monday', label: 'Luni' },
@@ -73,7 +83,11 @@ const WorkingHoursDrawer = ({ onClose, settingId, settingData }) => {
         address: '',
         phone: '',
         email: '',
-        description: ''
+        description: '',
+        companyName: '',
+        cif: '',
+        iban: '',
+        banca: ''
       }
       
       days.forEach(day => {
@@ -134,17 +148,21 @@ const WorkingHoursDrawer = ({ onClose, settingId, settingData }) => {
       // Dacă există settingId, actualizează setarea existentă
       if (settingId) {
         const settingData = {
-          data: {
-            settingType: 'working-hours',
-            name: 'Program de funcționare',
-            isActive: true,
-            ...workingHoursData
-          }
+          settingType: 'working-hours',
+          name: 'Program de funcționare',
+          isActive: true,
+          data: workingHoursData
         }
         await updateSetting(settingId, settingData)
       } else {
         // Altfel, creează o setare nouă
-        await saveWorkingHours(workingHoursData)
+        const settingData = {
+          settingType: 'working-hours',
+          name: 'Program de funcționare',
+          isActive: true,
+          data: workingHoursData
+        }
+        await addSetting(settingData)
       }
       
       onClose()
@@ -273,6 +291,52 @@ const WorkingHoursDrawer = ({ onClose, settingId, settingData }) => {
                   rows={2}
                   className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent resize-none"
                 />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium mb-1">Firmă</label>
+                <input
+                  type="text"
+                  value={localLocationDetails.companyName || ''}
+                  onChange={(e) => handleLocationChange('companyName', e.target.value)}
+                  placeholder="S.C. Cabinet Medical S.R.L."
+                  className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium mb-1">CIF</label>
+                <input
+                  type="text"
+                  value={localLocationDetails.cif || ''}
+                  onChange={(e) => handleLocationChange('cif', e.target.value)}
+                  placeholder="RO12345678"
+                  className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium mb-1">IBAN</label>
+                  <input
+                    type="text"
+                    value={localLocationDetails.iban || ''}
+                    onChange={(e) => handleLocationChange('iban', e.target.value)}
+                    placeholder="RO49AAAA1B31007593840000"
+                    className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1">Bancă</label>
+                  <input
+                    type="text"
+                    value={localLocationDetails.banca || ''}
+                    onChange={(e) => handleLocationChange('banca', e.target.value)}
+                    placeholder="BCR"
+                    className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
               </div>
             </div>
           </div>

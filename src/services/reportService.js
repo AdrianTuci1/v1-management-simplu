@@ -6,7 +6,7 @@ import { formatCurrency, formatDate, generateReportId } from '../utils/dailyRepo
 // Serviciu pentru rapoarte folosind DataFacade
 class ReportService {
   constructor() {
-    this.repository = new ResourceRepository('report', 'reports');
+    this.repository = new ResourceRepository('report', 'report');
     this.dataFacade = dataFacade;
   }
 
@@ -51,10 +51,52 @@ class ReportService {
   }
 
   // Generează un raport zilnic
-  async generateDailyReport(sales, products, treatments, date) {
+  async generateDailyReport(date, salesData = null, productsData = null, treatmentsData = null) {
     try {
+      // Încarcă datele necesare pentru ziua respectivă
+      // Dacă nu sunt furnizate, le încarcă din DataFacade (cu fallback la IndexedDB)
+      let sales, products, treatments;
+      
+      if (salesData && productsData && treatmentsData) {
+        // Folosește datele furnizate
+        sales = salesData;
+        products = productsData;
+        treatments = treatmentsData;
+      } else {
+        // Încarcă datele din DataFacade - va folosi automat IndexedDB dacă serverul nu răspunde
+        console.log(`📊 Încărcare date pentru raportul zilnic din ${date}`);
+        
+        try {
+          // Încearcă să încarce toate datele în paralel
+          [sales, products, treatments] = await Promise.all([
+            salesManager.loadSales(), // Folosește salesManager pentru a obține vânzările
+            this.dataFacade.getAll('product'),
+            this.dataFacade.getAll('treatment')
+          ]);
+          
+          console.log(`✅ Date încărcate: ${sales.length} vânzări, ${products.length} produse, ${treatments.length} servicii`);
+        } catch (loadError) {
+          console.warn('⚠️ Eroare la încărcarea datelor pentru raport:', loadError);
+          // Dacă încărcarea eșuează complet, folosește array-uri goale
+          sales = [];
+          products = [];
+          treatments = [];
+        }
+      }
+      
+      // Filtrează vânzările doar pentru ziua respectivă
+      const dailySales = sales.filter(sale => {
+        if (!sale.date) return false;
+        // Normalizează data pentru comparație
+        const saleDate = sale.date.split('T')[0]; // Ia doar partea de dată (YYYY-MM-DD)
+        const reportDate = date.split('T')[0];
+        return saleDate === reportDate;
+      });
+      
+      console.log(`📈 Găsite ${dailySales.length} vânzări pentru ${date}`);
+      
       // Calculează statisticile
-      const stats = this.calculateReportStats(sales, products, treatments, date);
+      const stats = this.calculateReportStats(dailySales, products, treatments, date);
       
       // Generează PDF-ul
       const pdfBlob = await this.generatePDF(stats, date);
@@ -75,7 +117,7 @@ class ReportService {
         fileSize: pdfBlob.size
       };
       
-      // Creează raportul prin DataFacade
+      // Creează raportul prin DataFacade (va folosi IndexedDB în demo mode)
       const report = await this.dataFacade.create('report', reportData);
       
       return this.transformForUI(report);
@@ -87,100 +129,119 @@ class ReportService {
 
   // Calculează statisticile pentru raport
   calculateReportStats(sales, products, treatments, date) {
-    const dailySales = sales.filter(sale => sale.date === date && sale.status === 'completed');
+    // Filtrează doar vânzările completate (filtrarea pe dată se face deja în generateDailyReport)
+    const dailySales = sales.filter(sale => sale.status === 'completed');
     
     if (dailySales.length === 0) {
       return {
         date,
         totalSales: 0,
         totalRevenue: 0,
-        cashRevenue: 0,
-        cardRevenue: 0,
         servicesRevenue: 0,
         productsRevenue: 0,
-        servicesCount: 0,
-        productsCount: 0,
-        salesBreakdown: [],
-        paymentMethodBreakdown: {
-          cash: { count: 0, revenue: 0 },
-          card: { count: 0, revenue: 0 },
-          tickets: { count: 0, revenue: 0 },
-          receipt: { count: 0, revenue: 0 }
-        }
+        vatBreakdown: {},
+        paymentMethodBreakdown: {},
+        paymentVatBreakdown: {},
+        servicesList: [],
+        productsList: []
       };
     }
 
-    const totalRevenue = dailySales.reduce((sum, sale) => sum + parseFloat(sale.total), 0);
+    const totalRevenue = dailySales.reduce((sum, sale) => sum + parseFloat(sale.total || 0), 0);
     
-    const paymentMethodBreakdown = {
-      cash: { count: 0, revenue: 0 },
-      card: { count: 0, revenue: 0 },
-      tickets: { count: 0, revenue: 0 },
-      receipt: { count: 0, revenue: 0 }
-    };
+    // Breakdown pe cote TVA
+    const vatBreakdown = {}; // { '19': { base: 0, vat: 0, total: 0 }, ... }
+    
+    // Breakdown pe metode de plată
+    const paymentMethodBreakdown = {}; // { 'cash': { count: 0, revenue: 0 }, ... }
+    
+    // Breakdown pe metode de plată și cote TVA
+    const paymentVatBreakdown = {}; // { 'cash': { '19': { base: 0, vat: 0, total: 0 } }, ... }
+    
+    // Liste complete de servicii și produse vândute
+    const servicesMap = new Map(); // Pentru agregare servicii
+    const productsMap = new Map(); // Pentru agregare produse
 
     let servicesRevenue = 0;
     let productsRevenue = 0;
-    let servicesCount = 0;
-    let productsCount = 0;
-    const salesBreakdown = [];
 
     dailySales.forEach(sale => {
-      const saleTotal = parseFloat(sale.total);
+      const paymentMethod = sale.paymentMethod || 'cash';
+      const saleTotal = parseFloat(sale.total || 0);
       
-      // Actualizează breakdown-ul pe metode de plată
-      if (paymentMethodBreakdown[sale.paymentMethod]) {
-        paymentMethodBreakdown[sale.paymentMethod].count++;
-        paymentMethodBreakdown[sale.paymentMethod].revenue += saleTotal;
+      // Inițializează breakdown-ul pe metode de plată
+      if (!paymentMethodBreakdown[paymentMethod]) {
+        paymentMethodBreakdown[paymentMethod] = { count: 0, revenue: 0 };
       }
+      paymentMethodBreakdown[paymentMethod].count++;
+      paymentMethodBreakdown[paymentMethod].revenue += saleTotal;
 
-      // Analizează fiecare item din vânzare
-      let saleServicesRevenue = 0;
-      let saleProductsRevenue = 0;
-      let saleServicesCount = 0;
-      let saleProductsCount = 0;
-
-      sale.items.forEach(item => {
-        const itemTotal = parseFloat(item.total || item.quantity * item.price);
+      // Procesează fiecare item din vânzare
+      (sale.items || []).forEach(item => {
+        const quantity = parseInt(item.quantity || 1);
+        const price = parseFloat(item.price || 0);
+        const itemTotal = parseFloat(item.total || quantity * price);
+        const vatRate = parseFloat(item.vatRate || item.vat || 19); // Default 19%
+        
+        // Calculează baza și TVA-ul
+        const base = itemTotal / (1 + vatRate / 100);
+        const vat = itemTotal - base;
         
         // Determină dacă este serviciu sau produs
         const isService = this.isItemService(item, products, treatments);
         
-        if (isService) {
-          saleServicesRevenue += itemTotal;
-          saleServicesCount += parseInt(item.quantity);
-        } else {
-          saleProductsRevenue += itemTotal;
-          saleProductsCount += parseInt(item.quantity);
+        // Actualizează breakdown pe cote TVA
+        if (!vatBreakdown[vatRate]) {
+          vatBreakdown[vatRate] = { base: 0, vat: 0, total: 0 };
         }
-      });
-
-      // Dacă nu am putut determina tipul, considerăm că sunt produse
-      if (saleServicesRevenue === 0 && saleProductsRevenue === 0) {
-        saleProductsRevenue = saleTotal;
-        saleProductsCount = 1;
-      }
-
-      servicesRevenue += saleServicesRevenue;
-      productsRevenue += saleProductsRevenue;
-      servicesCount += saleServicesCount;
-      productsCount += saleProductsCount;
-
-      // Adaugă la breakdown-ul vânzărilor
-      salesBreakdown.push({
-        saleId: sale.saleId,
-        time: sale.time,
-        total: saleTotal,
-        paymentMethod: sale.paymentMethod,
-        servicesRevenue: saleServicesRevenue,
-        productsRevenue: saleProductsRevenue,
-        items: sale.items.map(item => ({
-          name: item.productName,
-          quantity: item.quantity,
-          price: item.price,
-          total: parseFloat(item.total || item.quantity * item.price),
-          isService: this.isItemService(item, products, treatments)
-        }))
+        vatBreakdown[vatRate].base += base;
+        vatBreakdown[vatRate].vat += vat;
+        vatBreakdown[vatRate].total += itemTotal;
+        
+        // Actualizează breakdown pe metode de plată și cote TVA
+        if (!paymentVatBreakdown[paymentMethod]) {
+          paymentVatBreakdown[paymentMethod] = {};
+        }
+        if (!paymentVatBreakdown[paymentMethod][vatRate]) {
+          paymentVatBreakdown[paymentMethod][vatRate] = { base: 0, vat: 0, total: 0 };
+        }
+        paymentVatBreakdown[paymentMethod][vatRate].base += base;
+        paymentVatBreakdown[paymentMethod][vatRate].vat += vat;
+        paymentVatBreakdown[paymentMethod][vatRate].total += itemTotal;
+        
+        // Agregare servicii/produse
+        const itemKey = item.productId || item.productName;
+        if (isService) {
+          servicesRevenue += itemTotal;
+          if (servicesMap.has(itemKey)) {
+            const existing = servicesMap.get(itemKey);
+            existing.quantity += quantity;
+            existing.total += itemTotal;
+          } else {
+            servicesMap.set(itemKey, {
+              name: item.productName,
+              quantity: quantity,
+              unitPrice: price,
+              vatRate: vatRate,
+              total: itemTotal
+            });
+          }
+        } else {
+          productsRevenue += itemTotal;
+          if (productsMap.has(itemKey)) {
+            const existing = productsMap.get(itemKey);
+            existing.quantity += quantity;
+            existing.total += itemTotal;
+          } else {
+            productsMap.set(itemKey, {
+              name: item.productName,
+              quantity: quantity,
+              unitPrice: price,
+              vatRate: vatRate,
+              total: itemTotal
+            });
+          }
+        }
       });
     });
 
@@ -188,14 +249,13 @@ class ReportService {
       date,
       totalSales: dailySales.length,
       totalRevenue,
-      cashRevenue: paymentMethodBreakdown.cash.revenue,
-      cardRevenue: paymentMethodBreakdown.card.revenue,
       servicesRevenue,
       productsRevenue,
-      servicesCount,
-      productsCount,
-      salesBreakdown,
-      paymentMethodBreakdown
+      vatBreakdown,
+      paymentMethodBreakdown,
+      paymentVatBreakdown,
+      servicesList: Array.from(servicesMap.values()),
+      productsList: Array.from(productsMap.values())
     };
   }
 
@@ -237,111 +297,258 @@ class ReportService {
     
     const doc = new jsPDF();
     
-    // Header
-    doc.setFontSize(20);
+    // ====================
+    // HEADER - Data și Total Vânzări
+    // ====================
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('RAPORT ZILNIC DE VÂNZĂRI', 105, 20, { align: 'center' });
     
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(14);
     doc.text(`Data: ${formatDate(date)}`, 105, 30, { align: 'center' });
-    doc.text(`Generat la: ${new Date().toLocaleString('ro-RO')}`, 105, 35, { align: 'center' });
     
-    let yPosition = 50;
+    doc.setFontSize(16);
+    doc.setTextColor(0, 102, 204);
+    doc.text(`Total Vânzări: ${formatCurrency(stats.totalRevenue)}`, 105, 40, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    
+    let yPosition = 55;
 
-    // Statistici generale
-    doc.setFontSize(14);
+    // ====================
+    // SECȚIUNEA 1: Vânzări Mărfuri și Servicii
+    // ====================
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('STATISTICI GENERALE', 20, yPosition);
-    yPosition += 10;
+    doc.text('1. VÂNZĂRI MĂRFURI ȘI SERVICII', 20, yPosition);
+    yPosition += 8;
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    
-    const generalStats = [
-      ['Total vânzări:', stats.totalSales],
-      ['Venit total:', formatCurrency(stats.totalRevenue)],
-      ['Venit servicii:', formatCurrency(stats.servicesRevenue)],
-      ['Venit produse:', formatCurrency(stats.productsRevenue)],
-      ['Încasări cash:', formatCurrency(stats.cashRevenue)],
-      ['Încasări card:', formatCurrency(stats.cardRevenue)]
+    const goodsServicesData = [
+      ['Servicii', formatCurrency(stats.servicesRevenue)],
+      ['Mărfuri (Produse)', formatCurrency(stats.productsRevenue)],
+      ['TOTAL', formatCurrency(stats.totalRevenue)]
     ];
 
-    generalStats.forEach(([label, value]) => {
-      doc.text(label, 20, yPosition);
-      doc.text(value, 120, yPosition);
-      yPosition += 6;
-    });
-
-    yPosition += 10;
-
-    // Breakdown pe metode de plată
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('METODE DE PLATĂ', 20, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-
-    const paymentData = [
-      ['Metodă', 'Număr vânzări', 'Venit'],
-      ['Cash', stats.paymentMethodBreakdown.cash.count, formatCurrency(stats.paymentMethodBreakdown.cash.revenue)],
-      ['Card', stats.paymentMethodBreakdown.card.count, formatCurrency(stats.paymentMethodBreakdown.card.revenue)],
-      ['Tichete', stats.paymentMethodBreakdown.tickets.count, formatCurrency(stats.paymentMethodBreakdown.tickets.revenue)],
-      ['Bon', stats.paymentMethodBreakdown.receipt.count, formatCurrency(stats.paymentMethodBreakdown.receipt.revenue)]
-    ];
-
-    doc.autoTable({
+    autoTable(doc, {
       startY: yPosition,
-      head: [paymentData[0]],
-      body: paymentData.slice(1),
-      theme: 'grid',
-      headStyles: { fillColor: [66, 139, 202] },
-      styles: { fontSize: 9 }
+      head: [['Categorie', 'Valoare']],
+      body: goodsServicesData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185], fontStyle: 'bold' },
+      styles: { fontSize: 10 },
+      columnStyles: {
+        1: { halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 20, right: 20 }
     });
 
-    yPosition = doc.lastAutoTable.finalY + 15;
+    yPosition = doc.lastAutoTable.finalY + 12;
 
-    // Detalii vânzări
-    if (stats.salesBreakdown.length > 0) {
-      doc.setFontSize(14);
+    // ====================
+    // SECȚIUNEA 2: Vânzări pe Cote TVA
+    // ====================
+    if (yPosition > 240) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('2. VÂNZĂRI PE COTE TVA', 20, yPosition);
+    yPosition += 8;
+
+    const vatData = [];
+    let totalBase = 0;
+    let totalVat = 0;
+    let totalWithVat = 0;
+
+    Object.keys(stats.vatBreakdown).sort((a, b) => parseFloat(b) - parseFloat(a)).forEach(vatRate => {
+      const vat = stats.vatBreakdown[vatRate];
+      totalBase += vat.base;
+      totalVat += vat.vat;
+      totalWithVat += vat.total;
+      
+      vatData.push([
+        `Cotă TVA ${vatRate}%`,
+        formatCurrency(vat.base),
+        formatCurrency(vat.vat),
+        formatCurrency(vat.total)
+      ]);
+    });
+
+    vatData.push([
+      'TOTAL',
+      formatCurrency(totalBase),
+      formatCurrency(totalVat),
+      formatCurrency(totalWithVat)
+    ]);
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [['Cotă TVA', 'Bază impozabilă', 'TVA', 'Total cu TVA']],
+      body: vatData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185], fontStyle: 'bold' },
+      styles: { fontSize: 10 },
+      columnStyles: {
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 20, right: 20 }
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 12;
+
+    // ====================
+    // SECȚIUNEA 3: Vânzări pe Modalități de Plată și Cote TVA
+    // ====================
+    if (yPosition > 200) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('3. VÂNZĂRI PE MODALITĂȚI DE PLATĂ ȘI COTE TVA', 20, yPosition);
+    yPosition += 8;
+
+    const paymentVatData = [];
+    const paymentMethodNames = {
+      'cash': 'Numerar',
+      'card': 'Card',
+      'tickets': 'Tichete',
+      'receipt': 'Bon'
+    };
+
+    Object.keys(stats.paymentVatBreakdown).forEach(paymentMethod => {
+      const methodName = paymentMethodNames[paymentMethod] || paymentMethod;
+      const vatRates = stats.paymentVatBreakdown[paymentMethod];
+      
+      Object.keys(vatRates).sort((a, b) => parseFloat(b) - parseFloat(a)).forEach(vatRate => {
+        const vat = vatRates[vatRate];
+        paymentVatData.push([
+          methodName,
+          `TVA ${vatRate}%`,
+          formatCurrency(vat.base),
+          formatCurrency(vat.vat),
+          formatCurrency(vat.total)
+        ]);
+      });
+    });
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [['Modalitate Plată', 'Cotă TVA', 'Bază', 'TVA', 'Total']],
+      body: paymentVatData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185], fontStyle: 'bold' },
+      styles: { fontSize: 9 },
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 20, right: 20 }
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 12;
+
+    // ====================
+    // SECȚIUNEA 4: Liste Detaliate Servicii și Produse
+    // ====================
+    if (yPosition > 220) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('4. DETALII SERVICII ȘI PRODUSE VÂNDUTE', 20, yPosition);
+    yPosition += 8;
+
+    // SERVICII
+    if (stats.servicesList.length > 0) {
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text('DETALII VÂNZĂRI', 20, yPosition);
-      yPosition += 10;
+      doc.text('Servicii:', 20, yPosition);
+      yPosition += 6;
 
-      const salesData = stats.salesBreakdown.map(sale => [
-        sale.saleId,
-        sale.time,
-        formatCurrency(sale.total),
-        sale.paymentMethod,
-        formatCurrency(sale.servicesRevenue),
-        formatCurrency(sale.productsRevenue)
+      const servicesData = stats.servicesList.map(service => [
+        service.name,
+        String(service.quantity),
+        formatCurrency(service.unitPrice),
+        `${service.vatRate}%`,
+        formatCurrency(service.total)
       ]);
 
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPosition,
-        head: [['ID Vânzare', 'Ora', 'Total', 'Plată', 'Servicii', 'Produse']],
-        body: salesData,
+        head: [['Serviciu', 'Cantitate', 'Preț unitar', 'TVA', 'Total']],
+        body: servicesData,
         theme: 'grid',
-        headStyles: { fillColor: [66, 139, 202] },
-        styles: { fontSize: 8 },
+        headStyles: { fillColor: [46, 204, 113], fontStyle: 'bold' },
+        styles: { fontSize: 9 },
         columnStyles: {
+          1: { halign: 'center' },
           2: { halign: 'right' },
-          4: { halign: 'right' },
-          5: { halign: 'right' }
-        }
+          3: { halign: 'center' },
+          4: { halign: 'right', fontStyle: 'bold' }
+        },
+        margin: { left: 20, right: 20 }
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 10;
+    }
+
+    // PRODUSE
+    if (stats.productsList.length > 0) {
+      if (yPosition > 220) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Produse:', 20, yPosition);
+      yPosition += 6;
+
+      const productsData = stats.productsList.map(product => [
+        product.name,
+        String(product.quantity),
+        formatCurrency(product.unitPrice),
+        `${product.vatRate}%`,
+        formatCurrency(product.total)
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Produs', 'Cantitate', 'Preț unitar', 'TVA', 'Total']],
+        body: productsData,
+        theme: 'grid',
+        headStyles: { fillColor: [230, 126, 34], fontStyle: 'bold' },
+        styles: { fontSize: 9 },
+        columnStyles: {
+          1: { halign: 'center' },
+          2: { halign: 'right' },
+          3: { halign: 'center' },
+          4: { halign: 'right', fontStyle: 'bold' }
+        },
+        margin: { left: 20, right: 20 }
       });
     }
 
-    // Footer
+    // ====================
+    // FOOTER
+    // ====================
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Pagina ${i} din ${pageCount}`, 20, doc.internal.pageSize.height - 10);
-      doc.text('Generat de Sistem de Management Cabinet', doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 10, { align: 'right' });
+      doc.setTextColor(128, 128, 128);
+      doc.text(`Pagina ${i} din ${pageCount}`, 105, doc.internal.pageSize.height - 10, { align: 'center' });
+      doc.text(`Generat: ${new Date().toLocaleString('ro-RO')}`, 20, doc.internal.pageSize.height - 10);
+      doc.text('Sistem Management Cabinet', doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 10, { align: 'right' });
     }
 
     return doc.output('blob');

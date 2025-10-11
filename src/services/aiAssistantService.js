@@ -67,32 +67,16 @@ export class AIAssistantService {
     try {
       Logger.log('info', 'Loading active session for user');
       
-      const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/user/${this.userId}/active`;
-      const response = await fetch(endpoint);
+      // In demo mode, return null (no active session)
+      if (this.isDemoMode) {
+        Logger.log('info', 'Demo mode - no active session');
+        return null;
+      }
       
-      if (response.ok) {
-        // Check if response has content
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          Logger.log('info', 'No active session found (empty response)');
-          return null;
-        }
-        
-        // Get response text first to check if it's empty
-        const responseText = await response.text();
-        if (!responseText || responseText.trim() === '') {
-          Logger.log('info', 'No active session found (empty response body)');
-          return null;
-        }
-        
-        // Try to parse JSON
-        let activeSession;
-        try {
-          activeSession = JSON.parse(responseText);
-        } catch (parseError) {
-          Logger.log('warn', 'Failed to parse response as JSON', { responseText });
-          return null;
-        }
+      const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/user/${this.userId}/active`;
+      
+      try {
+        const activeSession = await aiApiRequest(endpoint);
         
         if (activeSession && activeSession.sessionId) {
           // Use existing active session
@@ -113,17 +97,18 @@ export class AIAssistantService {
           Logger.log('info', 'No active session found');
           return null;
         }
-      } else if (response.status === 404) {
+      } catch (error) {
         // 404 means no active session - this is normal
-        Logger.log('info', 'No active session found (404)');
-        return null;
-      } else {
-        throw new Error(`Failed to load active session: ${response.status} ${response.statusText}`);
+        if (error.status === 404) {
+          Logger.log('info', 'No active session found (404)');
+          return null;
+        }
+        throw error;
       }
     } catch (error) {
       Logger.log('error', 'Failed to load active session', error);
       // Don't throw error for missing sessions, just return null
-      if (error.message.includes('404') || error.message.includes('Unexpected end of JSON input')) {
+      if (error.message.includes('404') || error.status === 404) {
         Logger.log('info', 'No active session exists, continuing...');
         return null;
       }
@@ -211,21 +196,10 @@ export class AIAssistantService {
         endpoint += `?${params.toString()}`;
       }
       
-      const response = await fetch(endpoint);
-      
-      if (response.ok) {
-        let messages = [];
-        try {
-          const responseText = await response.text();
-          if (responseText && responseText.trim() !== '') {
-            messages = JSON.parse(responseText);
-          }
-        } catch (parseError) {
-          Logger.log('warn', 'Failed to parse message history response', parseError);
-          messages = [];
-        }
+      try {
+        const messages = await aiApiRequest(endpoint);
         
-        this.messageHistory = messages || [];
+        this.messageHistory = Array.isArray(messages) ? messages : [];
         
         Logger.log('info', 'Message history loaded', { 
           sessionId, 
@@ -236,14 +210,15 @@ export class AIAssistantService {
         this.onMessageReceived?.(this.messageHistory);
         
         return this.messageHistory;
-      } else if (response.status === 404) {
+      } catch (error) {
         // 404 means no messages - this is normal for new sessions
-        Logger.log('info', 'No messages found for session', { sessionId });
-        this.messageHistory = [];
-        this.onMessageReceived?.([]);
-        return [];
-      } else {
-        throw new Error(`Failed to load message history: ${response.status} ${response.statusText}`);
+        if (error.status === 404) {
+          Logger.log('info', 'No messages found for session', { sessionId });
+          this.messageHistory = [];
+          this.onMessageReceived?.([]);
+          return [];
+        }
+        throw error;
       }
     } catch (error) {
       Logger.log('error', 'Failed to load message history', error);
@@ -290,59 +265,39 @@ export class AIAssistantService {
         type: 'agent.response'
       };
 
-      const response = await fetch(getConfig('API_ENDPOINTS.MESSAGES'), {
+      const result = await aiApiRequest(getConfig('API_ENDPOINTS.MESSAGES'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(messagePayload)
       });
       
-      if (response.ok) {
-        let result;
-        try {
-          const responseText = await response.text();
-          if (responseText && responseText.trim() !== '') {
-            result = JSON.parse(responseText);
-          } else {
-            result = { success: true };
-          }
-        } catch (parseError) {
-          Logger.log('warn', 'Failed to parse response, but message was sent', parseError);
-          result = { success: true };
+      Logger.log('info', 'Message sent successfully via API', result);
+      
+      // Add user message to history
+      const userMessage = {
+        messageId: messagePayload.message_id,
+        sessionId: this.currentSessionId,
+        businessId: this.businessId,
+        userId: this.userId,
+        content: content.trim(),
+        type: 'user',
+        timestamp: messagePayload.timestamp,
+        metadata: {
+          source: 'api',
+          ...messagePayload.payload.context
         }
-        
-        Logger.log('info', 'Message sent successfully via API', result);
-        
-        // Add user message to history
-        const userMessage = {
-          messageId: messagePayload.message_id,
-          sessionId: this.currentSessionId,
-          businessId: this.businessId,
-          userId: this.userId,
-          content: content.trim(),
-          type: 'user',
-          timestamp: messagePayload.timestamp,
-          metadata: {
-            source: 'api',
-            ...messagePayload.payload.context
-          }
-        };
-        
-        this.messageHistory.push(userMessage);
-        this.onMessageReceived?.([userMessage]);
-        
-        // Try to reload messages to get the updated conversation
-        try {
-          await this.loadMessageHistory(this.currentSessionId);
-        } catch (historyError) {
-          Logger.log('warn', 'Could not reload message history', historyError);
-        }
-        
-        return result;
-      } else {
-        throw new Error(`Failed to send message: ${response.status} ${response.statusText}`);
+      };
+      
+      this.messageHistory.push(userMessage);
+      this.onMessageReceived?.([userMessage]);
+      
+      // Try to reload messages to get the updated conversation
+      try {
+        await this.loadMessageHistory(this.currentSessionId);
+      } catch (historyError) {
+        Logger.log('warn', 'Could not reload message history', historyError);
       }
+      
+      return result;
     } catch (error) {
       Logger.log('error', 'Failed to send message via API', error);
       this.onError?.(getConfig('ERRORS.MESSAGE_SEND_FAILED'), error);
@@ -389,26 +344,21 @@ export class AIAssistantService {
       Logger.log('info', 'Switching to session', { sessionId });
       
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/${sessionId}`;
-      const response = await fetch(endpoint);
+      const session = await aiApiRequest(endpoint);
       
-      if (response.ok) {
-        const session = await response.json();
-        this.currentSessionId = sessionId;
-        
-        // Load message history for the session
-        await this.loadMessageHistory(sessionId);
-        
-        // Send session loaded event via SocketFacade
-        this.socketFacade.sendAIAssistantSessionLoaded(this.businessId, this.userId, sessionId, this.locationId);
-        
-        // Notify session change
-        this.onSessionChange?.(sessionId);
-        
-        Logger.log('info', 'Switched to session successfully', { sessionId });
-        return session;
-      } else {
-        throw new Error(`Failed to switch session: ${response.status}`);
-      }
+      this.currentSessionId = sessionId;
+      
+      // Load message history for the session
+      await this.loadMessageHistory(sessionId);
+      
+      // Send session loaded event via SocketFacade
+      this.socketFacade.sendAIAssistantSessionLoaded(this.businessId, this.userId, sessionId, this.locationId);
+      
+      // Notify session change
+      this.onSessionChange?.(sessionId);
+      
+      Logger.log('info', 'Switched to session successfully', { sessionId });
+      return session;
     } catch (error) {
       Logger.log('error', 'Failed to switch session', error);
       this.onError?.('Failed to switch session', error);
@@ -422,33 +372,25 @@ export class AIAssistantService {
       Logger.log('info', 'Loading session history', { limit });
       
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${this.businessId}/user/${this.userId}/history?limit=${limit}`;
-      const response = await fetch(endpoint);
       
-      if (response.ok) {
-        let history = [];
-        try {
-          const responseText = await response.text();
-          if (responseText && responseText.trim() !== '') {
-            history = JSON.parse(responseText);
-          }
-        } catch (parseError) {
-          Logger.log('warn', 'Failed to parse session history response', parseError);
-          history = [];
-        }
+      try {
+        const history = await aiApiRequest(endpoint);
+        const historyArray = Array.isArray(history) ? history : [];
         
-        Logger.log('info', 'Session history loaded', { count: history.length });
-        return history;
-      } else if (response.status === 404) {
+        Logger.log('info', 'Session history loaded', { count: historyArray.length });
+        return historyArray;
+      } catch (error) {
         // 404 means no session history - this is normal for new users
-        Logger.log('info', 'No session history found');
-        return [];
-      } else {
-        throw new Error(`Failed to load session history: ${response.status} ${response.statusText}`);
+        if (error.status === 404) {
+          Logger.log('info', 'No session history found');
+          return [];
+        }
+        throw error;
       }
     } catch (error) {
       Logger.log('error', 'Failed to load session history', error);
       // Don't throw error for missing session history, just return empty array
-      if (error.message.includes('404') || error.message.includes('Unexpected end of JSON input')) {
+      if (error.status === 404) {
         Logger.log('info', 'No session history exists, returning empty array');
         return [];
       }
@@ -496,15 +438,10 @@ export class AIAssistantService {
   async getSessionById(sessionId) {
     try {
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/${sessionId}`;
-      const response = await fetch(endpoint);
+      const session = await aiApiRequest(endpoint);
       
-      if (response.ok) {
-        const session = await response.json();
-        Logger.log('info', 'Session retrieved by ID', { sessionId });
-        return session;
-      } else {
-        throw new Error(`Failed to get session by ID: ${response.status}`);
-      }
+      Logger.log('info', 'Session retrieved by ID', { sessionId });
+      return session;
     } catch (error) {
       Logger.log('error', 'Failed to get session by ID', error);
       this.onError?.('Failed to retrieve session', error);

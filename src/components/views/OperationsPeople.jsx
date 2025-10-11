@@ -41,14 +41,10 @@ const OperationsPeople = () => {
   }, [currentPage, searchTerm, loadPatientsByPage])
 
   // Funcție pentru căutare
-  const handleSearch = async (term) => {
+  const handleSearch = (term) => {
     setSearchTerm(term)
     setCurrentPage(1)
-    if (term.trim()) {
-      await searchPatients(term)
-    } else {
-      await loadPatientsByPage(1, 20, {})
-    }
+    // useEffect-ul va gestiona încărcarea automată
   }
 
   // Funcție pentru ștergerea unui pacient

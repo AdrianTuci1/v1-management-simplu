@@ -137,13 +137,9 @@ export const validateAppointmentFields = (appointmentData) => {
   if (!appointmentData.date) {
     errors.push('Data este obligatorie')
   } else {
-    const selectedDate = new Date(appointmentData.date)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
-    if (selectedDate < today) {
-      errors.push('Data nu poate fi în trecut')
-    }
   }
 
   if (!appointmentData.time) {

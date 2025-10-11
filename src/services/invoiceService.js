@@ -1,11 +1,9 @@
 import { dataFacade } from '../data/DataFacade.js';
-import { ResourceRepository } from '../data/repositories/ResourceRepository.js';
 import { invoiceManager } from '../business/invoiceManager.js';
 
 // Serviciu pentru facturi
 class InvoiceService {
   constructor() {
-    this.repository = new ResourceRepository('invoice', 'invoices');
     this.dataFacade = dataFacade;
   }
 
@@ -49,20 +47,28 @@ class InvoiceService {
   // Creează o factură nouă
   async createInvoice(invoiceData) {
     try {
+      console.log('📝 Creating invoice with data:', invoiceData);
+      
       // Validează datele
       const validationResult = invoiceManager.validateInvoice(invoiceData);
       if (!validationResult.isValid) {
+        console.error('❌ Validation failed:', validationResult.errors);
         throw new Error(validationResult.errors.join(', '));
       }
+      console.log('✅ Validation passed');
 
       // Transformă datele pentru API
       const transformedData = invoiceManager.transformForAPI(invoiceData);
+      console.log('🔄 Transformed data for API:', transformedData);
       
       // Creează factura
+      console.log('📤 Sending to dataFacade.create("invoice", ...)');
       const result = await this.dataFacade.create('invoice', transformedData);
+      console.log('✅ Invoice created successfully:', result);
       
       return invoiceManager.transformForUI(result);
     } catch (error) {
+      console.error('❌ Error creating invoice:', error);
       throw error;
     }
   }

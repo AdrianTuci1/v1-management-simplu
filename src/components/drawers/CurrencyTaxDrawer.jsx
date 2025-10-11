@@ -205,6 +205,36 @@ const CurrencyTaxDrawer = ({ onClose, settingId, settingData }) => {
             </div>
             
             <div className="mt-3">
+              <label className="block text-xs font-medium mb-1">Cotă TVA pentru servicii/tratamente</label>
+              <select
+                value={localTaxSettings.serviceVATRateId || 1}
+                onChange={(e) => setLocalTaxSettings({ ...localTaxSettings, serviceVATRateId: parseInt(e.target.value) })}
+                className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
+              >
+                {localTaxSettings.vatRates.filter(rate => rate.enabled).map(rate => (
+                  <option key={rate.id} value={rate.id}>
+                    {rate.name} ({rate.rate}%)
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="mt-3">
+              <label className="block text-xs font-medium mb-1">Cotă TVA pentru produse</label>
+              <select
+                value={localTaxSettings.productVATRateId || 1}
+                onChange={(e) => setLocalTaxSettings({ ...localTaxSettings, productVATRateId: parseInt(e.target.value) })}
+                className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-primary focus:border-transparent"
+              >
+                {localTaxSettings.vatRates.filter(rate => rate.enabled).map(rate => (
+                  <option key={rate.id} value={rate.id}>
+                    {rate.name} ({rate.rate}%)
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="mt-3">
               <label className="block text-xs font-medium mb-1">TVA implicit pentru facturi noi</label>
               <select
                 value={localTaxSettings.defaultVAT}
