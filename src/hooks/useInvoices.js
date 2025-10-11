@@ -30,8 +30,12 @@ export const useInvoices = () => {
     console.log('useInvoices render - invoices count:', invoices.length, 'loading:', loading, 'error:', error)
   }
 
-  // Abonare la schimbările de stare partajată
+  // Inițializare și abonare la schimbările de stare partajată
   useEffect(() => {
+    // Inițializează din starea partajată
+    setInvoices([...sharedInvoices])
+    setStats(sharedStats)
+    
     const handleStateChange = (newInvoices, newStats) => {
       if (!isDemoMode) {
         console.log('State change received, invoices count:', newInvoices.length, 'newInvoices:', newInvoices)
@@ -44,6 +48,7 @@ export const useInvoices = () => {
     if (!isDemoMode) {
       console.log('Subscriber added, total subscribers:', subscribers.size)
     }
+    
     return () => {
       subscribers.delete(handleStateChange)
       if (!isDemoMode) {
@@ -62,20 +67,65 @@ export const useInvoices = () => {
       const operation = type?.replace('resource_', '') || type
       const invoiceId = data?.id || data?.resourceId
       if (!invoiceId) return
-      const ui = invoiceManager.transformForUI ? invoiceManager.transformForUI({ ...data, id: invoiceId, resourceId: invoiceId }) : { ...data, id: invoiceId, resourceId: invoiceId }
-      if (operation === 'created' || operation === 'create') {
-        const idx = sharedInvoices.findIndex(i => i.id === invoiceId || i.resourceId === invoiceId)
-        if (idx >= 0) sharedInvoices[idx] = { ...ui, _isOptimistic: false }
-        else sharedInvoices = [{ ...ui, _isOptimistic: false }, ...sharedInvoices]
-        notifySubscribers()
-      } else if (operation === 'updated' || operation === 'update') {
-        const idx = sharedInvoices.findIndex(i => i.id === invoiceId || i.resourceId === invoiceId)
-        if (idx >= 0) sharedInvoices[idx] = { ...ui, _isOptimistic: false }
-        else sharedInvoices = [{ ...ui, _isOptimistic: false }, ...sharedInvoices]
-        notifySubscribers()
-      } else if (operation === 'deleted' || operation === 'delete') {
-        sharedInvoices = sharedInvoices.filter(i => (i.id !== invoiceId && i.resourceId !== invoiceId))
-        notifySubscribers()
+      
+      try {
+        if (operation === 'created' || operation === 'create') {
+          // Înlocuiește factura optimistă cu datele reale
+          const ui = invoiceManager.transformForUI ? invoiceManager.transformForUI({ ...data, id: invoiceId, resourceId: invoiceId }) : { ...data, id: invoiceId, resourceId: invoiceId }
+          
+          // Caută în outbox pentru a găsi operația optimistică folosind ID-ul real
+          const outboxEntry = await indexedDb.outboxFindByResourceId(invoiceId, 'invoice')
+          
+          if (outboxEntry) {
+            const optimisticIndex = sharedInvoices.findIndex(i => i._tempId === outboxEntry.tempId)
+            if (optimisticIndex >= 0) {
+              sharedInvoices[optimisticIndex] = { ...ui, _isOptimistic: false }
+            }
+            await indexedDb.outboxDelete(outboxEntry.id)
+          } else {
+            // Dacă nu găsim în outbox, încercăm să găsim după euristică
+            const optimisticIndex = sharedInvoices.findIndex(i => 
+              i._isOptimistic && 
+              i.clientId === data.clientId &&
+              i.issueDate === data.issueDate &&
+              Math.abs((i.total || 0) - (data.total || 0)) < 0.01
+            )
+            if (optimisticIndex >= 0) {
+              sharedInvoices[optimisticIndex] = { ...ui, _isOptimistic: false }
+            } else {
+              // Verifică dacă nu există deja (evită dubluri)
+              const existingIndex = sharedInvoices.findIndex(i => i.id === invoiceId || i.resourceId === invoiceId)
+              if (existingIndex >= 0) {
+                sharedInvoices[existingIndex] = { ...ui, _isOptimistic: false }
+              } else {
+                // Adaugă ca nou doar dacă nu există deloc
+                sharedInvoices = [{ ...ui, _isOptimistic: false }, ...sharedInvoices]
+              }
+            }
+          }
+          
+          notifySubscribers()
+        } else if (operation === 'updated' || operation === 'update') {
+          // Dezactivează flag-ul optimistic
+          const ui = invoiceManager.transformForUI ? invoiceManager.transformForUI({ ...data, id: invoiceId, resourceId: invoiceId }) : { ...data, id: invoiceId, resourceId: invoiceId }
+          const existingIndex = sharedInvoices.findIndex(i => 
+            i.id === invoiceId || i.resourceId === invoiceId
+          )
+          if (existingIndex >= 0) {
+            sharedInvoices[existingIndex] = { ...ui, _isOptimistic: false }
+          }
+          
+          notifySubscribers()
+        } else if (operation === 'deleted' || operation === 'delete') {
+          // Elimină factura din lista locală
+          sharedInvoices = sharedInvoices.filter(i => {
+            const matches = i.id === invoiceId || i.resourceId === invoiceId
+            return !matches
+          })
+          notifySubscribers()
+        }
+      } catch (error) {
+        console.error('Error handling invoice WebSocket message:', error)
       }
     }
 
@@ -316,13 +366,33 @@ export const useInvoices = () => {
     return invoiceManager.sortInvoices(invoices, sortBy, sortOrder);
   }, [invoices]);
 
-  // Încarcă facturile la prima renderizare
+  // Funcție pentru sortarea facturilor cu prioritizare pentru optimistic updates
+  const getSortedInvoices = useCallback((sortBy = 'issueDate', sortOrder = 'desc') => {
+    const baseSorted = invoiceManager.sortInvoices ? invoiceManager.sortInvoices(sharedInvoices, sortBy, sortOrder) : [...sharedInvoices]
+    return [...baseSorted].sort((a, b) => {
+      const aOpt = !!a._isOptimistic && !a._isDeleting
+      const bOpt = !!b._isOptimistic && !b._isDeleting
+      const aDel = !!a._isDeleting
+      const bDel = !!b._isDeleting
+      
+      // Prioritizează optimistic updates
+      if (aOpt && !bOpt) return -1
+      if (!aOpt && bOpt) return 1
+      
+      // Pune elementele în ștergere la sfârșit
+      if (aDel && !bDel) return 1
+      if (!aDel && bDel) return -1
+      
+      return 0
+    })
+  }, []);
+
+  // Încarcă facturile la prima montare dacă cache-ul este gol
   useEffect(() => {
-    // Verifică dacă avem deja facturi încărcate pentru a evita încărcări multiple
     if (sharedInvoices.length === 0) {
       loadInvoices();
     }
-  }, []); // Nu mai avem dependențe pentru a evita re-renderizările infinite
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     // State
@@ -345,6 +415,7 @@ export const useInvoices = () => {
     // Utilitare
     filterInvoices,
     sortInvoices,
+    getSortedInvoices,
     clearError: () => setError(null),
     
     // Manager utilities

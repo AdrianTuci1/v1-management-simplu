@@ -11,7 +11,9 @@ import {
   Tag,
   Pill,
   Clock,
-  X
+  X,
+  Upload,
+  Image
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
@@ -62,7 +64,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
         address: patientData.address || '',
         notes: patientData.notes || '',
         tags: patientData.tags || [],
-        status: patientData.status || 'active'
+        status: patientData.status || 'active',
+        images: patientData.images || []
       }
     }
     return {
@@ -74,7 +77,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       address: '',
       notes: '',
       tags: [],
-      status: 'active'
+      status: 'active',
+      images: []
     }
   })
 
@@ -123,6 +127,26 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     setFormData(prev => ({
       ...prev,
       tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }))
+  }
+
+  const handleImageUpload = (event) => {
+    const files = Array.from(event.target.files)
+    const newImages = files.map(file => ({
+      id: Date.now() + Math.random(),
+      name: file.name,
+      url: URL.createObjectURL(file)
+    }))
+    setFormData(prev => ({
+      ...prev,
+      images: [...prev.images, ...newImages]
+    }))
+  }
+
+  const removeImage = (imageId) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter(img => img.id !== imageId)
     }))
   }
 
@@ -433,11 +457,65 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     </div>
   )
 
+  const renderGallery = () => (
+    <div className="space-y-4">
+      <div className="text-sm font-medium text-muted-foreground">
+        Galerie foto
+      </div>
+      
+      {/* Upload Area */}
+      <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground mb-2">
+          Trageți și plasați imaginile aici sau
+        </p>
+        <label className="btn btn-outline btn-sm cursor-pointer">
+          <input
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+          Selectează fișiere
+        </label>
+      </div>
+
+      {/* Images Grid */}
+      {formData.images.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Imagini atașate</div>
+          <div className="grid grid-cols-2 gap-2">
+            {formData.images.map((image) => (
+              <div key={image.id} className="relative group">
+                <img
+                  src={image.url}
+                  alt={image.name}
+                  className="w-full h-24 object-cover rounded-lg"
+                />
+                <button
+                  onClick={() => removeImage(image.id)}
+                  className="absolute top-1 right-1 h-6 w-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                <div className="absolute bottom-1 left-1 right-1 bg-black/50 text-white text-xs p-1 rounded truncate">
+                  {image.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
   const renderMenu = () => {
     switch (currentMenu) {
       case 1: return renderPatientDetails()
       case 2: return renderDentalNotes()
       case 3: return renderAppointments()
+      case 4: return renderGallery()
       default: return renderPatientDetails()
     }
   }
@@ -445,7 +523,8 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
   const navigationItems = [
     { id: 1, label: 'Detalii pacient', icon: User },
     { id: 2, label: 'Note dentare', icon: Pill },
-    { id: 3, label: 'Programări', icon: Calendar }
+    { id: 3, label: 'Programări', icon: Calendar },
+    { id: 4, label: 'Galerie', icon: Image, disabled: isNewPatient }
   ]
 
   return (

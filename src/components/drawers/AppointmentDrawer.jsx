@@ -1,12 +1,9 @@
 import { 
   Plus, 
-  Upload,
   Loader2,
   Trash2,
   Calendar,
   FileText,
-  Image,
-  X,
   CreditCard
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
@@ -111,8 +108,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         service: uiData.service || '',
         serviceDuration: uiData.service?.duration || '',
         price: uiData.price || '',
-        status: uiData.status || appointmentData.status || 'scheduled',
-        images: appointmentData.images || []
+        status: uiData.status || appointmentData.status || 'scheduled'
       }
     }
     return {
@@ -125,8 +121,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       status: 'scheduled', // Statusul este întotdeauna 'scheduled' inițial
       postOperativeNotes: '',
       prescription: '',
-      price: '',
-      images: []
+      price: ''
     }
   })
 
@@ -204,26 +199,6 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     setFormData(prev => ({
       ...prev,
       [field]: value
-    }))
-  }
-
-  const handleImageUpload = (event) => {
-    const files = Array.from(event.target.files)
-    const newImages = files.map(file => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      url: URL.createObjectURL(file)
-    }))
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...newImages]
-    }))
-  }
-
-  const removeImage = (imageId) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter(img => img.id !== imageId)
     }))
   }
 
@@ -601,67 +576,12 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     </div>
   )
 
-  const renderMenu3 = () => (
-    <div className="space-y-4">
-      <div className="text-sm font-medium text-muted-foreground">
-        Galerie foto
-      </div>
-      
-      {/* Upload Area */}
-      <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground mb-2">
-          Trageți și plasați imaginile aici sau
-        </p>
-        <label className="btn btn-outline btn-sm cursor-pointer">
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          Selectează fișiere
-        </label>
-      </div>
-
-      {/* Images Grid */}
-      {formData.images.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Imagini atașate</div>
-          <div className="grid grid-cols-2 gap-2">
-            {formData.images.map((image) => (
-              <div key={image.id} className="relative group">
-                <img
-                  src={image.url}
-                  alt={image.name}
-                  className="w-full h-24 object-cover rounded-lg"
-                />
-                <button
-                  onClick={() => removeImage(image.id)}
-                  className="absolute top-1 right-1 h-6 w-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-                <div className="absolute bottom-1 left-1 right-1 bg-black/50 text-white text-xs p-1 rounded truncate">
-                  {image.name}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-
   const renderContent = () => {
     switch (currentMenu) {
       case 1:
         return renderMenu1()
       case 2:
         return renderMenu2()
-      case 3:
-        return renderMenu3()
       default:
         return renderMenu1()
     }
@@ -669,8 +589,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
 
   const navigationItems = [
     { id: 1, label: 'Detalii', icon: Calendar },
-    { id: 2, label: 'Note', icon: FileText },
-    { id: 3, label: 'Galerie', icon: Image, disabled: isNewAppointment }
+    { id: 2, label: 'Note', icon: FileText }
   ]
 
   return (

@@ -66,20 +66,65 @@ export const useProducts = () => {
       const operation = type?.replace('resource_', '') || type
       const productId = data?.id || data?.resourceId
       if (!productId) return
-      const ui = productManager.transformForUI ? productManager.transformForUI({ ...data, id: productId, resourceId: productId }) : { ...data, id: productId, resourceId: productId }
-      if (operation === 'created' || operation === 'create') {
-        const idx = sharedProducts.findIndex(p => p.id === productId || p.resourceId === productId)
-        if (idx >= 0) sharedProducts[idx] = { ...ui, _isOptimistic: false }
-        else sharedProducts = [{ ...ui, _isOptimistic: false }, ...sharedProducts]
-        notifySubscribers()
-      } else if (operation === 'updated' || operation === 'update') {
-        const idx = sharedProducts.findIndex(p => p.id === productId || p.resourceId === productId)
-        if (idx >= 0) sharedProducts[idx] = { ...ui, _isOptimistic: false }
-        else sharedProducts = [{ ...ui, _isOptimistic: false }, ...sharedProducts]
-        notifySubscribers()
-      } else if (operation === 'deleted' || operation === 'delete') {
-        sharedProducts = sharedProducts.filter(p => (p.id !== productId && p.resourceId !== productId))
-        notifySubscribers()
+      
+      try {
+        if (operation === 'created' || operation === 'create') {
+          // Înlocuiește produsul optimistic cu datele reale
+          const ui = productManager.transformForUI ? productManager.transformForUI({ ...data, id: productId, resourceId: productId }) : { ...data, id: productId, resourceId: productId }
+          
+          // Caută în outbox pentru a găsi operația optimistică folosind ID-ul real
+          const outboxEntry = await indexedDb.outboxFindByResourceId(productId, 'product')
+          
+          if (outboxEntry) {
+            const optimisticIndex = sharedProducts.findIndex(p => p._tempId === outboxEntry.tempId)
+            if (optimisticIndex >= 0) {
+              sharedProducts[optimisticIndex] = { ...ui, _isOptimistic: false }
+            }
+            await indexedDb.outboxDelete(outboxEntry.id)
+          } else {
+            // Dacă nu găsim în outbox, încercăm să găsim după euristică
+            const optimisticIndex = sharedProducts.findIndex(p => 
+              p._isOptimistic && 
+              p.name === data.name &&
+              p.sku === data.sku &&
+              Math.abs((p.price || 0) - (data.price || 0)) < 0.01
+            )
+            if (optimisticIndex >= 0) {
+              sharedProducts[optimisticIndex] = { ...ui, _isOptimistic: false }
+            } else {
+              // Verifică dacă nu există deja (evită dubluri)
+              const existingIndex = sharedProducts.findIndex(p => p.id === productId || p.resourceId === productId)
+              if (existingIndex >= 0) {
+                sharedProducts[existingIndex] = { ...ui, _isOptimistic: false }
+              } else {
+                // Adaugă ca nou doar dacă nu există deloc
+                sharedProducts = [{ ...ui, _isOptimistic: false }, ...sharedProducts]
+              }
+            }
+          }
+          
+          notifySubscribers()
+        } else if (operation === 'updated' || operation === 'update') {
+          // Dezactivează flag-ul optimistic
+          const ui = productManager.transformForUI ? productManager.transformForUI({ ...data, id: productId, resourceId: productId }) : { ...data, id: productId, resourceId: productId }
+          const existingIndex = sharedProducts.findIndex(p => 
+            p.id === productId || p.resourceId === productId
+          )
+          if (existingIndex >= 0) {
+            sharedProducts[existingIndex] = { ...ui, _isOptimistic: false }
+          }
+          
+          notifySubscribers()
+        } else if (operation === 'deleted' || operation === 'delete') {
+          // Elimină produsul din lista locală
+          sharedProducts = sharedProducts.filter(p => {
+            const matches = p.id === productId || p.resourceId === productId
+            return !matches
+          })
+          notifySubscribers()
+        }
+      } catch (error) {
+        console.error('Error handling product WebSocket message:', error)
       }
     }
 
@@ -244,63 +289,62 @@ export const useProducts = () => {
 
   // Adaugă un produs nou (optimism gestionat în Repository)
   const addProduct = useCallback(async (productData) => {
-    setLoading(true);
-    setError(null);
-    
+    setError(null)
     try {
       const result = await productService.addProduct(productData);
       const ui = productManager.transformForUI ? productManager.transformForUI(result) : result
-      const idx = sharedProducts.findIndex(p => p.id === ui.id || p.resourceId === ui.resourceId)
-      if (idx >= 0) sharedProducts[idx] = { ...ui, _isOptimistic: false }
-      else sharedProducts = [ui, ...sharedProducts]
-      notifySubscribers()
+      
+      // Doar resursele optimistice sunt adăugate imediat în shared state
+      // Resursele cu ID real vor fi adăugate de WebSocket
+      if (ui._isOptimistic || ui._tempId) {
+        const idx = sharedProducts.findIndex(p => p._tempId === ui._tempId)
+        if (idx >= 0) {
+          sharedProducts[idx] = ui
+        } else {
+          sharedProducts = [ui, ...sharedProducts]
+        }
+        notifySubscribers()
+      }
+      
       return ui
     } catch (err) {
       setError(err.message);
       console.error('Error adding product:', err);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   // Actualizează un produs (optimism gestionat în Repository)
   const updateProduct = useCallback(async (id, productData) => {
-    setLoading(true);
-    setError(null);
-    
+    setError(null)
+    if (!id) throw new Error('Product ID is required for update')
     try {
       const result = await productService.updateProduct(id, productData);
       const ui = productManager.transformForUI ? productManager.transformForUI(result) : result
-      const existingIndex = sharedProducts.findIndex(p => p.id === id || p.resourceId === id)
-      if (existingIndex >= 0) sharedProducts[existingIndex] = { ...ui, _isOptimistic: false }
+      const idx = sharedProducts.findIndex(p => p.id === id || p.resourceId === id)
+      if (idx >= 0) sharedProducts[idx] = { ...ui, _isOptimistic: false }
       notifySubscribers()
       return ui;
     } catch (err) {
       setError(err.message);
       console.error('Error updating product:', err);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   // Șterge un produs (optimism gestionat în Repository)
   const deleteProduct = useCallback(async (id) => {
-    setLoading(true);
-    setError(null);
-    
+    setError(null)
+    if (!id) throw new Error('Product ID is required for deletion')
     try {
       await productService.deleteProduct(id);
       sharedProducts = sharedProducts.filter(p => (p.id !== id && p.resourceId !== id))
       notifySubscribers()
-      return { success: true };
+      return true;
     } catch (err) {
       setError(err.message);
       console.error('Error deleting product:', err);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -337,13 +381,48 @@ export const useProducts = () => {
     return await updateProduct(id, { ...product, stock: newStock });
   }, [updateProduct]);
 
-  // Încarcă produsele la prima renderizare
+  // Funcție pentru sortarea produselor cu prioritizare pentru optimistic updates
+  const getSortedProducts = useCallback((sortBy = 'name', sortOrder = 'asc') => {
+    const baseSorted = productManager.sortProducts ? productManager.sortProducts(sharedProducts, sortBy, sortOrder) : [...sharedProducts]
+    return [...baseSorted].sort((a, b) => {
+      const aOpt = !!a._isOptimistic && !a._isDeleting
+      const bOpt = !!b._isOptimistic && !b._isDeleting
+      const aDel = !!a._isDeleting
+      const bDel = !!b._isDeleting
+      
+      // Prioritizează optimistic updates
+      if (aOpt && !bOpt) return -1
+      if (!aOpt && bOpt) return 1
+      
+      // Pune elementele în ștergere la sfârșit
+      if (aDel && !bDel) return 1
+      if (!aDel && bDel) return -1
+      
+      return 0
+    })
+  }, []);
+
+  // Încarcă datele la montarea componentei și abonare la actualizări
   useEffect(() => {
-    // Verifică dacă avem deja produse încărcate pentru a evita încărcări multiple
+    // Initialize from shared state
+    setProducts([...sharedProducts])
+    
+    // Adaugă subscriber pentru actualizări
+    const subscriber = (newProducts) => {
+      console.log('Product subscriber called with products count:', newProducts.length)
+      setProducts(newProducts)
+    }
+    subscribers.add(subscriber)
+    
+    // Încarcă produsele dacă nu avem deja
     if (sharedProducts.length === 0) {
       loadProducts();
     }
-  }, []); // Nu mai avem dependențe pentru a evita re-renderizările infinite
+    
+    return () => {
+      subscribers.delete(subscriber)
+    }
+  }, [])
 
   return {
     // State
@@ -365,6 +444,7 @@ export const useProducts = () => {
     exportProducts,
     
     // Utilitare
+    getSortedProducts,
     clearError: () => setError(null)
   };
 };

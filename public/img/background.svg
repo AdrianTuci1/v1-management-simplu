@@ -1,0 +1,21 @@
+<svg width="400" height="600" viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background decorativ subtil pentru factură -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F0F9FF;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#DBEAFE;stop-opacity:0.1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fundal gradient subtil -->
+  <rect width="400" height="600" fill="url(#bgGradient)"/>
+  
+  <!-- Elemente decorative subtile -->
+  <circle cx="350" cy="50" r="80" fill="#3B82F6" opacity="0.05"/>
+  <circle cx="50" cy="550" r="100" fill="#3B82F6" opacity="0.05"/>
+  
+  <!-- Linii decorative -->
+  <path d="M 0 200 Q 200 180 400 200" stroke="#3B82F6" stroke-width="1" fill="none" opacity="0.1"/>
+  <path d="M 0 400 Q 200 420 400 400" stroke="#3B82F6" stroke-width="1" fill="none" opacity="0.1"/>
+</svg>
+

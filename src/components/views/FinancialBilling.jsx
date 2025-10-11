@@ -26,10 +26,6 @@ const FinancialBilling = () => {
   // Filter invoices by selected date
   const filteredInvoices = invoices.filter(invoice => invoice.issueDate === selectedDate)
 
-  // Handle creating new invoice
-  const handleCreateInvoice = () => {
-    openInvoiceDrawer()
-  }
 
   // Handle opening existing invoice
   const handleOpenInvoice = (invoice) => {
@@ -60,14 +56,6 @@ const FinancialBilling = () => {
           className="w-48"
         />
 
-        {/* Buton adăugare factură */}
-        <button 
-          onClick={handleCreateInvoice}
-          className="h-9 w-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-sm transition-all"
-          title="Factură nouă"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
       </div>
 
 

@@ -241,15 +241,15 @@ function AppContent() {
       case 'appointment':
         return [
           { id: 1, label: 'Detalii', icon: Calendar },
-          { id: 2, label: 'Note', icon: FileText },
-          { id: 3, label: 'Galerie', icon: Image }
+          { id: 2, label: 'Note', icon: FileText }
         ]
       case 'new-person':
       case 'edit-person':
         return [
           { id: 1, label: 'Detalii pacient', icon: User },
           { id: 2, label: 'Note dentare', icon: Pill },
-          { id: 3, label: 'Programări', icon: Calendar }
+          { id: 3, label: 'Programări', icon: Calendar },
+          { id: 4, label: 'Galerie', icon: Image }
         ]
       default:
         return []

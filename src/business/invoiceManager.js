@@ -82,7 +82,7 @@ class InvoiceManager {
   transformForUI(invoiceData) {
     return {
       ...invoiceData,
-      id: invoiceData.id || invoiceData.resourceId,
+      id: invoiceData.resourceId,
       resourceId: invoiceData.resourceId || invoiceData.id,
       // Calculează totalurile dacă nu sunt deja calculate
       subtotal: invoiceData.subtotal || this.calculateSubtotal(invoiceData.items),
