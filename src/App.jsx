@@ -39,6 +39,17 @@ function AppContent() {
     'edit-person': 1
   })
 
+  // Resetează navigația externă când drawer-ul se închide
+  useEffect(() => {
+    if (!drawerOpen) {
+      setExternalNavigationState({
+        appointment: 1,
+        'new-person': 1,
+        'edit-person': 1
+      })
+    }
+  }, [drawerOpen])
+
   // Detect mobile/desktop
   useEffect(() => {
     const checkMobile = () => {

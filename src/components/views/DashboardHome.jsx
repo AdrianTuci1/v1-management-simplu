@@ -16,8 +16,10 @@ import {
   Percent,
   WifiOff
 } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
 import { useStatistics } from '../../hooks/useStatistics.js'
 import { useHealthRepository } from '../../hooks/useHealthRepository'
+import { useAppointments } from '../../hooks/useAppointments.js'
 import { ChartBarLabelCustom } from '../analytics/BarChartCustomLabel'
 import {
   Label,
@@ -36,6 +38,67 @@ const DashboardHome = () => {
     loading, 
   } = useStatistics()
   const { isOffline } = useHealthRepository()
+  const { appointments } = useAppointments()
+  const [doctorProgressFromDB, setDoctorProgressFromDB] = useState([])
+
+  // Calculează progresul medicilor din programările de azi (cu status completed)
+  useEffect(() => {
+    if (!appointments || appointments.length === 0) {
+      setDoctorProgressFromDB([])
+      return
+    }
+
+    // Filtrează programările de azi
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    
+    const todaysAppointments = appointments.filter(appointment => {
+      const appointmentDate = appointment.date 
+        ? (appointment.date.split('T')[0]) 
+        : null
+      return appointmentDate === todayStr
+    })
+
+    if (todaysAppointments.length === 0) {
+      setDoctorProgressFromDB([])
+      return
+    }
+
+    // Grupează programările după medic și calculează progresul
+    const doctorStats = {}
+    
+    todaysAppointments.forEach(appointment => {
+      // Extrage numele medicului
+      const doctorName = typeof appointment.doctor === 'string' 
+        ? appointment.doctor 
+        : appointment.doctor?.name || appointment.doctor?.medicName || appointment.medicName || 'Doctor necunoscut'
+      
+      // Inițializează statistica pentru medic dacă nu există
+      if (!doctorStats[doctorName]) {
+        doctorStats[doctorName] = {
+          total: 0,
+          completed: 0
+        }
+      }
+      
+      // Incrementează totalul
+      doctorStats[doctorName].total++
+      
+      // Incrementează completate dacă statusul este 'completed'
+      if (appointment.status === 'completed') {
+        doctorStats[doctorName].completed++
+      }
+    })
+    
+    // Transformă în array pentru chart
+    const progressData = Object.entries(doctorStats).map(([doctorName, stats]) => ({
+      doctor: doctorName,
+      appointments: stats.total,
+      progress: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
+    }))
+    
+    setDoctorProgressFromDB(progressData)
+  }, [appointments]) // Recalculează când se schimbă appointments
 
   /**
    * Exemple de structură pentru businessStatistics:
@@ -154,33 +217,13 @@ const DashboardHome = () => {
   }
 
   const getDoctorProgress = () => {
-    // Dacă suntem offline, returnează array gol
-    if (isOffline) {
+    // Folosește datele calculate din IndexedDB
+    if (!doctorProgressFromDB || doctorProgressFromDB.length === 0) {
       return []
     }
     
-    if (!Array.isArray(businessStatistics?.doctorProgress) || businessStatistics.doctorProgress.length === 0) {
-      // Returnează array gol dacă nu există date din backend
-      return []
-    }
-    
-    // Elimină duplicate și adaugă culori pentru chart
-    const uniqueDoctors = new Map()
-    
-    businessStatistics.doctorProgress.forEach((doc) => {
-      const doctorName = typeof doc.doctor === 'string' ? doc.doctor : (doc.doctor?.name || doc.doctor?.id || 'Doctor')
-      
-      if (!uniqueDoctors.has(doctorName)) {
-        uniqueDoctors.set(doctorName, {
-          doctor: doctorName,
-          progress: extractNumber(doc.progress),
-          appointments: extractNumber(doc.appointments)
-        })
-      }
-    })
-    
-    // Convertește Map la array și adaugă culori
-    return Array.from(uniqueDoctors.values()).map((doc, index) => ({
+    // Adaugă culori pentru chart
+    return doctorProgressFromDB.map((doc, index) => ({
       ...doc,
       fill: `var(--chart-${(index % 5) + 1})`
     }))
@@ -691,11 +734,11 @@ const DashboardHome = () => {
               <h3 className="card-title">Progresul medicilor azi</h3>
             </div>
             <div className="card-content pb-0">
-              {isOffline || doctorProgressData.length === 0 ? (
+              {doctorProgressData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <WifiOff className="h-12 w-12 text-muted-foreground mb-4" />
+                  <Activity className="h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-sm text-muted-foreground">
-                    {isOffline ? 'Date indisponibile offline' : 'Nu există date despre progresul medicilor'}
+                    Nu există programări pentru azi
                   </p>
                 </div>
               ) : (

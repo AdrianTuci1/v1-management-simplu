@@ -18,6 +18,7 @@ import {
 import { useState, useEffect } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
 import appointmentService from '../../services/appointmentService.js'
+import { useDrawer } from '../../contexts/DrawerContext.jsx'
 import { 
   Drawer, 
   DrawerHeader, 
@@ -52,6 +53,7 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
   
   // Hook pentru gestionarea pacienților
   const { addPatient, updatePatient, deletePatient } = usePatients()
+  const { openDrawer } = useDrawer()
   
   const [formData, setFormData] = useState(() => {
     if (patientData) {
@@ -196,6 +198,13 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
 
   console.log('appointments', appointments)
 
+  const handleAppointmentClick = (appointment) => {
+    openDrawer({
+      type: 'appointment',
+      data: appointment,
+      isNew: false
+    })
+  }
 
   const renderPatientDetails = () => (
     <div className="space-y-4">
@@ -408,10 +417,11 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
           {appointments.map((appointment) => (
             <div
               key={appointment.id}
-              className={`p-4 rounded-lg border ${
+              onClick={() => handleAppointmentClick(appointment)}
+              className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
                 appointment.status === 'completed' 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-blue-50 border-blue-200'
+                  ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                  : 'bg-blue-50 border-blue-200 hover:bg-blue-100'
               }`}
             >
               <div className="flex items-center justify-between mb-2">

@@ -244,14 +244,23 @@ const OperationsPlanning = () => {
       const selectedDateStr = formatDate(selectedDate)
       filteredByDate = appointments.filter(apt => apt.date === selectedDateStr)
     } else if (viewType === 'week') {
+      // Calculează începutul săptămânii (luni) folosind aceeași logică ca în getCalendarDates
       const startOfWeek = new Date(currentViewDate)
-      startOfWeek.setDate(currentViewDate.getDate() - currentViewDate.getDay())
+      const dayOfWeek = startOfWeek.getDay()
+      const diff = startOfWeek.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+      startOfWeek.setDate(diff)
+      startOfWeek.setHours(0, 0, 0, 0)
+      
       const endOfWeek = new Date(startOfWeek)
       endOfWeek.setDate(startOfWeek.getDate() + 6)
+      endOfWeek.setHours(23, 59, 59, 999)
+      
+      // Convertim datele în format string pentru comparație
+      const startDateStr = formatDate(startOfWeek)
+      const endDateStr = formatDate(endOfWeek)
       
       filteredByDate = appointments.filter(apt => {
-        const aptDate = new Date(apt.date)
-        return aptDate >= startOfWeek && aptDate <= endOfWeek
+        return apt.date >= startDateStr && apt.date <= endDateStr
       })
     } else if (viewType === 'month') {
       const currentMonth = currentViewDate.getMonth()
@@ -425,17 +434,19 @@ const OperationsPlanning = () => {
                   const isSelected = isSelectedDate(date)
                   const appointmentsCount = getAppointmentsCount(date)
                   const isCurrentMonth = date.getMonth() === currentViewDate.getMonth()
+                  const isClickable = viewType !== 'day'
 
                   return (
                     <div
                       key={index}
-                      onClick={() => setSelectedDate(date)}
+                      onClick={isClickable ? () => setSelectedDate(date) : undefined}
                       className={`
-                        p-2 text-center text-sm border rounded-md cursor-pointer relative
+                        p-2 text-center text-sm border rounded-md relative
+                        ${isClickable ? 'cursor-pointer' : 'cursor-default'}
                         ${isCurrent ? 'bg-blue-500 text-white' : ''}
                         ${isSelected && !isCurrent ? 'bg-gray-200' : ''}
                         ${!isCurrentMonth && viewType === 'month' ? 'text-gray-400' : ''}
-                        ${!isCurrent && !isSelected ? 'hover:bg-muted' : ''}
+                        ${!isCurrent && !isSelected && isClickable ? 'hover:bg-muted' : ''}
                       `}
                     >
                       <div className="font-medium">{date.getDate()}</div>

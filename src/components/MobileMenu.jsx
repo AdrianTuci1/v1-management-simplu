@@ -73,7 +73,7 @@ const navigationStructure = {
 
 function MobileMenu({ isOpen, onClose, currentView, onViewChange, currentLocation, onLocationChange }) {
   const [expandedSection, setExpandedSection] = useState(null);
-  const { businessName, BusinessIcon } = useBusinessConfig();
+  const { BusinessIcon } = useBusinessConfig();
   const { isHealthy, isOffline, isServerDown } = useHealthRepository();
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -112,7 +112,6 @@ function MobileMenu({ isOpen, onClose, currentView, onViewChange, currentLocatio
               }`}
             />
           </div>
-          <span className="text-lg font-semibold">{businessName}</span>
         </div>
         <button
           onClick={onClose}

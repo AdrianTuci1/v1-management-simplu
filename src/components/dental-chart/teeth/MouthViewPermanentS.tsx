@@ -16,12 +16,12 @@ export class MouthViewPermanentS extends React.Component<
 				style={{ maxHeight: "500px", width: "100%" }}
 				version="1.1"
 				preserveAspectRatio="xMidYMid meet"
-				viewBox="0 0 560 1055"
+				viewBox="0 0 560 1255"
 			>
 				<defs>
 					<path
 						style={{ cursor: "pointer" }}
-						d="M266.17 8.55C259.99 -4.36 193.1 6.32 197.86 21.38C206.17 47.66 225.74 73.28 248.05 67.4C267.9 62.17 262.54 20.32 266.17 8.55Z"
+						d="M266.17 8.55 L197.86 21.38 L248.05 67.4 Z"
 						id="iso-11"
 					/>
 					<path
@@ -509,7 +509,7 @@ export class MouthViewPermanentS extends React.Component<
 						x="241.89"
 						y="100.29"
 						fontSize="20"
-						transform="matrix(1 0 0 1 185.35020856665585 279.45436176574924)"
+						transform="matrix(1 0 0 1)"
 					>
 						<tspan
 							x="241.89"
@@ -1046,7 +1046,7 @@ export class MouthViewPermanentS extends React.Component<
 					</text>
 				</defs>
 				<g className="main">
-					<g className="q1">
+					<g className="q1" transform="translate(0, 0) rotate(0)">
 						<g className="1" transform="translate(-15, 0) rotate(10)" onClick={() => this.props.onClick(11)}>
 							<g>
 								<use
@@ -1754,8 +1754,8 @@ export class MouthViewPermanentS extends React.Component<
 							</g>
 						</g>
 					</g>
-					<g className="q3">
-						<g className="1" onClick={() => this.props.onClick(31)}>
+					<g className="q3" transform="translate(1200, -500) rotate(65)">
+						<g className="1" transform="translate(0, 0) rotate(0)" onClick={() => this.props.onClick(31)}>
 							<g>
 								<use
 									xlinkHref="#iso-31"
@@ -1788,7 +1788,7 @@ export class MouthViewPermanentS extends React.Component<
 								</g>
 							</g>
 						</g>
-						<g className="2" onClick={() => this.props.onClick(32)}>
+						<g className="2" transform="translate(0, 0) rotate(0)" onClick={() => this.props.onClick(32)}>
 							<g>
 								<use
 									xlinkHref="#iso-32"
@@ -1821,7 +1821,7 @@ export class MouthViewPermanentS extends React.Component<
 								</g>
 							</g>
 						</g>
-						<g className="3" onClick={() => this.props.onClick(33)}>
+						<g className="3" transform="translate(0, 0) rotate(0)" onClick={() => this.props.onClick(33)}>
 							<g>
 								<use
 									xlinkHref="#iso-33"
@@ -1854,7 +1854,7 @@ export class MouthViewPermanentS extends React.Component<
 								</g>
 							</g>
 						</g>
-						<g className="4" onClick={() => this.props.onClick(34)}>
+						<g className="4" transform="translate(0, 0) rotate(0)" onClick={() => this.props.onClick(34)}>
 							<g>
 								<use
 									xlinkHref="#iso-34"
@@ -2108,7 +2108,7 @@ export class MouthViewPermanentS extends React.Component<
 							</g>
 						</g>
 					</g>
-					<g className="q4">
+					<g className="q4" transform="translate(-900, 0) rotate(-65)">
 						<g className="1" onClick={() => this.props.onClick(41)}>
 							<g>
 								<use
