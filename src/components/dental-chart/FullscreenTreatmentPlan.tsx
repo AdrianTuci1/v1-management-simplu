@@ -22,7 +22,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import SimpleMouthView from "./SimpleMouthView";
+import TeethChartTab from "./TeethChartTab";
 
 type PlanItem = {
   id: string;
@@ -398,8 +398,8 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] mr-[440px] p-2 pt-0">
-      <div className="bg-white inset-0 h-full rounded-lg border border-gray-200 shadow-xl flex flex-col">
+    <div className="fixed top-0 right-0 bottom-0 z-[9997] p-2 pt-0 pr-16 w-[calc(100vw-25rem)]">
+      <div className="bg-white w-full h-full rounded-lg border border-gray-200 shadow-xl flex flex-col">
       {/* Header */}
       <DrawerHeader
         title="Plan de tratament"
@@ -417,172 +417,177 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="grid grid-cols-2 gap-6 h-full">
+            {/* Left Column - Treatment Plan */}
+            <div className="space-y-6 overflow-y-auto">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
                 {error}
               </div>
             )}
 
-            {/* Plan Management Section */}
-            <div className="bg-gray-50 p-6 rounded-lg">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  {hasExistingPlan ? "Plan de tratament existent" : "Plan nou"}
-                </h3>
-                <div className="flex items-center gap-3">
-                  {hasExistingPlan && (
-                    <button
-                      className="inline-flex items-center rounded-md bg-orange-600 px-4 py-2 text-white text-sm hover:bg-orange-700"
-                      onClick={handleCreateNewPlan}
-                    >
-                      Plan nou
-                    </button>
-                  )}
-                </div>
-              </div>
-              
-              {/* Chart Import/Export Controls */}
-              {chartItems.length > 0 && (
-                <div className="flex items-center gap-3 mb-4">
-                  <button
-                    className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-white text-sm hover:bg-blue-700"
-                    onClick={handleImportFromChart}
-                  >
-                    Importă din chart ({chartItems.length})
-                  </button>
-                  {items.some(item => item.isFromChart) && (
-                    <button
-                      className="inline-flex items-center rounded-md bg-gray-600 px-4 py-2 text-white text-sm hover:bg-gray-700"
-                      onClick={handleRemoveFromChart}
-                    >
-                      Elimină din chart din plan
-                    </button>
-                  )}
-                </div>
-              )}
-              
-              {/* Plan Actions */}
-              <div className="flex items-center gap-3">
-                {items.length > 0 && (
-                  <button
-                    className="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-white text-sm hover:bg-red-700"
-                    onClick={() => {
-                      if (window.confirm(`Ești sigur că vrei să ștergi toate tratamentele (${items.length})?`)) {
-                        setItems([]);
-                      }
-                    }}
-                  >
-                    Șterge toate
-                  </button>
-                )}
-                <button
-                  className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-white text-sm hover:bg-emerald-700"
-                  onClick={handleAddExtra}
-                >
-                  + Adaugă tratament manual
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-4">
-                  <SimpleMouthView patientId={String(patientId)} />
-            </div>
-
-            {/* Treatment List Section */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Ordinea tratamentelor</h3>
-
-              {items.length === 0 && (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500 text-lg">
-                    {chartItems.length > 0 
-                      ? `Nu există tratamente în plan. Adaugă tratamente manual sau importă din chart (${chartItems.length} disponibile).`
-                      : "Nu există tratamente în plan. Adaugă tratamente manual."
-                    }
-                  </p>
-                </div>
-              )}
-
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext items={items.map(item => item.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-3">
-                    {items.map((item, index) => (
-                      <SortableItem
-                        key={item.id}
-                        item={item}
-                        index={index}
-                        onRemove={removeItem}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            </div>
-            
-            {/* Available Chart Treatments Section */}
-            {chartItems.length > 0 && (
-              <div className="mt-8">
-                <h4 className="text-lg font-medium text-gray-700 mb-4">
-                  Tratamente disponibile din chart ({chartItems.filter(chartItem => 
-                    !items.some(planItem => planItem.treatmentId === chartItem.treatmentId)
-                  ).length} neimportate)
-                </h4>
-                <div className="space-y-3">
-                  {chartItems
-                    .filter(chartItem => 
-                      !items.some(planItem => planItem.treatmentId === chartItem.treatmentId)
-                    )
-                    .map((chartItem, index) => (
-                      <div 
-                        key={chartItem.id}
-                        className="flex items-center gap-3 p-4 rounded-lg border bg-blue-50 border-blue-200"
+              {/* Plan Management Section */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-medium text-gray-900">
+                    {hasExistingPlan ? "Plan de tratament existent" : "Plan nou"}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {hasExistingPlan && (
+                      <button
+                        className="inline-flex items-center rounded-md bg-orange-600 px-3 py-1.5 text-white text-sm hover:bg-orange-700"
+                        onClick={handleCreateNewPlan}
                       >
-                        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-600">
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3">
-                            <span className="text-base font-medium text-gray-900">
-                              Dinte {chartItem.toothNumber}
-                            </span>
-                            <span className="text-base text-gray-700 truncate">
-                              {chartItem.title}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                            {chartItem.durationMinutes && (
-                              <span>{chartItem.durationMinutes} min</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex-shrink-0">
-                          <button
-                            type="button"
-                            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-white text-sm hover:bg-blue-700"
-                            onClick={() => {
-                              setItems(prev => [...prev, chartItem]);
-                            }}
-                          >
-                            Importă
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                        Plan nou
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Chart Import/Export Controls */}
+                {chartItems.length > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <button
+                      className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-white text-sm hover:bg-blue-700"
+                      onClick={handleImportFromChart}
+                    >
+                      Importă din chart ({chartItems.length})
+                    </button>
+                    {items.some(item => item.isFromChart) && (
+                      <button
+                        className="inline-flex items-center rounded-md bg-gray-600 px-3 py-1.5 text-white text-sm hover:bg-gray-700"
+                        onClick={handleRemoveFromChart}
+                      >
+                        Elimină din chart
+                      </button>
+                    )}
+                  </div>
+                )}
+                
+                {/* Plan Actions */}
+                <div className="flex items-center gap-2">
+                  {items.length > 0 && (
+                    <button
+                      className="inline-flex items-center rounded-md bg-red-600 px-3 py-1.5 text-white text-sm hover:bg-red-700"
+                      onClick={() => {
+                        if (window.confirm(`Ești sigur că vrei să ștergi toate tratamentele (${items.length})?`)) {
+                          setItems([]);
+                        }
+                      }}
+                    >
+                      Șterge toate
+                    </button>
+                  )}
+                  <button
+                    className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-1.5 text-white text-sm hover:bg-emerald-700"
+                    onClick={handleAddExtra}
+                  >
+                    + Adaugă tratament manual
+                  </button>
                 </div>
               </div>
-            )}
+
+              {/* Treatment List Section */}
+              <div>
+                <h3 className="text-base font-medium text-gray-900 mb-3">Ordinea tratamentelor</h3>
+
+                {items.length === 0 && (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500 text-sm">
+                      {chartItems.length > 0 
+                        ? `Nu există tratamente în plan. Adaugă tratamente manual sau importă din chart (${chartItems.length} disponibile).`
+                        : "Nu există tratamente în plan. Adaugă tratamente manual."
+                      }
+                    </p>
+                  </div>
+                )}
+
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext items={items.map(item => item.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {items.map((item, index) => (
+                        <SortableItem
+                          key={item.id}
+                          item={item}
+                          index={index}
+                          onRemove={removeItem}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
+              
+              {/* Available Chart Treatments Section */}
+              {chartItems.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-base font-medium text-gray-700 mb-3">
+                    Tratamente disponibile din chart ({chartItems.filter(chartItem => 
+                      !items.some(planItem => planItem.treatmentId === chartItem.treatmentId)
+                    ).length} neimportate)
+                  </h4>
+                  <div className="space-y-2">
+                    {chartItems
+                      .filter(chartItem => 
+                        !items.some(planItem => planItem.treatmentId === chartItem.treatmentId)
+                      )
+                      .map((chartItem, index) => (
+                        <div 
+                          key={chartItem.id}
+                          className="flex items-center gap-2 p-3 rounded-lg border bg-blue-50 border-blue-200"
+                        >
+                          <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                Dinte {chartItem.toothNumber}
+                              </span>
+                              <span className="text-sm text-gray-700 truncate">
+                                {chartItem.title}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+                              {chartItem.durationMinutes && (
+                                <span>{chartItem.durationMinutes} min</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0">
+                            <button
+                              type="button"
+                              className="inline-flex items-center rounded-md bg-blue-600 px-2 py-1 text-white text-xs hover:bg-blue-700"
+                              onClick={() => {
+                                setItems(prev => [...prev, chartItem]);
+                              }}
+                            >
+                              Importă
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column - Dental Chart */}
+            <div className="bg-gray-50 rounded-lg p-4 overflow-y-auto">
+              <h3 className="text-base font-medium text-gray-900 mb-3">Chart dentar</h3>
+              <TeethChartTab patientId={String(patientId)} />
+            </div>
           </div>
         )}
       </DrawerContent>
 
       {/* Footer */}
       <DrawerFooter>
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3">
             <button
               className="inline-flex items-center gap-2 rounded-md bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200"

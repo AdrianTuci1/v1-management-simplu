@@ -32,8 +32,7 @@ class PlanService {
     try {
       const endpoint = buildResourcesEndpoint(`/search/data-field/patientId`);
       const query = new URLSearchParams({ 
-        fieldValue: String(patientId),
-        resourceType: this.resourceType
+        fieldValue: String(patientId)
       }).toString();
       const url = `${endpoint}?${query}`;
       
@@ -101,8 +100,7 @@ class PlanService {
         // Update existing plan
         const endpoint = buildResourcesEndpoint(`/search/data-field/patientId`);
         const query = new URLSearchParams({ 
-          fieldValue: String(patientId),
-          resourceType: this.resourceType
+          fieldValue: String(patientId)
         }).toString();
         const searchUrl = `${endpoint}?${query}`;
         
@@ -150,8 +148,7 @@ class PlanService {
     try {
       const endpoint = buildResourcesEndpoint(`/search/data-field/patientId`);
       const query = new URLSearchParams({ 
-        fieldValue: String(patientId),
-        resourceType: this.resourceType
+        fieldValue: String(patientId)
       }).toString();
       const searchUrl = `${endpoint}?${query}`;
       
@@ -181,8 +178,7 @@ class PlanService {
     try {
       const endpoint = buildResourcesEndpoint("/pdf");
       const query = new URLSearchParams({ 
-        fieldValue: String(patientId),
-        resourceType: this.resourceType
+        fieldValue: String(patientId)
       }).toString();
       const url = `${endpoint}?${query}`;
       
@@ -209,8 +205,7 @@ class PlanService {
     try {
       const endpoint = buildResourcesEndpoint("/send");
       const query = new URLSearchParams({ 
-        fieldValue: String(patientId),
-        resourceType: this.resourceType
+        fieldValue: String(patientId)
       }).toString();
       const url = `${endpoint}?${query}`;
       

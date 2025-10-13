@@ -305,10 +305,10 @@ export class AIAssistantService {
     }
   }
 
-  // Start new session (new method - session will be created when first message is sent via WebSocket)
+  // Start new session (session will be created automatically when first message is sent)
   async startNewSession() {
     try {
-      Logger.log('info', 'Starting new session - session will be created when first message is sent');
+      Logger.log('info', '🆕 Starting new session - will be created when first message is sent');
       
       // Clear current messages and session ID
       this.messageHistory = [];
@@ -318,12 +318,13 @@ export class AIAssistantService {
       this.onMessageReceived?.([]);
       this.onSessionChange?.(null);
       
-      // Generate a temporary session ID that will be replaced when the first message is sent
+      // Generate a temporary session ID that will be replaced by backend when first message is sent
       const tempSessionId = `temp_${Date.now()}`;
       this.currentSessionId = tempSessionId;
       
-      Logger.log('info', 'New session prepared - waiting for first message to create actual session', { 
-        tempSessionId 
+      Logger.log('info', '✅ New session prepared with temp ID', { 
+        tempSessionId,
+        note: 'Real session ID will be received from backend after first message'
       });
       
       return { 
@@ -332,7 +333,7 @@ export class AIAssistantService {
         message: 'Session will be created when first message is sent via WebSocket'
       };
     } catch (error) {
-      Logger.log('error', 'Failed to start new session', error);
+      Logger.log('error', '❌ Failed to start new session', error);
       this.onError?.('Failed to start new session', error);
       throw error;
     }
@@ -565,47 +566,7 @@ export class AIAssistantService {
     }
   }
 
-  // Export session data (updated to use direct API)
-  async exportSession(format = 'json') {
-    if (!this.currentSessionId) {
-      throw new Error('No active session');
-    }
 
-    try {
-      // For now, we'll export the local session data
-      const sessionData = {
-        sessionId: this.currentSessionId,
-        businessId: this.businessId,
-        userId: this.userId,
-        locationId: this.locationId,
-        messages: this.messageHistory,
-        exportedAt: new Date().toISOString(),
-        format: format
-      };
-      
-      let exportData;
-      if (format === 'json') {
-        exportData = JSON.stringify(sessionData, null, 2);
-      } else {
-        // For other formats, you would implement the conversion logic
-        exportData = sessionData;
-      }
-      
-      // Send export event via SocketFacade
-      this.socketFacade.sendAIAssistantSessionExport(
-        this.currentSessionId, 
-        format, 
-        exportData?.length || 0
-      );
-      
-      Logger.log('info', 'Session exported successfully', { format, size: exportData?.length });
-      return exportData;
-    } catch (error) {
-      Logger.log('error', 'Failed to export session', error);
-      this.onError?.('Failed to export session', error);
-      throw error;
-    }
-  }
 
   // Format session date for display (utility method)
   formatSessionDate(timestamp) {
@@ -620,37 +581,88 @@ export class AIAssistantService {
 
   // Update session ID when received from WebSocket (utility method)
   updateSessionId(newSessionId) {
-    if (newSessionId && newSessionId !== this.currentSessionId) {
-      Logger.log('info', 'Session ID updated from WebSocket', { 
+    if (!newSessionId) {
+      Logger.log('warn', '⚠️ Attempted to update session ID with null/undefined value');
+      return;
+    }
+
+    // Check if this is a real session ID replacing a temp one
+    const isTempSession = this.currentSessionId && this.currentSessionId.startsWith('temp_');
+    const isRealSession = !newSessionId.startsWith('temp_');
+    
+    if (newSessionId !== this.currentSessionId) {
+      Logger.log('info', '🔄 Session ID updated from WebSocket', { 
         oldSessionId: this.currentSessionId, 
-        newSessionId 
+        newSessionId,
+        wasTemp: isTempSession,
+        isReal: isRealSession
       });
       
       this.currentSessionId = newSessionId;
       this.onSessionChange?.(newSessionId);
+      
+      // Send session loaded event if this is a new real session
+      if (isTempSession && isRealSession) {
+        this.socketFacade.sendAIAssistantSessionLoaded(
+          this.businessId, 
+          this.userId, 
+          newSessionId, 
+          this.locationId
+        );
+        Logger.log('info', '✅ Session loaded event sent for new real session');
+      }
     }
   }
 
   // Get current session info (utility method)
   getCurrentSessionInfo() {
+    const isTemp = this.currentSessionId && this.currentSessionId.startsWith('temp_');
+    
     return {
       sessionId: this.currentSessionId,
       businessId: this.businessId,
       userId: this.userId,
       locationId: this.locationId,
       messageCount: this.messageHistory.length,
-      lastMessage: this.messageHistory[this.messageHistory.length - 1] || null
+      lastMessage: this.messageHistory[this.messageHistory.length - 1] || null,
+      isTemporary: isTemp,
+      isReal: !isTemp && !!this.currentSessionId
     };
   }
 
   // Check if session is active (utility method)
   hasActiveSession() {
-    return !!this.currentSessionId;
+    return !!this.currentSessionId && !this.currentSessionId.startsWith('temp_');
+  }
+
+  // Check if session is temporary (waiting for real session ID)
+  hasTemporarySession() {
+    return !!this.currentSessionId && this.currentSessionId.startsWith('temp_');
   }
 
   // Get message by ID (utility method)
   getMessageById(messageId) {
     return this.messageHistory.find(msg => msg.messageId === messageId);
+  }
+
+  // Handle streaming message update (utility method for UI)
+  handleStreamingMessage(message) {
+    const existingIndex = this.messageHistory.findIndex(m => m.messageId === message.messageId);
+    
+    if (existingIndex >= 0) {
+      // Update existing message
+      this.messageHistory[existingIndex] = { ...message };
+      Logger.log('debug', '🔄 Updated streaming message in history', {
+        messageId: message.messageId,
+        isStreaming: message.isStreaming
+      });
+    } else {
+      // Add new streaming message
+      this.messageHistory.push({ ...message });
+      Logger.log('debug', '➕ Added new streaming message to history', {
+        messageId: message.messageId
+      });
+    }
   }
 
   // Cleanup and dispose

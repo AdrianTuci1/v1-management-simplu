@@ -57,6 +57,8 @@ export class AIWebSocketService {
     this.onConnectionChange = null;
     this.onError = null;
     this.onReconnect = null;
+    this.onSessionUpdate = null;
+    this.onFunctionCall = null;
     
     // DataFacade and SocketFacade integration
     this.dataFacade = dataFacade;
@@ -107,7 +109,21 @@ export class AIWebSocketService {
       
       this.aiAssistantInstance.onSessionUpdate = (payload) => {
         Logger.log('info', '🔄 AI Assistant instance session update', payload);
+        
+        // Update local session ID if it changed
+        if (payload.sessionId && payload.sessionId !== this.currentSessionId) {
+          this.currentSessionId = payload.sessionId;
+          Logger.log('info', '✅ Session ID updated from session update event', {
+            newSessionId: payload.sessionId
+          });
+        }
+        
         this.onSessionUpdate?.(payload);
+      };
+      
+      this.aiAssistantInstance.onFunctionCall = (payload) => {
+        Logger.log('info', '🔧 AI Assistant instance function call', payload);
+        this.onFunctionCall?.(payload);
       };
       
       // Now connect using SocketFacade
@@ -557,6 +573,30 @@ export class AIWebSocketService {
     }
   }
 
+  // Send function response back to AI
+  sendFunctionResponse(functionName, data, success = true, error = null) {
+    if (!this.aiAssistantInstance) {
+      Logger.log('error', '❌ Cannot send function response - no AI Assistant instance');
+      return false;
+    }
+
+    Logger.log('info', '📤 Sending function response', {
+      functionName,
+      success,
+      hasData: !!data,
+      hasError: !!error
+    });
+
+    try {
+      const result = this.aiAssistantInstance.sendFunctionResponse(functionName, data, success, error);
+      Logger.log('info', '✅ Function response sent successfully');
+      return result;
+    } catch (error) {
+      Logger.log('error', '❌ Failed to send function response', error);
+      throw error;
+    }
+  }
+
   // Disconnect from WebSocket
   async disconnect() {
     Logger.log('info', 'Disconnecting from WebSocket server via SocketFacade...');
@@ -600,6 +640,7 @@ export class AIWebSocketService {
     this.onError = null;
     this.onReconnect = null;
     this.onSessionUpdate = null;
+    this.onFunctionCall = null;
     
     // Clear AI Assistant instance
     this.aiAssistantInstance = null;

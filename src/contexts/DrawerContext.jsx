@@ -14,6 +14,8 @@ export const useDrawer = () => {
 export const DrawerProvider = ({ children }) => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerContent, setDrawerContent] = useState(null)
+  const [treatmentPlanOpen, setTreatmentPlanOpen] = useState(false)
+  const [treatmentPlanPatientId, setTreatmentPlanPatientId] = useState(null)
   
   // Folosește stiva de drawere din Zustand
   const { 
@@ -148,6 +150,10 @@ export const DrawerProvider = ({ children }) => {
   const value = {
     drawerOpen,
     drawerContent,
+    treatmentPlanOpen,
+    setTreatmentPlanOpen,
+    treatmentPlanPatientId,
+    setTreatmentPlanPatientId,
     openDrawer,
     closeDrawer,
     openAppointmentDrawer,

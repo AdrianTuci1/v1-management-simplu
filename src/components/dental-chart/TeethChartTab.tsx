@@ -141,9 +141,7 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
     setSelectedTooth(null);
   };
 
-  const handleOpenTreatmentPlan = () => {
-    setIsPlanOpen(true);
-  };
+
 
   return (
     <div className="space-y-4">
@@ -158,12 +156,6 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
           />
           {showCharts ? "Teeth Charts" : "Mouth View"}
         </label>
-        <button
-          className="inline-flex items-center rounded-md bg-emerald-600 px-3 py-2 text-white text-sm hover:bg-emerald-700"
-          onClick={handleOpenTreatmentPlan}
-        >
-          Plan tratament
-        </button>
       </div>
 
       {/* Main content container */}

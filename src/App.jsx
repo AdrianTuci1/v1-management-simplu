@@ -15,6 +15,8 @@ import QuickActionsDrawer from './components/drawers/QuickActionsDrawer'
 import SalesDrawer from './components/drawers/SalesDrawer'
 import InvoiceDrawer from './components/drawers/InvoiceDrawer'
 import InvoiceClientDrawer from './components/drawers/InvoiceClientDrawer'
+import FullscreenTreatmentPlan from './components/dental-chart/FullscreenTreatmentPlan'
+import PlanService from './services/planService'
 import authService from './services/authService'
 import cognitoAuthService from './services/cognitoAuthService'
 import { DrawerProvider, useDrawer } from './contexts/DrawerContext'
@@ -30,7 +32,7 @@ function AppContent() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [showBusinessSelector, setShowBusinessSelector] = useState(false)
-  const { drawerOpen, drawerContent, closeDrawer } = useDrawer()
+  const { drawerOpen, drawerContent, closeDrawer, treatmentPlanOpen, treatmentPlanPatientId, setTreatmentPlanOpen, setTreatmentPlanPatientId } = useDrawer()
   
   // State pentru navigația externă
   const [externalNavigationState, setExternalNavigationState] = useState({
@@ -305,7 +307,7 @@ function AppContent() {
   }
 
   return (
-    <div className="h-screen bg-background w-full relative">
+    <div className="h-screen bg-background w-full relative overflow-hidden">
       {/* Mobile Menu */}
       {isMobile && (
         <MobileMenu
@@ -346,10 +348,10 @@ function AppContent() {
         
         {/* Floating Drawer with External Navigation */}
         {drawerOpen && (
-          <div className="absolute top-0 right-0 z-30 h-full pt-18 p-2">
-            {/* External Navigation - positioned at top */}
+          <>
+            {/* External Navigation - stays visible and moves to the right edge */}
             {(drawerContent?.type === 'appointment' || drawerContent?.type === 'new-person' || drawerContent?.type === 'edit-person') && (
-              <div className="absolute top-20 -left-10 z-40">
+              <div className={`absolute top-20 z-40 transition-all duration-300 ${treatmentPlanOpen ? 'right-2' : 'right-[26rem]'}`}>
                 <DrawerExternalNavigation
                   items={getExternalNavigationItems(drawerContent?.type)}
                   activeItem={getCurrentNavigationItem(drawerContent?.type)}
@@ -360,20 +362,35 @@ function AppContent() {
               </div>
             )}
             
-            <Drawer 
-              onClose={closeDrawer}
-              position="side"
-              size="md"
-            >
-              <DraftMainDrawer 
-                open={drawerOpen}
-                content={drawerContent}
+            {/* Drawer slides out to the right */}
+            <div className={`absolute top-0 right-0 z-30 h-full pt-18 p-2 transition-transform duration-300 ${treatmentPlanOpen ? 'translate-x-full' : 'translate-x-0'}`}>
+              <Drawer 
                 onClose={closeDrawer}
-                externalNavigationState={externalNavigationState}
-                onExternalNavigationChange={handleNavigationChange}
-              />
-            </Drawer>
-          </div>
+                position="side"
+                size="md"
+              >
+                <DraftMainDrawer 
+                  open={drawerOpen}
+                  content={drawerContent}
+                  onClose={closeDrawer}
+                  externalNavigationState={externalNavigationState}
+                  onExternalNavigationChange={handleNavigationChange}
+                />
+              </Drawer>
+            </div>
+          </>
+        )}
+        
+        {/* FullscreenTreatmentPlan - randat complet separat de drawer */}
+        {treatmentPlanOpen && treatmentPlanPatientId && (
+          <FullscreenTreatmentPlan
+            patientId={treatmentPlanPatientId}
+            isOpen={treatmentPlanOpen}
+            onClose={() => {
+              setTreatmentPlanOpen(false)
+              setTreatmentPlanPatientId(null)
+            }}
+          />
         )}
 
       </div>

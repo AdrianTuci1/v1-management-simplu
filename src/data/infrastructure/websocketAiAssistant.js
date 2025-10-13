@@ -65,6 +65,11 @@ export class WebSocketAIAssistant {
     this.onConnectionChange = null;
     this.onError = null;
     this.onSessionUpdate = null;
+    this.onFunctionCall = null;
+    
+    // Streaming state
+    this.currentStreamingMessage = null;
+    this.streamingMessageId = null;
     
     Logger.log('info', 'WebSocket AI Assistant initialized', { businessId, userId, locationId });
   }
@@ -233,24 +238,8 @@ export class WebSocketAIAssistant {
         this.handleNewMessage(payload);
         break;
         
-      case 'frontend_data_available':
-        this.handleFrontendDataAvailable(payload);
-        break;
-        
-      case 'draft_created':
-        this.handleDraftCreated(payload);
-        break;
-        
-      case 'draft_updated':
-        this.handleDraftUpdated(payload);
-        break;
-        
-      case 'draft_deleted':
-        this.handleDraftDeleted(payload);
-        break;
-        
-      case 'drafts_listed':
-        this.handleDraftsListed(payload);
+      case 'ai_function_call':
+        this.handleFunctionCall(payload);
         break;
         
       default:
@@ -259,41 +248,179 @@ export class WebSocketAIAssistant {
   }
 
   /**
-   * Gestionează mesajele noi de la WebSocket
+   * Gestionează mesajele noi de la WebSocket (cu suport pentru streaming)
    */
   handleNewMessage(payload) {
-    const { responseId, message: content, timestamp, sessionId } = payload;
+    const { 
+      responseId, 
+      message: content, 
+      timestamp, 
+      sessionId,
+      streaming,
+      actions,
+      toolsUsed 
+    } = payload;
     
-    if (content) {
-      // Check if this message is for the current session or if we need to update session ID
-      const messageSessionId = sessionId;
-      const currentSessionId = this.currentSessionId;
+    Logger.log('info', '📨 WebSocketAIAssistant received new_message', {
+      hasContent: !!content,
+      hasStreaming: !!streaming,
+      streamingType: streaming?.type,
+      isChunk: streaming?.isChunk,
+      isComplete: streaming?.isComplete,
+      sessionId: sessionId
+    });
+    
+    if (!content) {
+      Logger.log('warn', 'WebSocketAIAssistant no content in new message', payload);
+      return;
+    }
+    
+    // Check if this message is for the current session or if we need to update session ID
+    const messageSessionId = sessionId;
+    const currentSessionId = this.currentSessionId;
+    
+    // If we have a temp session ID but got a real one, update it
+    const isTempSession = currentSessionId && currentSessionId.startsWith('temp_');
+    const shouldUpdateSession = isTempSession && messageSessionId && !messageSessionId.startsWith('temp_');
+    
+    // If we don't have a current session but got one, update it
+    const shouldSetSession = !currentSessionId && messageSessionId;
+    
+    // Update session ID if needed
+    if (shouldUpdateSession || shouldSetSession) {
+      Logger.log('info', '🔄 Updating session ID from WebSocket message', { 
+        oldSessionId: currentSessionId, 
+        newSessionId: messageSessionId,
+        reason: shouldUpdateSession ? 'temp_to_real' : 'null_to_real'
+      });
+      this.currentSessionId = messageSessionId;
       
-      // If we have a temp session ID but got a real one, update it
-      const isTempSession = currentSessionId && currentSessionId.startsWith('temp_');
-      const shouldUpdateSession = isTempSession && messageSessionId && !messageSessionId.startsWith('temp_');
-      
-      // If we don't have a current session but got one, update it
-      const shouldSetSession = !currentSessionId && messageSessionId;
-      
-      // Update session ID if needed
-      if (shouldUpdateSession || shouldSetSession) {
-        Logger.log('info', '🔄 Updating session ID from WebSocket message', { 
-          oldSessionId: currentSessionId, 
-          newSessionId: messageSessionId,
-          reason: shouldUpdateSession ? 'temp_to_real' : 'null_to_real'
+      // Notify about session update
+      if (this.onSessionUpdate) {
+        this.onSessionUpdate({
+          sessionId: messageSessionId,
+          status: 'updated',
+          metadata: { source: 'websocket_message', reason: shouldUpdateSession ? 'temp_to_real' : 'null_to_real' }
         });
-        this.currentSessionId = messageSessionId;
+      }
+    }
+    
+    // Handle streaming messages
+    if (streaming && streaming.isChunk) {
+      // Este un chunk de streaming
+      Logger.log('info', '🔄 Processing streaming chunk');
+      
+      if (!this.currentStreamingMessage) {
+        // Creează un nou mesaj streaming
+        this.streamingMessageId = responseId || `ai_stream_${Date.now()}`;
+        this.currentStreamingMessage = {
+          messageId: this.streamingMessageId,
+          sessionId: messageSessionId || currentSessionId,
+          businessId: this.businessId,
+          userId: 'agent',
+          content: content,
+          type: 'agent',
+          timestamp: timestamp || new Date().toISOString(),
+          isStreaming: true,
+          metadata: { 
+            source: 'websocket', 
+            responseId,
+            streaming: true
+          }
+        };
         
-        // Notify about session update
-        if (this.onSessionUpdate) {
-          this.onSessionUpdate({
-            sessionId: messageSessionId,
-            status: 'updated',
-            metadata: { source: 'websocket_message', reason: shouldUpdateSession ? 'temp_to_real' : 'null_to_real' }
-          });
+        Logger.log('info', '✨ Created new streaming message', {
+          messageId: this.streamingMessageId,
+          initialContentLength: content.length
+        });
+      } else {
+        // Adaugă chunk-ul la mesajul existent
+        this.currentStreamingMessage.content += content;
+        
+        Logger.log('info', '➕ Added chunk to streaming message', {
+          messageId: this.streamingMessageId,
+          chunkLength: content.length,
+          totalLength: this.currentStreamingMessage.content.length
+        });
+      }
+      
+      // Notifică callback-ul cu mesajul streaming în curs
+      if (this.onMessageReceived) {
+        try {
+          this.onMessageReceived([{ ...this.currentStreamingMessage }]);
+          Logger.log('info', '🎯 Streaming chunk sent to callback');
+        } catch (error) {
+          Logger.log('error', '❌ Error in streaming chunk callback', error);
         }
       }
+      
+    } else if (streaming && streaming.isComplete) {
+      // Mesaj streaming complet
+      Logger.log('info', '✅ Streaming complete');
+      
+      if (this.currentStreamingMessage) {
+        // Finalizează mesajul streaming
+        this.currentStreamingMessage.isStreaming = false;
+        this.currentStreamingMessage.actions = actions;
+        this.currentStreamingMessage.metadata.toolsUsed = toolsUsed;
+        this.currentStreamingMessage.metadata.streaming = false;
+        
+        Logger.log('info', '🏁 Finalized streaming message', {
+          messageId: this.streamingMessageId,
+          totalLength: this.currentStreamingMessage.content.length,
+          hasActions: !!actions,
+          actionsCount: actions?.length || 0
+        });
+        
+        // Notifică callback-ul cu mesajul final
+        if (this.onMessageReceived) {
+          try {
+            this.onMessageReceived([{ ...this.currentStreamingMessage }]);
+            Logger.log('info', '🎯 Final streaming message sent to callback');
+          } catch (error) {
+            Logger.log('error', '❌ Error in final streaming callback', error);
+          }
+        }
+        
+        // Curăță starea streaming
+        this.currentStreamingMessage = null;
+        this.streamingMessageId = null;
+      } else {
+        // Mesaj complet fără chunks anterioare (mesaj direct)
+        Logger.log('info', '📝 Complete message without chunks');
+        
+        const aiMessage = {
+          messageId: responseId || `ai_${Date.now()}`,
+          sessionId: messageSessionId || currentSessionId,
+          businessId: this.businessId,
+          userId: 'agent',
+          content: content,
+          type: 'agent',
+          timestamp: timestamp || new Date().toISOString(),
+          isStreaming: false,
+          actions: actions,
+          metadata: { 
+            source: 'websocket', 
+            responseId,
+            toolsUsed,
+            streaming: false,
+            sessionUpdate: shouldUpdateSession || shouldSetSession
+          }
+        };
+        
+        if (this.onMessageReceived) {
+          try {
+            this.onMessageReceived([aiMessage]);
+            Logger.log('info', '🎯 Complete message sent to callback');
+          } catch (error) {
+            Logger.log('error', '❌ Error in complete message callback', error);
+          }
+        }
+      }
+      
+    } else {
+      // Mesaj normal (fără streaming)
+      Logger.log('info', '📝 Normal message (no streaming)');
       
       const aiMessage = {
         messageId: responseId || `ai_${Date.now()}`,
@@ -303,188 +430,35 @@ export class WebSocketAIAssistant {
         content: content,
         type: 'agent',
         timestamp: timestamp || new Date().toISOString(),
+        isStreaming: false,
+        actions: actions,
         metadata: { 
           source: 'websocket', 
           responseId,
+          toolsUsed,
+          streaming: false,
           sessionUpdate: shouldUpdateSession || shouldSetSession
         }
       };
       
-      Logger.log('info', '🎯 WebSocketAIAssistant calling onMessageReceived (new_message)', {
-        sessionId: aiMessage.sessionId,
-        messageId: aiMessage.messageId,
-        hasCallback: !!this.onMessageReceived,
-        callbackType: typeof this.onMessageReceived,
-        sessionUpdated: shouldUpdateSession || shouldSetSession
-      });
-      
       if (this.onMessageReceived) {
-        Logger.log('info', '🎯 WebSocketAIAssistant executing callback');
         try {
           this.onMessageReceived([aiMessage]);
-          Logger.log('info', '🎯 WebSocketAIAssistant callback executed successfully');
+          Logger.log('info', '🎯 Normal message sent to callback');
         } catch (error) {
-          Logger.log('error', '❌ WebSocketAIAssistant callback error', error);
+          Logger.log('error', '❌ Error in normal message callback', error);
         }
-      } else {
-        Logger.log('warn', '❌ WebSocketAIAssistant callback is null/undefined');
-      }
-    } else {
-      Logger.log('warn', 'WebSocketAIAssistant no content in new message', payload);
-    }
-  }
-
-  /**
-   * Gestionează datele frontend disponibile
-   */
-  handleFrontendDataAvailable(payload) {
-    const { messageId, message, timestamp, sessionId, frontendData } = payload;
-    
-    Logger.log('info', 'Frontend data available received', payload);
-    
-    const frontendMessage = {
-      messageId: messageId || `frontend_${Date.now()}`,
-      sessionId: sessionId || this.currentSessionId,
-      businessId: this.businessId,
-      userId: 'agent',
-      content: message,
-      type: 'frontend_data',
-      timestamp: timestamp || new Date().toISOString(),
-      metadata: { 
-        source: 'websocket',
-        frontendData: frontendData
-      }
-    };
-    
-    if (this.onMessageReceived) {
-      try {
-        this.onMessageReceived([frontendMessage]);
-        Logger.log('info', 'Frontend data message sent to callback');
-      } catch (error) {
-        Logger.log('error', 'Error processing frontend data message', error);
       }
     }
   }
 
-  /**
-   * Gestionează crearea de draft-uri
-   */
-  handleDraftCreated(payload) {
-    Logger.log('info', 'Draft created received', payload);
-    
-    const draftMessage = {
-      messageId: payload.messageId || `draft_created_${Date.now()}`,
-      sessionId: payload.sessionId || this.currentSessionId,
-      businessId: this.businessId,
-      userId: 'agent',
-      content: payload.message || 'Draft created',
-      type: 'draft_created',
-      timestamp: payload.timestamp || new Date().toISOString(),
-      metadata: { 
-        source: 'websocket',
-        draftData: payload.draftData
-      }
-    };
-    
-    if (this.onMessageReceived) {
-      try {
-        this.onMessageReceived([draftMessage]);
-        Logger.log('info', 'Draft created message sent to callback');
-      } catch (error) {
-        Logger.log('error', 'Error processing draft created message', error);
-      }
-    }
-  }
 
-  /**
-   * Gestionează actualizarea de draft-uri
-   */
-  handleDraftUpdated(payload) {
-    Logger.log('info', 'Draft updated received', payload);
-    
-    const draftMessage = {
-      messageId: payload.messageId || `draft_updated_${Date.now()}`,
-      sessionId: payload.sessionId || this.currentSessionId,
-      businessId: this.businessId,
-      userId: 'agent',
-      content: payload.message || 'Draft updated',
-      type: 'draft_updated',
-      timestamp: payload.timestamp || new Date().toISOString(),
-      metadata: { 
-        source: 'websocket',
-        draftData: payload.draftData
-      }
-    };
-    
-    if (this.onMessageReceived) {
-      try {
-        this.onMessageReceived([draftMessage]);
-        Logger.log('info', 'Draft updated message sent to callback');
-      } catch (error) {
-        Logger.log('error', 'Error processing draft updated message', error);
-      }
-    }
-  }
 
-  /**
-   * Gestionează ștergerea de draft-uri
-   */
-  handleDraftDeleted(payload) {
-    Logger.log('info', 'Draft deleted received', payload);
-    
-    const draftMessage = {
-      messageId: payload.messageId || `draft_deleted_${Date.now()}`,
-      sessionId: payload.sessionId || this.currentSessionId,
-      businessId: this.businessId,
-      userId: 'agent',
-      content: payload.message || 'Draft deleted',
-      type: 'draft_deleted',
-      timestamp: payload.timestamp || new Date().toISOString(),
-      metadata: { 
-        source: 'websocket',
-        draftData: payload.draftData
-      }
-    };
-    
-    if (this.onMessageReceived) {
-      try {
-        this.onMessageReceived([draftMessage]);
-        Logger.log('info', 'Draft deleted message sent to callback');
-      } catch (error) {
-        Logger.log('error', 'Error processing draft deleted message', error);
-      }
-    }
-  }
 
-  /**
-   * Gestionează listarea de draft-uri
-   */
-  handleDraftsListed(payload) {
-    Logger.log('info', 'Drafts listed received', payload);
-    
-    const draftMessage = {
-      messageId: payload.messageId || `drafts_listed_${Date.now()}`,
-      sessionId: payload.sessionId || this.currentSessionId,
-      businessId: this.businessId,
-      userId: 'agent',
-      content: payload.message || 'Drafts listed',
-      type: 'drafts_listed',
-      timestamp: payload.timestamp || new Date().toISOString(),
-      metadata: { 
-        source: 'websocket',
-        draftData: payload.draftData
-      }
-    };
-    
-    if (this.onMessageReceived) {
-      try {
-        this.onMessageReceived([draftMessage]);
-        Logger.log('info', 'Drafts listed message sent to callback');
-      } catch (error) {
-        Logger.log('error', 'Error processing drafts listed message', error);
-      }
-    }
-  }
+
+
+
+
 
   // ========================================
   // MESSAGE SENDING
@@ -662,11 +636,16 @@ export class WebSocketAIAssistant {
     
     this.disconnect();
     
+    // Clear streaming state
+    this.currentStreamingMessage = null;
+    this.streamingMessageId = null;
+    
     // Clear callbacks
     this.onMessageReceived = null;
     this.onConnectionChange = null;
     this.onError = null;
     this.onSessionUpdate = null;
+    this.onFunctionCall = null;
   }
 }
 

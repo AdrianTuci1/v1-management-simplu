@@ -58,38 +58,6 @@ function createWorker() {
           }
           break;
           
-        case 'resource_update':
-          // Extract data from the payload as per documentation
-          const payload = data.data;
-          
-          // Get operation type from payload.type
-          const operation = payload.type || 'unknown';
-          const normalizedData = {
-            type: operation,
-            data: payload.data,
-            resourceType: payload.resourceType,
-            resourceId: payload.resourceId,
-            tempId: payload.tempId,
-            businessId: payload.businessId,
-            locationId: payload.locationId,
-            timestamp: payload.timestamp
-          };
-          
-          // Send to general listeners
-          listeners.forEach((cb) => cb(normalizedData));
-          
-          // Send to specific resource listeners
-          if (normalizedData.resourceType && resourceListeners.has(normalizedData.resourceType)) {
-            resourceListeners.get(normalizedData.resourceType).forEach(cb => cb(normalizedData));
-          }
-          
-          // Centralized handler: persist + retention
-          try {
-            // Lazy import to avoid circular deps at module load
-            import('./websocketResourceHandler').then(m => m.handleResourceEvent(normalizedData)).catch(() => {});
-          } catch (_) {}
-          break;
-          
         case 'log':
           const logLevel = data.kind === 'error' ? 'error' : data.kind === 'warn' ? 'warn' : 'log';
           console[logLevel](`[WebSocket Worker] ${data.msg}`, data);
@@ -248,57 +216,6 @@ export function reconnectWithNewContext() {
   }
 }
 
-// Handle requests from AI Agent
-async function handleAgentRequest(data) {
-  try {
-    const { type, payload } = data;
-    
-    // Lazy import DataFacade to avoid circular dependencies
-    const { dataFacade } = await import('../DataFacade.js');
-    
-    switch (type) {
-      case 'agent_resource_query':
-        await dataFacade.handleAgentResourceQuery(payload);
-        break;
-        
-      case 'agent_draft_creation':
-        await dataFacade.handleAgentDraftCreation(payload);
-        break;
-        
-      case 'agent_draft_update':
-        await dataFacade.handleAgentDraftUpdate(payload);
-        break;
-        
-      case 'agent_draft_commit':
-        await dataFacade.handleAgentDraftCommit(payload);
-        break;
-        
-      case 'agent_draft_cancel':
-        await dataFacade.handleAgentDraftCancel(payload);
-        break;
-        
-      case 'agent_draft_list':
-        await dataFacade.handleAgentDraftList(payload);
-        break;
-        
-      default:
-        // Unknown agent request type
-    }
-  } catch (error) {
-    // Error handling agent request
-    
-    // Send error response back to agent
-    try {
-      const { dataFacade } = await import('../DataFacade.js');
-      dataFacade.sendWebSocketMessage('agent_request_error', {
-        type: data.type,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
-    } catch (importError) {
-      // Failed to import DataFacade for error response
-    }
-  }
-}
+
 
 

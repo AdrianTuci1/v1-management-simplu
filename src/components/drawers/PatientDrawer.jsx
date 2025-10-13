@@ -13,11 +13,14 @@ import {
   Clock,
   X,
   Upload,
-  Image
+  Image,
+  ClipboardList,
+  FileText
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
 import appointmentService from '../../services/appointmentService.js'
+import PlanService from '../../services/planService.js'
 import { useDrawer } from '../../contexts/DrawerContext.jsx'
 import { 
   Drawer, 
@@ -26,7 +29,7 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
-import TeethChartTab from '../dental-chart/TeethChartTab'
+import FullscreenTreatmentPlan from '../dental-chart/FullscreenTreatmentPlan'
 import { normalizePhoneNumber } from '../../utils/phoneUtils.js'
 
 const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, position = "side", externalCurrentMenu, onExternalMenuChange }) => {
@@ -44,16 +47,25 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     if (onExternalMenuChange) {
       onExternalMenuChange(id)
     }
+    // Închide planul de tratament când se schimbă meniul
+    if (showTreatmentPlan) {
+      setShowTreatmentPlan(false)
+      setTreatmentPlanOpen(false)
+      setTreatmentPlanPatientId(null)
+    }
   }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [newTag, setNewTag] = useState('')
   const [appointments, setAppointments] = useState([])
   const [appointmentsLoading, setAppointmentsLoading] = useState(false)
+  const [showTreatmentPlan, setShowTreatmentPlan] = useState(false)
+  const [planItems, setPlanItems] = useState([])
+  const [planLoading, setPlanLoading] = useState(false)
   
   // Hook pentru gestionarea pacienților
   const { addPatient, updatePatient, deletePatient } = usePatients()
-  const { openDrawer } = useDrawer()
+  const { openDrawer, setTreatmentPlanOpen, setTreatmentPlanPatientId } = useDrawer()
   
   const [formData, setFormData] = useState(() => {
     if (patientData) {
@@ -107,6 +119,30 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
 
     loadAppointments()
   }, [patientData?.id])
+
+  // Load plan when patient data changes or when treatment plan closes
+  useEffect(() => {
+    const loadPlan = async () => {
+      if (patientData?.id) {
+        setPlanLoading(true)
+        try {
+          const patientId = patientData.resourceId || patientData.id
+          const planService = new PlanService()
+          const plan = await planService.getPlan(patientId)
+          setPlanItems(plan)
+        } catch (error) {
+          console.error('Error loading plan:', error)
+          setPlanItems([])
+        } finally {
+          setPlanLoading(false)
+        }
+      } else {
+        setPlanItems([])
+      }
+    }
+
+    loadPlan()
+  }, [patientData?.id, showTreatmentPlan])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -390,16 +426,119 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     </div>
   )
 
-  const renderDentalNotes = () => (
-    <div className="space-y-4">
-      <div className="text-sm font-medium text-muted-foreground">
-        Note dentare
-      </div>
-      <div className="">
-        <TeethChartTab patientId={String(patientData?.id || patientData?.resourceId || '')} />
-      </div>
-    </div>
-  )
+  const renderDentalNotes = () => {
+    if (!patientData?.id && !patientData?.resourceId) {
+      return (
+        <div className="space-y-4">
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">
+              Salvează pacientul mai întâi pentru a putea accesa planul de tratament.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium text-muted-foreground">
+              Plan de tratament
+            </div>
+            <button
+              onClick={() => {
+                setShowTreatmentPlan(true)
+                setTreatmentPlanOpen(true)
+                setTreatmentPlanPatientId(String(patientData?.id || patientData?.resourceId || ''))
+              }}
+              className="btn btn-primary btn-sm"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {planItems.length > 0 ? 'Editează planul' : 'Crează plan nou'}
+            </button>
+          </div>
+          
+          {planLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+              <p className="text-slate-500">Se încarcă planul...</p>
+            </div>
+          ) : planItems.length > 0 ? (
+            <div className="space-y-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium text-gray-900">Plan de tratament activ</h4>
+                  <span className="text-sm text-blue-600">{planItems.length} tratamente</span>
+                </div>
+                <div className="space-y-2">
+                  {planItems.slice(0, 5).map((item, index) => (
+                    <div key={item.id} className="flex items-start gap-2 text-sm">
+                      <span className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
+                        {index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">
+                            Dinte {item.toothNumber}
+                          </span>
+                          <span className="text-gray-700 truncate">
+                            {item.title}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+                          {item.durationMinutes && (
+                            <span>{item.durationMinutes} min</span>
+                          )}
+                          {item.price && (
+                            <span>{item.price} RON</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {planItems.length > 5 && (
+                    <div className="text-center pt-2">
+                      <button
+                        onClick={() => {
+                          setShowTreatmentPlan(true)
+                          setTreatmentPlanOpen(true)
+                          setTreatmentPlanPatientId(String(patientData?.id || patientData?.resourceId || ''))
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        +{planItems.length - 5} tratamente suplimentare
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="text-xs text-muted-foreground">
+                Click pe "Editează planul" pentru a modifica ordinea tratamentelor sau pentru a adăuga/șterge tratamente.
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <ClipboardList className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+              <p className="text-gray-500 mb-3">
+                Nu există încă un plan de tratament pentru acest pacient.
+              </p>
+              <button
+                onClick={() => {
+                  setShowTreatmentPlan(true)
+                  setTreatmentPlanOpen(true)
+                  setTreatmentPlanPatientId(String(patientData?.id || patientData?.resourceId || ''))
+                }}
+                className="btn btn-primary"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Crează plan nou
+              </button>
+            </div>
+          )}
+        </div>
+    );
+  }
 
   const renderAppointments = () => (
     <div className="space-y-4">
@@ -530,20 +669,15 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     }
   }
 
-  const navigationItems = [
-    { id: 1, label: 'Detalii pacient', icon: User },
-    { id: 2, label: 'Note dentare', icon: Pill },
-    { id: 3, label: 'Programări', icon: Calendar },
-    { id: 4, label: 'Galerie', icon: Image, disabled: isNewPatient }
-  ]
+
 
   return (
     <Drawer onClose={onClose} position={position}>
-      <DrawerHeader
-        title={isNewPatient ? 'Pacient nou' : 'Editare pacient'}
-        subtitle={isNewPatient ? 'Adaugă un pacient nou în sistem' : 'Modifică informațiile pacientului'}
-        onClose={onClose}
-      />
+        <DrawerHeader
+          title={isNewPatient ? 'Pacient nou' : 'Editare pacient'}
+          subtitle={isNewPatient ? 'Adaugă un pacient nou în sistem' : 'Modifică informațiile pacientului'}
+          onClose={onClose}
+        />
       
       <DrawerContent>
         {error && (

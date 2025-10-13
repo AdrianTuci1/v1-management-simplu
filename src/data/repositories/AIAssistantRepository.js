@@ -67,9 +67,9 @@ export class AIAssistantRepository {
   }
 
   /**
-   * Încarcă istoricul mesajelor pentru o sesiune
+   * Încarcă istoricul mesajelor pentru o sesiune (conform ghidului)
    */
-  async loadMessageHistory(sessionId, limit = null, before = null) {
+  async loadMessageHistory(sessionId, limit = 50, before = null) {
     try {
       if (this.isDemoMode) {
         // În modul demo, returnează mesaje mock
@@ -79,7 +79,7 @@ export class AIAssistantRepository {
             sessionId: sessionId,
             content: 'Bună! Sunt AI Assistant-ul în modul demo. Cum vă pot ajuta astăzi?',
             timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-            type: 'assistant'
+            type: 'agent'
           }
         ];
         
@@ -97,15 +97,27 @@ export class AIAssistantRepository {
         endpoint += `?${params.toString()}`;
       }
       
-      const data = await aiApiRequest(endpoint);
-      const messages = data.messages || [];
-      
-      // Salvează mesajele în IndexedDB
-      if (messages.length > 0) {
-        await db.table(this.messagesStore).bulkPut(messages);
+      try {
+        // Conform ghidului, serverul returnează direct array-ul de mesaje
+        const messages = await aiApiRequest(endpoint);
+        const messagesArray = Array.isArray(messages) ? messages : [];
+        
+        console.log(`✅ Loaded ${messagesArray.length} messages for session ${sessionId}`);
+        
+        // Salvează mesajele în IndexedDB
+        if (messagesArray.length > 0) {
+          await db.table(this.messagesStore).bulkPut(messagesArray);
+        }
+        
+        return messagesArray;
+      } catch (error) {
+        // 404 înseamnă că nu există mesaje - normal pentru sesiuni noi
+        if (error.status === 404) {
+          console.log(`ℹ️ No messages found for session ${sessionId} (404)`);
+          return [];
+        }
+        throw error;
       }
-      
-      return messages;
     } catch (error) {
       console.error('Failed to load message history:', error);
       throw error;
@@ -177,7 +189,7 @@ export class AIAssistantRepository {
   }
 
   /**
-   * Obține sesiunea activă pentru un utilizator
+   * Obține sesiunea activă pentru un utilizator (conform ghidului)
    */
   async getActiveSessionForUser(businessId, userId) {
     try {
@@ -186,24 +198,50 @@ export class AIAssistantRepository {
           sessionId: 'demo-session-1',
           businessId: businessId,
           userId: userId,
-          startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          status: 'active'
+          locationId: getConfig('DEFAULTS.LOCATION_ID'),
+          status: 'active',
+          createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastMessageAt: new Date().toISOString(),
+          metadata: {
+            businessType: 'dental',
+            context: {}
+          }
         };
       }
 
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${businessId}/user/${userId}/active`;
-      const data = await aiApiRequest(endpoint);
       
-      // Server returns session object directly, not wrapped
-      return data || null;
+      try {
+        const session = await aiApiRequest(endpoint);
+        
+        if (session && session.sessionId) {
+          console.log(`✅ Found active session: ${session.sessionId}`);
+          return session;
+        } else {
+          console.log('ℹ️ No active session found');
+          return null;
+        }
+      } catch (error) {
+        // 404 înseamnă că nu există sesiune activă - normal
+        if (error.status === 404) {
+          console.log('ℹ️ No active session found (404)');
+          return null;
+        }
+        throw error;
+      }
     } catch (error) {
       console.error('Failed to get active session for user:', error);
+      // Nu aruncăm eroare pentru sesiuni lipsă
+      if (error.status === 404) {
+        return null;
+      }
       throw error;
     }
   }
 
   /**
-   * Obține istoricul sesiunilor pentru un utilizator
+   * Obține istoricul sesiunilor pentru un utilizator (conform ghidului)
    */
   async getUserSessionHistory(businessId, userId, limit = 20) {
     try {
@@ -213,19 +251,29 @@ export class AIAssistantRepository {
             sessionId: 'demo-session-1',
             businessId: businessId,
             userId: userId,
-            startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-            endTime: null,
+            locationId: getConfig('DEFAULTS.LOCATION_ID'),
             status: 'active',
-            messageCount: 5
+            createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+            updatedAt: new Date().toISOString(),
+            lastMessageAt: new Date().toISOString(),
+            metadata: {
+              businessType: 'dental',
+              context: {}
+            }
           },
           {
             sessionId: 'demo-session-2',
             businessId: businessId,
             userId: userId,
-            startTime: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-            endTime: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-            status: 'resolved',
-            messageCount: 12
+            locationId: getConfig('DEFAULTS.LOCATION_ID'),
+            status: 'closed',
+            createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+            updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+            lastMessageAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+            metadata: {
+              businessType: 'dental',
+              context: {}
+            }
           }
         ];
         
@@ -236,16 +284,39 @@ export class AIAssistantRepository {
       }
 
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/business/${businessId}/user/${userId}/history?limit=${limit}`;
-      const data = await aiApiRequest(endpoint);
       
-      // Server returns array directly, wrap it for consistency
-      const sessions = Array.isArray(data) ? data : [];
-      return {
-        sessions,
-        total: sessions.length
-      };
+      try {
+        const data = await aiApiRequest(endpoint);
+        
+        // Conform ghidului, serverul returnează direct array-ul de sesiuni
+        const sessions = Array.isArray(data) ? data : [];
+        
+        console.log(`✅ Loaded ${sessions.length} sessions for user ${userId}`);
+        
+        return {
+          sessions,
+          total: sessions.length
+        };
+      } catch (error) {
+        // 404 înseamnă că nu există istoric - normal pentru utilizatori noi
+        if (error.status === 404) {
+          console.log(`ℹ️ No session history found for user ${userId} (404)`);
+          return {
+            sessions: [],
+            total: 0
+          };
+        }
+        throw error;
+      }
     } catch (error) {
       console.error('Failed to get user session history:', error);
+      // Nu aruncăm eroare pentru istoric lipsă
+      if (error.status === 404) {
+        return {
+          sessions: [],
+          total: 0
+        };
+      }
       throw error;
     }
   }
@@ -279,7 +350,7 @@ export class AIAssistantRepository {
   }
 
   /**
-   * Obține o sesiune specifică după ID
+   * Obține o sesiune specifică după ID (conform ghidului)
    */
   async getSessionById(sessionId) {
     try {
@@ -288,18 +359,35 @@ export class AIAssistantRepository {
           sessionId: sessionId,
           businessId: 'demo-business',
           userId: 'demo-user',
-          startTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          endTime: null,
+          locationId: getConfig('DEFAULTS.LOCATION_ID'),
           status: 'active',
-          messageCount: 5
+          createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastMessageAt: new Date().toISOString(),
+          metadata: {
+            businessType: 'dental',
+            context: {}
+          }
         };
       }
 
       const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/${sessionId}`;
-      const data = await aiApiRequest(endpoint);
       
-      // Server returns session object directly, not wrapped
-      return data || null;
+      try {
+        const session = await aiApiRequest(endpoint);
+        
+        console.log(`✅ Loaded session: ${sessionId}`);
+        
+        // Conform ghidului, serverul returnează direct obiectul sesiunii
+        return session || null;
+      } catch (error) {
+        // 404 înseamnă că sesiunea nu există
+        if (error.status === 404) {
+          console.log(`ℹ️ Session not found: ${sessionId} (404)`);
+          return null;
+        }
+        throw error;
+      }
     } catch (error) {
       console.error('Failed to get session by ID:', error);
       throw error;
