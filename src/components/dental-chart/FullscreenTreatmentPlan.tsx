@@ -196,20 +196,25 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
         
         // Always load chart treatments for potential import
         const dentalHistory = await dentalHistoryService.getDentalHistory(patientId);
+        console.log(`📋 Loaded dental history for plan (${dentalHistory.length} teeth):`, dentalHistory);
+        
         const chartItems: PlanItem[] = [];
         
         // Add treatments from chart (with specific tooth)
         dentalHistory.forEach((tooth: any) => {
-          const treatments = tooth.treatments || (tooth as any).history || [];
+          const treatments = tooth.treatments || [];
           if (Array.isArray(treatments) && treatments.length > 0) {
             treatments.forEach((treatment: any) => {
+              const duration = treatment.duration || treatment.durationMinutes;
+              const price = treatment.price;
+              
               chartItems.push({
                 id: `chart-${tooth.toothNumber}-${treatment.id || Math.random()}`,
                 toothNumber: tooth.toothNumber,
-                title: treatment.name || treatment.description || "Tratament",
-                durationMinutes: treatment.duration || null,
-                price: null,
-                notes: "",
+                title: treatment.name || treatment.title || treatment.description || "Tratament",
+                durationMinutes: duration ? (typeof duration === 'string' ? parseInt(duration) : Number(duration)) : null,
+                price: price ? (typeof price === 'string' ? parseFloat(price) : Number(price)) : null,
+                notes: treatment.notes || "",
                 isNew: false,
                 treatmentId: treatment.id,
                 isFromChart: true,
@@ -217,20 +222,26 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
             });
           }
         });
+        
+        console.log(`✅ Extracted ${chartItems.length} treatments from dental chart for plan`);
 
         // Add general treatments (tooth 0) with numbers from 100 up
         const generalTooth = dentalHistory.find((tooth: any) => tooth.toothNumber === 0);
         if (generalTooth) {
           const generalTreatments = generalTooth.treatments || [];
           if (Array.isArray(generalTreatments) && generalTreatments.length > 0) {
+            console.log(`📋 Found ${generalTreatments.length} general treatments (tooth 0)`);
             generalTreatments.forEach((treatment: any, index: number) => {
+              const duration = treatment.duration || treatment.durationMinutes;
+              const price = treatment.price;
+              
               chartItems.push({
                 id: `chart-general-${treatment.id || Math.random()}`,
                 toothNumber: 100 + index, // Numbers from 100 up for general treatments
-                title: treatment.name || treatment.description || "Tratament general",
-                durationMinutes: treatment.duration || null,
-                price: null,
-                notes: "",
+                title: treatment.name || treatment.title || treatment.description || "Tratament general",
+                durationMinutes: duration ? (typeof duration === 'string' ? parseInt(duration) : Number(duration)) : null,
+                price: price ? (typeof price === 'string' ? parseFloat(price) : Number(price)) : null,
+                notes: treatment.notes || "",
                 isNew: false,
                 treatmentId: treatment.id,
                 isFromChart: true,
@@ -347,6 +358,16 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
         return;
       }
 
+      console.log("📄 === GENERATING PDF ===");
+      console.log("📄 Items to include in PDF:", items);
+      console.log("📄 Items breakdown:");
+      items.forEach((item, index) => {
+        console.log(`   ${index + 1}. Tooth ${item.toothNumber}: ${item.title}`);
+        console.log(`      - durationMinutes: ${item.durationMinutes}`);
+        console.log(`      - price: ${item.price}`);
+        console.log(`      - isFromChart: ${item.isFromChart}`);
+      });
+
       // Prepare data for PDF generation
       const treatmentPlanData = {
         clinic: {
@@ -372,15 +393,19 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
           doctorName: "", // Can be added if available
           clinicLocation: locationDetails?.address || "",
         },
-        treatments: items.map((item) => ({
-          id: item.id,
-          toothNumber: item.toothNumber,
-          title: item.title,
-          durationMinutes: item.durationMinutes,
-          price: item.price,
-          notes: item.notes,
-          isFromChart: item.isFromChart,
-        })),
+        treatments: items.map((item) => {
+          const treatment = {
+            id: item.id,
+            toothNumber: item.toothNumber,
+            title: item.title,
+            durationMinutes: item.durationMinutes,
+            price: item.price,
+            notes: item.notes,
+            isFromChart: item.isFromChart,
+          };
+          console.log(`📄 Mapping treatment for PDF:`, treatment);
+          return treatment;
+        }),
         labels: {
           title: "Plan de Tratament Dentar",
           patientInfo: "Informații Pacient",
@@ -401,6 +426,10 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
           generalTreatment: "General",
         }
       };
+
+      console.log("📄 Final treatmentPlanData for PDF:", treatmentPlanData);
+      console.log("📄 Treatments count:", treatmentPlanData.treatments.length);
+      console.log("📄 Total price:", treatmentPlanData.treatments.reduce((sum, t) => sum + (t.price || 0), 0));
 
       // Generate professional PDF using print-treatment-plan library
       printTreatmentPlanPDF(treatmentPlanData);
@@ -448,7 +477,7 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-6 h-full">
+          <div className="grid grid-cols-[1.5fr_1fr] gap-6 h-full">
             {/* Left Column - Treatment Plan */}
             <div className="space-y-6 overflow-y-auto">
             {error && (
@@ -608,7 +637,7 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
             </div>
 
             {/* Right Column - Dental Chart */}
-            <div className="bg-gray-50 rounded-lg p-4 overflow-y-auto">
+            <div id="dental-chart-container" className="flex flex-col bg-gray-50 rounded-lg p-4">
               <h3 className="text-base font-medium text-gray-900 mb-3">Chart dentar</h3>
               <TeethChartTab patientId={String(patientId)} />
             </div>

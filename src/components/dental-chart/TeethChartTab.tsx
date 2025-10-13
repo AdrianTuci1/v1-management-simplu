@@ -7,7 +7,6 @@ import Accordion from "./teeth/Accordion";
 import { Tooth } from "./teeth/Tooth"; // Import the Tooth class
 import { ToothCondition } from "./teeth/utils/toothCondition";
 import DentalHistoryService from "@/services/dentalHistoryService";
-import FullscreenTreatmentPlan from "./FullscreenTreatmentPlan";
 // import { useDrawer } from "@/contexts/DrawerContext";
 
 
@@ -23,7 +22,6 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
   >({});
   const [selectedTooth, setSelectedTooth] = useState<Tooth | null>(null);
   const [showCharts, setShowCharts] = useState<boolean>(false);
-  const [isPlanOpen, setIsPlanOpen] = useState<boolean>(false);
 
   const dentalHistoryService = new DentalHistoryService();
   // const { openDrawer } = useDrawer();
@@ -42,32 +40,69 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
 
   const handleSaveChanges = async () => {
     if (!hasChanges()) {
+      console.log("ℹ️ No changes detected, skipping save");
       return;
     }
 
     try {
-      const teethUpdates = Object.keys(teethConditions).map((toothNumber) => ({
-        toothNumber: String(toothNumber),
-        condition: teethConditions[Number(toothNumber)],
-        treatments: toothTreatments[Number(toothNumber)] || [],
-      }));
+      console.log("🦷 === START SAVE PROCESS ===");
+      console.log("🦷 Current tooth conditions:", teethConditions);
+      console.log("🦷 Current tooth treatments:", toothTreatments);
+      
+      // Combine all teeth that have either conditions OR treatments
+      const conditionKeys = Object.keys(teethConditions);
+      const treatmentKeys = Object.keys(toothTreatments);
+      
+      console.log("🦷 Condition keys:", conditionKeys);
+      console.log("🦷 Treatment keys:", treatmentKeys);
+      
+      const allTeethNumbers = new Set([
+        ...conditionKeys,
+        ...treatmentKeys
+      ]);
+      
+      console.log("🦷 Combined teeth numbers (Set):", Array.from(allTeethNumbers));
+
+      const teethUpdates = Array.from(allTeethNumbers).map((toothNumber) => {
+        const toothNum = Number(toothNumber);
+        const condition = teethConditions[toothNum] || "sound";
+        const treatments = toothTreatments[toothNum] || [];
+        
+        console.log(`🦷 Building update for tooth ${toothNumber}:`);
+        console.log(`   - toothNumber key in treatments: ${toothNum}`);
+        console.log(`   - condition: ${condition}`);
+        console.log(`   - treatments from state: ${JSON.stringify(treatments)}`);
+        console.log(`   - treatments length: ${treatments.length}`);
+        
+        const update = {
+          toothNumber: String(toothNumber),
+          condition: condition,
+          treatments: treatments,
+        };
+        console.log(`   - final update object:`, update);
+        return update;
+      });
 
       if (teethUpdates.length === 0) {
+        console.log("⚠️ No teeth updates to save");
         return;
       }
 
-      console.log("Saving teeth updates:", teethUpdates);
+      console.log("🦷 Final teeth updates array:", teethUpdates);
+      
       const updatedTeeth = await dentalHistoryService.bulkPatchDentalHistory(
         patientId,
         teethUpdates
       );
-      console.log("Updated Teeth:", updatedTeeth);
+      
+      console.log("✅ Updated Teeth saved:", updatedTeeth);
+      console.log("🦷 === END SAVE PROCESS ===");
 
       // Update initial state to match saved data
       initialTeethConditions.current = { ...teethConditions };
       initialToothTreatments.current = { ...toothTreatments };
     } catch (error) {
-      console.error("Failed to save changes:", error);
+      console.error("❌ Failed to save changes:", error);
     }
   };
 
@@ -76,6 +111,8 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
     const fetchData = async () => {
       try {
         const data = await dentalHistoryService.getDentalHistory(patientId);
+        console.log(`🦷 Fetched dental history for TeethChartTab (${data.length} teeth):`, data);
+        
         const conditions: Record<number, keyof typeof ToothCondition> = {};
         const treatments: Record<number, { id: string; name: string; duration?: number }[]> = {};
 
@@ -83,6 +120,8 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
           conditions[tooth.toothNumber] = tooth.condition;
           treatments[tooth.toothNumber] = tooth.treatments || [];
         });
+
+        console.log(`✅ Loaded ${Object.keys(conditions).length} tooth conditions and treatments`);
 
         setTeethConditions(conditions);
         setToothTreatments(treatments);
@@ -100,21 +139,32 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
 
   // Auto-save with debounce
   useEffect(() => {
+    console.log("🦷 Auto-save triggered. Current state:");
+    console.log("   - teethConditions:", teethConditions);
+    console.log("   - toothTreatments:", toothTreatments);
+    console.log("   - hasChanges():", hasChanges());
+    
     if (!hasChanges()) return;
 
+    console.log("⏱️ Changes detected, starting 2s countdown for auto-save...");
     const timeoutId = setTimeout(() => {
+      console.log("⏰ 2 seconds elapsed, calling handleSaveChanges...");
       handleSaveChanges();
     }, 2000); // Auto-save after 2 seconds of inactivity
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      console.log("🧹 Clearing auto-save timeout");
+      clearTimeout(timeoutId);
+    };
   }, [teethConditions, toothTreatments]);
 
   // Save changes when the component unmounts
   useEffect(() => {
     return () => {
+      console.log("🦷 Component unmounting, saving changes...");
       handleSaveChanges();
     };
-  }, []); // Empty dependency array to only run on unmount
+  }, [teethConditions, toothTreatments]); // Include dependencies to capture latest state
 
   const createTeeth = (startISO: number, endISO: number): Record<number, Tooth> => {
     const teeth: Record<number, Tooth> = {};
@@ -141,11 +191,29 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
     setSelectedTooth(null);
   };
 
+  // Block scroll on parent container when drawer is open
+  useEffect(() => {
+    const scrollContainer = document.getElementById('dental-chart-container');
+    if (scrollContainer) {
+      if (selectedTooth) {
+        scrollContainer.style.overflow = 'hidden';
+      } else {
+        scrollContainer.style.overflow = 'auto';
+      }
+    }
+    return () => {
+      if (scrollContainer) {
+        scrollContainer.style.overflow = 'auto';
+      }
+    };
+  }, [selectedTooth]);
+
 
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-none h-full">
       {/* Buttons moved outside the main container */}
+      <div className="overflow-none h-full">
       <div className="flex items-center justify-between">
         <label className="inline-flex items-center gap-2 text-sm">
           <input
@@ -159,7 +227,7 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
       </div>
 
       {/* Main content container */}
-      <div className="bg-white">
+      <div className="bg-white relative overflow-y-auto">
         {showCharts ? (
           <div className="space-y-4">
             <div className="border rounded-lg p-3">
@@ -200,6 +268,7 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
           </div>
         )}
       </div>
+      </div>
 
       <ToothDrawer
         selectedTooth={selectedTooth}
@@ -208,14 +277,8 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
         setTeethConditions={setTeethConditions}
         toothTreatments={toothTreatments}
         setToothTreatments={setToothTreatments}
-        position="side"
       />
 
-      <FullscreenTreatmentPlan
-        patientId={patientId}
-        isOpen={isPlanOpen}
-        onClose={() => setIsPlanOpen(false)}
-      />
     </div>
   );
 };

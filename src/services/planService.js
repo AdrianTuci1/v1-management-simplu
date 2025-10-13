@@ -1,20 +1,25 @@
+import { dataFacade } from "../data/DataFacade.js";
 import { apiRequest, buildResourcesEndpoint } from "../data/infrastructure/apiClient.js";
 
 /**
  * PlanService
  * Resource type: 'plan'
- * Uses unified resources API: /api/resources/{businessId}-{locationId}
- * Header: X-Resource-Type: plan
- * Searches plans by patientId using: GET /resources/businessId-locationId/search/data-field/patientId?fieldValue={id}&resourceType=plan
+ * Uses DataFacade for unified resource access
+ * Searches plans by patientId using DataFacade search methods
+ * Some special endpoints (PDF, send) still use apiRequest directly
  */
 class PlanService {
   constructor() {
     this.resourceType = "plan";
+    this.dataFacade = dataFacade;
   }
 
   /**
    * Get the plan for a specific patient.
-   * Uses the search endpoint to find plans by patientId field value.
+   * Uses DataFacade search to find plans by patientId field value.
+   * 
+   * NOTE: To get treatments from dental history, use DentalHistoryService.getTreatmentsForPlan()
+   * 
    * Returns an array of plan items: {
    *   id: string,
    *   toothNumber?: number | null,
@@ -30,23 +35,26 @@ class PlanService {
     if (!patientId) return [];
     
     try {
-      const endpoint = buildResourcesEndpoint(`/search/data-field/patientId`);
-      const query = new URLSearchParams({ 
-        fieldValue: String(patientId)
-      }).toString();
-      const url = `${endpoint}?${query}`;
+      const payload = await this.dataFacade.searchByField(
+        this.resourceType,
+        'patientId',
+        String(patientId),
+        1 // We only need the first result
+      );
       
-      const response = await apiRequest(this.resourceType, url, { method: "GET" });
-      const payload = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+      console.log(`📋 Plan search for patientId ${patientId}:`, payload);
       
       // If no plan found, return empty array
-      if (payload.length === 0) {
+      if (!payload || payload.length === 0) {
+        console.log(`ℹ️ No plan found for patient ${patientId}`);
         return [];
       }
       
       // Get the first plan (should be only one per patient)
       const planData = payload[0];
       const items = planData?.data?.plan || planData?.plan || [];
+      
+      console.log(`✅ Found plan with ${items.length} items for patient ${patientId}`);
       
       return items.map((item, index) => ({
         id: String(item.id || `${Date.now()}-${index}`),
@@ -76,11 +84,9 @@ class PlanService {
     if (!patientId) return null;
     
     try {
-      // First, try to get existing plan
-      const existingPlans = await this.getPlan(patientId);
-      
+      // Prepare data with patientId (IMPORTANT: patientId must be in data field for searchByField to work)
       const planData = {
-        patientId: String(patientId),
+        patientId: String(patientId),  // This will be saved as data.patientId
         plan: items.map((item, index) => ({
           id: item.id,
           toothNumber: item.toothNumber,
@@ -96,41 +102,40 @@ class PlanService {
         updatedAt: new Date().toISOString(),
       };
 
-      if (existingPlans.length > 0) {
-        // Update existing plan
-        const endpoint = buildResourcesEndpoint(`/search/data-field/patientId`);
-        const query = new URLSearchParams({ 
-          fieldValue: String(patientId)
-        }).toString();
-        const searchUrl = `${endpoint}?${query}`;
+      console.log(`📋 Saving plan for patientId ${patientId} with ${items.length} items`);
+
+      // Search for existing plan
+      const existingPlans = await this.dataFacade.searchByField(
+        this.resourceType,
+        'patientId',
+        String(patientId),
+        1
+      );
+      
+      if (existingPlans && existingPlans.length > 0) {
+        const existingPlan = existingPlans[0];
+        const existingPlanId = existingPlan?.resourceId || existingPlan?.id;
         
-        const searchResponse = await apiRequest(this.resourceType, searchUrl, { method: "GET" });
-        const existingPlan = searchResponse?.data?.[0] || searchResponse?.[0];
-        
-        if (existingPlan?.id) {
-          const updateEndpoint = buildResourcesEndpoint(`/${existingPlan.id}`);
-          const body = JSON.stringify({ 
-            data: planData
-          });
-          
-          const response = await apiRequest(this.resourceType, updateEndpoint, { 
-            method: "PUT", 
-            body 
-          });
+        if (existingPlanId) {
+          // Update existing plan - use resourceId, not id!
+          console.log(`📝 Updating existing plan record with resourceId: ${existingPlanId}`);
+          const response = await this.dataFacade.update(
+            this.resourceType,
+            existingPlanId,
+            { data: planData }
+          );
+          console.log(`✅ Plan updated successfully`);
           return response;
         }
       }
       
       // Create new plan
-      const endpoint = buildResourcesEndpoint("");
-      const body = JSON.stringify({ 
-        data: planData
-      });
-      
-      const response = await apiRequest(this.resourceType, endpoint, { 
-        method: "POST", 
-        body 
-      });
+      console.log(`✨ Creating new plan record for patient ${patientId}`);
+      const response = await this.dataFacade.create(
+        this.resourceType,
+        { data: planData }
+      );
+      console.log(`✅ Plan created successfully`);
       return response;
       
     } catch (error) {
@@ -146,19 +151,23 @@ class PlanService {
     if (!patientId) return { success: false };
     
     try {
-      const endpoint = buildResourcesEndpoint(`/search/data-field/patientId`);
-      const query = new URLSearchParams({ 
-        fieldValue: String(patientId)
-      }).toString();
-      const searchUrl = `${endpoint}?${query}`;
+      // Search for existing plan
+      const existingPlans = await this.dataFacade.searchByField(
+        this.resourceType,
+        'patientId',
+        String(patientId),
+        1
+      );
       
-      const searchResponse = await apiRequest(this.resourceType, searchUrl, { method: "GET" });
-      const existingPlan = searchResponse?.data?.[0] || searchResponse?.[0];
-      
-      if (existingPlan?.id) {
-        const deleteEndpoint = buildResourcesEndpoint(`/${existingPlan.id}`);
-        await apiRequest(this.resourceType, deleteEndpoint, { method: "DELETE" });
-        return { success: true };
+      if (existingPlans && existingPlans.length > 0) {
+        const existingPlan = existingPlans[0];
+        const existingPlanId = existingPlan?.resourceId || existingPlan?.id;
+        
+        if (existingPlanId) {
+          console.log(`🗑️ Deleting plan with resourceId: ${existingPlanId}`);
+          await this.dataFacade.delete(this.resourceType, existingPlanId);
+          return { success: true };
+        }
       }
       
       return { success: false, message: "Plan not found" };
