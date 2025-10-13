@@ -4,6 +4,9 @@ import DentalHistoryService from "@/services/dentalHistoryService";
 import TreatmentCombobox from "@/components/combobox/TreatmentCombobox.jsx";
 import { GripVertical, Trash2, Save, Download, Send } from "lucide-react";
 import { DrawerHeader, DrawerFooter, DrawerContent } from "@/components/ui/drawer";
+import { printTreatmentPlanPDF } from "@/utils/print-treatment-plan/app";
+import useSettingsStore from "@/stores/settingsStore";
+// import { usePatients } from "@/hooks/usePatients"; // Not needed - patient data not shown in PDF
 import {
   DndContext,
   closestCenter,
@@ -148,9 +151,12 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newTreatment, setNewTreatment] = useState<Partial<PlanItem>>({});
   const [hasExistingPlan, setHasExistingPlan] = useState<boolean>(false);
+  // const [patientData, setPatientData] = useState<any>(null); // Not needed - patient data not shown in PDF
 
   const planService = useMemo(() => new PlanService(), []);
   const dentalHistoryService = useMemo(() => new DentalHistoryService(), []);
+  const locationDetails = useSettingsStore((state: any) => state.locationDetails);
+  // const { getPatientById } = usePatients(); // Not needed
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -180,6 +186,10 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
       setIsLoading(true);
       setError("");
       try {
+        // Load patient data - NOT NEEDED, patient info not shown in PDF
+        // const patient = await getPatientById(patientId);
+        // setPatientData(patient);
+        
         // Load existing plan items
         const planItems = await planService.getPlan(patientId);
         setHasExistingPlan(planItems.length > 0);
@@ -331,52 +341,73 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
 
   const handlePreviewPdf = async () => {
     try {
-      // Try to use server-side PDF generation first
-      try {
-        const result = await planService.generatePdf(patientId, items);
-        if (result.pdfUrl) {
-          window.open(result.pdfUrl, '_blank');
-          return;
-        } else if (result.dataUrl) {
-          const link = document.createElement('a');
-          link.href = result.dataUrl;
-          link.download = 'plan-tratament.pdf';
-          link.click();
-          return;
-        }
-      } catch (serverError) {
-        console.log("Server PDF generation failed, falling back to client-side:", serverError);
+      // Validate required data
+      if (items.length === 0) {
+        setError("Nu există tratamente în plan pentru a genera PDF-ul.");
+        return;
       }
+
+      // Prepare data for PDF generation
+      const treatmentPlanData = {
+        clinic: {
+          name: locationDetails?.name || locationDetails?.companyName || "Clinica Dentară",
+          address: locationDetails?.address || "",
+          city: "", // Can be extracted from address if needed
+          email: locationDetails?.email || "",
+          phone: locationDetails?.phone || "",
+          website: locationDetails?.website || "",
+          cui: locationDetails?.cif || "",
+        },
+        patient: {
+          // Patient data not included in PDF for privacy
+          name: "",
+          dateOfBirth: "",
+          phone: "",
+          email: "",
+          cnp: "",
+        },
+        plan: {
+          date: new Date().toLocaleDateString('ro-RO'),
+          expiryDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString('ro-RO'), // 90 days validity
+          doctorName: "", // Can be added if available
+          clinicLocation: locationDetails?.address || "",
+        },
+        treatments: items.map((item) => ({
+          id: item.id,
+          toothNumber: item.toothNumber,
+          title: item.title,
+          durationMinutes: item.durationMinutes,
+          price: item.price,
+          notes: item.notes,
+          isFromChart: item.isFromChart,
+        })),
+        labels: {
+          title: "Plan de Tratament Dentar",
+          patientInfo: "Informații Pacient",
+          planDate: "Data planului",
+          expiryDate: "Valabilitate până la",
+          doctor: "Doctor",
+          toothNumber: "Dinte",
+          treatment: "Tratament",
+          duration: "Durată",
+          price: "Preț",
+          notes: "Note",
+          source: "Sursă",
+          total: "Total",
+          estimatedTotal: "Total Estimat",
+          footer: "Informații Clinică",
+          fromChart: "Chart",
+          manual: "Manual",
+          generalTreatment: "General",
+        }
+      };
+
+      // Generate professional PDF using print-treatment-plan library
+      printTreatmentPlanPDF(treatmentPlanData);
       
-      // Fallback to client-side PDF generation
-      const { default: jsPDF } = (await import("jspdf")) as any;
-      await import("jspdf-autotable");
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text("Plan de tratament", 14, 18);
-      
-      const rows = items.map((it, idx) => [
-        String(idx + 1),
-        it.toothNumber ? `Dinte ${it.toothNumber}` : "General",
-        it.title || "",
-        it.durationMinutes ? `${it.durationMinutes} min` : "",
-        it.price ? `${it.price} RON` : "",
-        it.notes || "",
-        it.isFromChart ? "Din chart" : "Manual",
-      ]);
-      
-      (doc as any).autoTable({
-        head: [["#", "Dintele", "Tratament", "Durata", "Preț", "Note", "Sursa"]],
-        body: rows,
-        startY: 24,
-        styles: { fontSize: 10 },
-        headStyles: { fillColor: [22, 163, 74] },
-      });
-      
-      doc.save("plan-tratament.pdf");
     } catch (e) {
       console.error("Error generating PDF:", e);
-      setError("Nu s-a putut genera PDF-ul.");
+      setError("Nu s-a putut genera PDF-ul. Vă rugăm încercați din nou.");
     }
   };
 
@@ -398,7 +429,7 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
   if (!isOpen) return null;
 
   return (
-    <div className="fixed top-0 right-0 bottom-0 z-[9997] p-2 pt-0 pr-16 w-[calc(100vw-25rem)]">
+    <div className="fixed top-0 right-0 bottom-0 z-[9997] p-2 pt-0 w-[calc(100vw-25em)]">
       <div className="bg-white w-full h-full rounded-lg border border-gray-200 shadow-xl flex flex-col">
       {/* Header */}
       <DrawerHeader

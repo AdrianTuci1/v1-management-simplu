@@ -349,9 +349,9 @@ function AppContent() {
         {/* Floating Drawer with External Navigation */}
         {drawerOpen && (
           <>
-            {/* External Navigation - stays visible and moves to the right edge */}
-            {(drawerContent?.type === 'appointment' || drawerContent?.type === 'new-person' || drawerContent?.type === 'edit-person') && (
-              <div className={`absolute top-20 z-40 transition-all duration-300 ${treatmentPlanOpen ? 'right-2' : 'right-[26rem]'}`}>
+            {/* External Navigation - hidden when treatment plan is open */}
+            {!treatmentPlanOpen && (drawerContent?.type === 'appointment' || drawerContent?.type === 'new-person' || drawerContent?.type === 'edit-person') && (
+              <div className="absolute top-20 right-[25rem] z-40 transition-all duration-300">
                 <DrawerExternalNavigation
                   items={getExternalNavigationItems(drawerContent?.type)}
                   activeItem={getCurrentNavigationItem(drawerContent?.type)}
