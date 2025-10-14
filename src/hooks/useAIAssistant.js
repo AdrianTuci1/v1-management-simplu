@@ -83,9 +83,10 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
         setError({ message, error });
       };
       
-      // Load today's session
+      // Load today's session (may return null if no session exists)
       if (aiServiceRef.current) {
-        await aiServiceRef.current.loadTodaySession();
+        const sessionId = await aiServiceRef.current.loadTodaySession();
+        setCurrentSessionId(sessionId);
       }
       
       // Connect to WebSocket only if not in demo mode
@@ -97,28 +98,68 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
           // Set up WebSocket event handlers AFTER connection
           Logger.log('info', 'Setting up WebSocket event handlers');
           
-          // Message handler - simplified to handle messages from current session
+          // Message handler - handles both complete and streaming messages
           webSocketRef.current.onMessageReceived = (newMessages) => {
+            if (!newMessages || newMessages.length === 0) {
+              Logger.log('warn', '⚠️ onMessageReceived called with empty messages');
+              return;
+            }
+            
             Logger.log('info', '🎯 Hook received messages from WebSocket', {
-              messageCount: newMessages?.length || 0,
-              messageSessionIds: newMessages?.map(m => m.sessionId) || []
+              messageCount: newMessages.length,
+              messageIds: newMessages.map(m => m.messageId),
+              messageSessionIds: newMessages.map(m => m.sessionId),
+              streamingStates: newMessages.map(m => ({ 
+                id: m.messageId, 
+                isStreaming: m.isStreaming,
+                isComplete: m.isComplete 
+              }))
             });
             
             setMessages(prev => {
-              const existingIds = new Set(prev.map(m => m.messageId));
+              // Process each new message
+              let updated = [...prev];
               
-              // Filter out duplicate messages
-              const filteredNew = newMessages.filter(m => !existingIds.has(m.messageId));
+              for (const newMessage of newMessages) {
+                const existingIndex = updated.findIndex(m => m.messageId === newMessage.messageId);
+                
+                if (existingIndex >= 0) {
+                  // Message exists - update it (for streaming or corrections)
+                  Logger.log('debug', '🔄 Updating existing message', {
+                    messageId: newMessage.messageId,
+                    wasStreaming: updated[existingIndex].isStreaming,
+                    nowStreaming: newMessage.isStreaming,
+                    wasComplete: updated[existingIndex].isComplete,
+                    nowComplete: newMessage.isComplete
+                  });
+                  
+                  updated[existingIndex] = newMessage;
+                } else {
+                  // New message - add it
+                  Logger.log('debug', '➕ Adding new message', {
+                    messageId: newMessage.messageId,
+                    isStreaming: newMessage.isStreaming,
+                    isComplete: newMessage.isComplete,
+                    contentLength: newMessage.content?.length
+                  });
+                  
+                  updated.push(newMessage);
+                }
+              }
               
               Logger.log('info', '✅ Messages processed in hook', {
                 originalCount: newMessages.length,
-                filteredCount: filteredNew.length,
-                totalCount: prev.length + filteredNew.length
+                totalCount: updated.length,
+                previousCount: prev.length,
+                added: updated.length - prev.length
               });
               
-              return [...prev, ...filteredNew];
+              return updated;
             });
           };
+          
+          // Streaming update handler - REMOVED to avoid duplicates
+          // Streaming messages are now handled directly through onMessageReceived
           
           // Connection status handler
           webSocketRef.current.onConnectionChange = (connected) => {
@@ -135,27 +176,49 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
 
           // Session update handler - handles session ID updates from WebSocket
           webSocketRef.current.onSessionUpdate = (payload) => {
-            Logger.log('info', '🔄 WebSocket session update received in hook', payload);
+            Logger.log('info', '🔄 WebSocket session update received in hook', {
+              payload,
+              hasSessionId: !!payload.sessionId,
+              sessionId: payload.sessionId,
+              currentSessionIdBefore: currentSessionId
+            });
             
             if (payload.sessionId) {
               const newSessionId = payload.sessionId;
               
-              // Update session ID in both services
-              setCurrentSessionId(newSessionId);
+              Logger.log('info', '📝 Updating session ID in all services', {
+                newSessionId,
+                oldSessionId: currentSessionId,
+                source: payload.metadata?.source
+              });
               
+              // Update session ID in state
+              setCurrentSessionId(newSessionId);
+              Logger.log('debug', '✅ Updated currentSessionId in state');
+              
+              // Update session ID in AI Assistant service (which will save to localStorage)
               if (aiServiceRef.current) {
                 aiServiceRef.current.updateSessionId(newSessionId);
+                Logger.log('debug', '✅ Updated sessionId in aiServiceRef');
+              } else {
+                Logger.log('warn', '⚠️ aiServiceRef.current is null');
               }
               
+              // Update session ID in WebSocket service
               if (webSocketRef.current) {
                 webSocketRef.current.setCurrentSessionId(newSessionId);
+                Logger.log('debug', '✅ Updated sessionId in webSocketRef');
+              } else {
+                Logger.log('warn', '⚠️ webSocketRef.current is null');
               }
               
-              Logger.log('info', '✅ Session ID updated in hook', { 
+              Logger.log('info', '✅ Session ID fully updated in hook and saved to localStorage', { 
                 sessionId: newSessionId,
                 source: payload.metadata?.source,
                 reason: payload.metadata?.reason
               });
+            } else {
+              Logger.log('warn', '⚠️ Session update payload has no sessionId', payload);
             }
           };
           
@@ -208,10 +271,11 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
 
     Logger.log('info', 'Sending message', { 
       content: content.substring(0, 50) + '...', 
-      currentSessionId, 
+      currentSessionId: currentSessionId || 'will_be_created', 
       isDemoMode,
       hasWebSocket: !!webSocketRef.current,
-      isConnected
+      isConnected,
+      isFirstMessage: !currentSessionId
     });
 
     setIsLoading(true);
@@ -221,13 +285,16 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
     const messageId = `user_${Date.now()}`;
     const userMessage = {
       messageId: messageId,
-      sessionId: currentSessionId,
+      sessionId: currentSessionId, // May be null for first message
       businessId: finalBusinessId,
       userId: finalUserId,
       content: content.trim(),
       type: 'user',
       timestamp: new Date().toISOString(),
-      metadata: { source: 'ui' }
+      metadata: { 
+        source: 'ui',
+        isFirstMessage: !currentSessionId
+      }
     };
 
     try {
@@ -235,28 +302,29 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       setMessages(prev => [...prev, userMessage]);
       Logger.log('info', '✅ User message added to UI', {
         messageId: userMessage.messageId,
-        sessionId: currentSessionId
+        sessionId: currentSessionId || 'pending',
+        isFirstMessage: !currentSessionId
       });
 
       // Try WebSocket first (if not in demo mode), fallback to API
       if (!isDemoMode && webSocketRef.current && isConnected) {
         Logger.log('info', '📤 Sending message via WebSocket', {
           content: content.substring(0, 50) + '...',
-          sessionId: currentSessionId
+          sessionId: currentSessionId || 'will_be_created'
         });
         
-        // Ensure WebSocket has current session ID
-        if (currentSessionId) {
-          webSocketRef.current.setCurrentSessionId(currentSessionId);
-        }
+        // Set current session ID in WebSocket (may be null for first message)
+        webSocketRef.current.setCurrentSessionId(currentSessionId);
         
         await webSocketRef.current.sendMessage(content.trim(), context);
         
-        Logger.log('info', '✅ Message sent via WebSocket');
+        Logger.log('info', '✅ Message sent via WebSocket', {
+          waitingForSessionId: !currentSessionId
+        });
       } else if (aiServiceRef.current) {
         Logger.log('info', '📤 Sending message via API (fallback)', {
           content: content.substring(0, 50) + '...',
-          sessionId: currentSessionId,
+          sessionId: currentSessionId || 'will_be_created',
           reason: isDemoMode ? 'demo mode' : !webSocketRef.current ? 'no websocket' : 'not connected'
         });
         
@@ -382,24 +450,23 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       
       const result = await aiServiceRef.current.startNewSession();
       
-      // Update session ID after service creates new session
-      const newSessionId = result.sessionId || aiServiceRef.current.currentSessionId;
-      setCurrentSessionId(newSessionId);
+      // Session ID is null - will be created on first message
+      Logger.log('info', '✅ New session prepared', { 
+        note: 'Session ID will be created on first message'
+      });
       
-      // Also update WebSocket service with new session ID
+      // Clear session ID in WebSocket service too
       if (webSocketRef.current) {
-        webSocketRef.current.setCurrentSessionId(newSessionId);
+        webSocketRef.current.setCurrentSessionId(null);
       }
       
-      // Optionally reload session history to include the new session
+      // Optionally reload session history
       try {
         const history = await aiServiceRef.current.loadSessionHistory(20);
         setSessionHistory(Array.isArray(history) ? history : []);
       } catch (historyError) {
-        Logger.log('warn', 'Could not reload session history after creating new session', historyError);
+        Logger.log('warn', 'Could not reload session history', historyError);
       }
-      
-      Logger.log('info', '✅ New session started', { sessionId: newSessionId });
       
       return result;
     } catch (error) {

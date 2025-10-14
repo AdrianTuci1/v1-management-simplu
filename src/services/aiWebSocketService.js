@@ -52,6 +52,9 @@ export class AIWebSocketService {
     this.heartbeatIntervalMs = getConfig('WEBSOCKET.HEARTBEAT_INTERVAL');
     this.lastCloseCode = null;
     
+    // Streaming message state
+    this.streamingMessages = new Map(); // Map<messageId, {content, metadata}>
+    
     // Event callbacks
     this.onMessageReceived = null;
     this.onConnectionChange = null;
@@ -59,6 +62,7 @@ export class AIWebSocketService {
     this.onReconnect = null;
     this.onSessionUpdate = null;
     this.onFunctionCall = null;
+    this.onStreamingUpdate = null; // New callback for streaming updates
     
     // DataFacade and SocketFacade integration
     this.dataFacade = dataFacade;
@@ -121,9 +125,42 @@ export class AIWebSocketService {
         this.onSessionUpdate?.(payload);
       };
       
-      this.aiAssistantInstance.onFunctionCall = (payload) => {
+      this.aiAssistantInstance.onFunctionCall = async (payload) => {
         Logger.log('info', '🔧 AI Assistant instance function call', payload);
-        this.onFunctionCall?.(payload);
+        
+        try {
+          // Execută function call prin DataFacade
+          const result = await this.dataFacade.executeAIFunctionCall(
+            payload,
+            (response) => {
+              // Trimite răspunsul înapoi către AI
+              this.aiAssistantInstance.sendFunctionResponse(
+                response.callId,
+                response.functionName,
+                response.success,
+                response.result,
+                response.error
+              );
+            }
+          );
+          
+          Logger.log('info', '✅ Function call executed successfully', result);
+          
+          // Notifică callback-ul extern dacă există
+          this.onFunctionCall?.(payload, result);
+          
+        } catch (error) {
+          Logger.log('error', '❌ Function call execution failed', error);
+          
+          // Trimite eroarea înapoi către AI
+          this.aiAssistantInstance.sendFunctionResponse(
+            payload.callId || `fc_${Date.now()}`,
+            payload.functionName,
+            false,
+            null,
+            error.message
+          );
+        }
       };
       
       // Now connect using SocketFacade
@@ -243,21 +280,23 @@ export class AIWebSocketService {
     
     const { type, data: payload } = data;
     
+    const messageId = payload?.message_id || payload?.messageId || payload?.payload?.message_id;
+    
     Logger.log('info', 'Processing worker message', { 
       type, 
+      messageId, // ← Log messageId para detectare duplicate
       payloadType: typeof payload,
-      payloadKeys: payload ? Object.keys(payload) : 'no payload',
-      payload: payload
+      payloadKeys: payload ? Object.keys(payload) : 'no payload'
     });
     
     switch (type) {
       case 'new_message':
-        Logger.log('info', 'Handling new_message type');
+        Logger.log('info', 'Handling new_message type', { messageId });
         this.handleNewMessage(payload);
         break;
         
       case 'ai_response':
-        Logger.log('info', 'Handling ai_response type');
+        Logger.log('info', 'Handling ai_response type', { messageId });
         this.handleAIResponse(payload);
         break;
         
@@ -286,11 +325,22 @@ export class AIWebSocketService {
     // Handle both direct payload and payload from event structure
     const messageData = payload.payload || payload;
     
+    // Extract streaming flags
+    const isChunk = messageData.isChunk || messageData.streaming?.isChunk || false;
+    const isComplete = messageData.isComplete || messageData.streaming?.isComplete || false;
+    
     // Try different field names for content (message, content)
     const content = messageData.content || messageData.message;
-    const responseId = messageData.responseId || messageData.message_id;
+    const responseId = messageData.responseId || messageData.message_id || messageData.messageId;
     const timestamp = messageData.timestamp;
-    const sessionId = messageData.sessionId || messageData.session_id;
+    
+    // Try multiple locations for sessionId
+    const sessionId = messageData.sessionId || 
+                     messageData.session_id || 
+                     messageData.session?.id ||
+                     messageData.session?.sessionId ||
+                     payload.session_id ||
+                     payload.sessionId;
     
     Logger.log('info', 'Extracted message data', {
       content: content ? content.substring(0, 100) + '...' : 'NO CONTENT',
@@ -298,54 +348,163 @@ export class AIWebSocketService {
       timestamp,
       sessionId,
       currentSessionId: this.currentSessionId,
-      hasContent: !!content
+      hasContent: !!content,
+      isChunk,
+      isComplete,
+      payloadKeys: Object.keys(messageData),
+      hasSessionInPayload: !!sessionId
     });
+    
+    // Capture session ID from first message if we don't have one yet
+    if (sessionId && !this.currentSessionId) {
+      Logger.log('info', '🆕 Captured session ID from first message', { 
+        sessionId,
+        source: 'new_message'
+      });
+      this.currentSessionId = sessionId;
+      
+      // Notify session update callback to trigger localStorage save
+      if (this.onSessionUpdate) {
+        this.onSessionUpdate({
+          sessionId: sessionId,
+          status: 'active',
+          metadata: {
+            source: 'first_message',
+            reason: 'Session ID captured from backend response'
+          }
+        });
+      }
+    } else if (sessionId && sessionId !== this.currentSessionId) {
+      // Update session ID if it changed
+      Logger.log('info', '🔄 Updating session ID from message', { 
+        oldSessionId: this.currentSessionId, 
+        newSessionId: sessionId 
+      });
+      this.currentSessionId = sessionId;
+      
+      // Notify session update
+      if (this.onSessionUpdate) {
+        this.onSessionUpdate({
+          sessionId: sessionId,
+          status: 'active',
+          metadata: {
+            source: 'message_update',
+            reason: 'Session ID changed in message'
+          }
+        });
+      }
+    }
     
     if (content) {
       // Use current session ID if not provided in payload
       const finalSessionId = sessionId || this.currentSessionId;
+      const messageId = responseId || `ai_${Date.now()}`;
       
-      const aiMessage = {
-        messageId: responseId || `ai_${Date.now()}`,
-        sessionId: finalSessionId,
-        businessId: this.businessId,
-        userId: 'agent',
-        content: content,
-        type: 'agent',
-        timestamp: timestamp || new Date().toISOString(),
-        metadata: { 
-          source: 'websocket', 
-          responseId: responseId,
-          context: messageData.context,
-          originalType: messageData.type
+      // Handle streaming chunks
+      if (isChunk) {
+        // This is a streaming chunk - concatenate with existing content
+        Logger.log('debug', '📦 Received streaming chunk', {
+          messageId,
+          chunkLength: content.length,
+          isComplete
+        });
+        
+        // Get or create streaming message
+        let streamingMessage = this.streamingMessages.get(messageId);
+        
+        if (!streamingMessage) {
+          // First chunk - create new streaming message
+          streamingMessage = {
+            messageId: messageId,
+            sessionId: finalSessionId,
+            businessId: this.businessId,
+            userId: 'agent',
+            content: content,
+            type: 'agent',
+            timestamp: timestamp || new Date().toISOString(),
+            isStreaming: !isComplete,
+            isComplete: isComplete,
+            metadata: { 
+              source: 'websocket', 
+              responseId: responseId,
+              context: messageData.context,
+              originalType: messageData.type,
+              streaming: true
+            }
+          };
+          
+          this.streamingMessages.set(messageId, streamingMessage);
+          
+          Logger.log('debug', '🆕 Created new streaming message', {
+            messageId,
+            contentLength: streamingMessage.content.length
+          });
+        } else {
+          // Subsequent chunk - concatenate content
+          streamingMessage.content += content;
+          streamingMessage.isComplete = isComplete;
+          streamingMessage.isStreaming = !isComplete;
+          
+          Logger.log('debug', '➕ Concatenated chunk to streaming message', {
+            messageId,
+            totalLength: streamingMessage.content.length,
+            isComplete
+          });
         }
-      };
-      
-      Logger.log('info', 'Created new message object', {
-        messageId: aiMessage.messageId,
-        sessionId: aiMessage.sessionId,
-        contentLength: aiMessage.content.length,
-        timestamp: aiMessage.timestamp
-      });
-      
-      // Update session ID if we received a new one
-      if (sessionId && sessionId !== this.currentSessionId) {
-        Logger.log('info', 'Updating session ID from new message', { 
-          oldSessionId: this.currentSessionId, 
-          newSessionId: sessionId 
-        });
-        this.currentSessionId = sessionId;
-      }
-      
-      if (this.onMessageReceived) {
-        Logger.log('info', 'Calling onMessageReceived callback for new message', { 
-          messageCount: 1,
-          sessionId: finalSessionId,
-          messageId: aiMessage.messageId
-        });
-        this.onMessageReceived([aiMessage]);
+        
+        // Notify UI about streaming update (only one callback)
+        if (this.onMessageReceived) {
+          this.onMessageReceived([streamingMessage]);
+          Logger.log('debug', '📤 Notified onMessageReceived for streaming chunk');
+        } else {
+          Logger.log('warn', 'onMessageReceived callback not set for streaming chunk');
+        }
+        
+        // If complete, remove from streaming messages map
+        if (isComplete) {
+          this.streamingMessages.delete(messageId);
+          Logger.log('info', '✅ Streaming message completed', {
+            messageId,
+            finalLength: streamingMessage.content.length
+          });
+        }
       } else {
-        Logger.log('warn', 'onMessageReceived callback not set for new message');
+        // Not a streaming chunk - handle as complete message
+        const aiMessage = {
+          messageId: messageId,
+          sessionId: finalSessionId,
+          businessId: this.businessId,
+          userId: 'agent',
+          content: content,
+          type: 'agent',
+          timestamp: timestamp || new Date().toISOString(),
+          isStreaming: false,
+          isComplete: true,
+          metadata: { 
+            source: 'websocket', 
+            responseId: responseId,
+            context: messageData.context,
+            originalType: messageData.type
+          }
+        };
+        
+        Logger.log('info', 'Created complete message object', {
+          messageId: aiMessage.messageId,
+          sessionId: aiMessage.sessionId,
+          contentLength: aiMessage.content.length,
+          timestamp: aiMessage.timestamp
+        });
+        
+        if (this.onMessageReceived) {
+          Logger.log('info', 'Calling onMessageReceived callback for complete message', { 
+            messageCount: 1,
+            sessionId: finalSessionId,
+            messageId: aiMessage.messageId
+          });
+          this.onMessageReceived([aiMessage]);
+        } else {
+          Logger.log('warn', 'onMessageReceived callback not set for complete message');
+        }
       }
     } else {
       Logger.log('warn', 'No content found in new message payload', payload);
@@ -368,7 +527,20 @@ export class AIWebSocketService {
     Logger.log('debug', 'Processing AI response payload', payload);
     
     // Extract data from the actual payload structure
-    const { content, message_id, session_id, timestamp, context, type } = payload;
+    const messageData = payload.payload || payload;
+    const content = messageData.content || messageData.message;
+    const message_id = messageData.message_id || messageData.messageId || messageData.responseId;
+    const timestamp = messageData.timestamp;
+    const context = messageData.context;
+    const type = messageData.type;
+    
+    // Try multiple locations for sessionId
+    const session_id = messageData.session_id || 
+                      messageData.sessionId || 
+                      messageData.session?.id ||
+                      messageData.session?.sessionId ||
+                      payload.session_id ||
+                      payload.sessionId;
     
     Logger.log('info', 'Extracted AI response data', {
       content: content ? content.substring(0, 100) + '...' : 'NO CONTENT',
@@ -376,8 +548,50 @@ export class AIWebSocketService {
       session_id,
       timestamp,
       currentSessionId: this.currentSessionId,
-      hasContent: !!content
+      hasContent: !!content,
+      payloadKeys: Object.keys(messageData),
+      hasSessionInPayload: !!session_id
     });
+    
+    // Capture session ID from first AI response if we don't have one yet
+    if (session_id && !this.currentSessionId) {
+      Logger.log('info', '🆕 Captured session ID from first AI response', { 
+        sessionId: session_id,
+        source: 'ai_response'
+      });
+      this.currentSessionId = session_id;
+      
+      // Notify session update callback to trigger localStorage save
+      if (this.onSessionUpdate) {
+        this.onSessionUpdate({
+          sessionId: session_id,
+          status: 'active',
+          metadata: {
+            source: 'first_response',
+            reason: 'Session ID captured from AI response'
+          }
+        });
+      }
+    } else if (session_id && session_id !== this.currentSessionId) {
+      // Update session ID if it changed
+      Logger.log('info', '🔄 Updating session ID from AI response', { 
+        oldSessionId: this.currentSessionId, 
+        newSessionId: session_id 
+      });
+      this.currentSessionId = session_id;
+      
+      // Notify session update
+      if (this.onSessionUpdate) {
+        this.onSessionUpdate({
+          sessionId: session_id,
+          status: 'active',
+          metadata: {
+            source: 'response_update',
+            reason: 'Session ID changed in AI response'
+          }
+        });
+      }
+    }
     
     if (content) {
       // Use current session ID if not provided in payload
@@ -405,15 +619,6 @@ export class AIWebSocketService {
         contentLength: aiMessage.content.length,
         timestamp: aiMessage.timestamp
       });
-      
-      // Update session ID if we received a new one
-      if (session_id && session_id !== this.currentSessionId) {
-        Logger.log('info', 'Updating session ID from AI response', { 
-          oldSessionId: this.currentSessionId, 
-          newSessionId: session_id 
-        });
-        this.currentSessionId = session_id;
-      }
       
       if (this.onMessageReceived) {
         Logger.log('info', 'Calling onMessageReceived callback for AI response', { 
@@ -534,19 +739,34 @@ export class AIWebSocketService {
     try {
       Logger.log('info', '📤 AIWebSocketService sending message', {
         content: content.substring(0, 50) + '...',
-        sessionId: this.currentSessionId,
-        hasContext: !!context
+        currentSessionId: this.currentSessionId,
+        sessionIdType: this.currentSessionId ? typeof this.currentSessionId : 'null',
+        hasContext: !!context,
+        isFirstMessage: !this.currentSessionId,
+        streamingMessagesCount: this.streamingMessages.size
       });
       
-      // Ensure session ID is set in instance
+      // Set session ID in instance only if we have one
+      // If currentSessionId is null, backend will create a new session
       if (this.currentSessionId && this.aiAssistantInstance) {
         this.aiAssistantInstance.setCurrentSessionId(this.currentSessionId);
+        Logger.log('info', '✅ Set session ID in AI instance', { 
+          sessionId: this.currentSessionId 
+        });
+      } else if (!this.currentSessionId && this.aiAssistantInstance) {
+        // Clear session ID in instance to force new session creation
+        this.aiAssistantInstance.setCurrentSessionId(null);
+        Logger.log('info', '🆕 Sending message without sessionId - backend will create new session');
       }
       
       // Send message directly through instance
       const success = this.aiAssistantInstance.sendMessage(content, context);
       
-      Logger.log('info', '✅ AIWebSocketService message sent', { success });
+      Logger.log('info', '✅ AIWebSocketService message sent', { 
+        success,
+        currentSessionId: this.currentSessionId,
+        willCaptureSessionId: !this.currentSessionId
+      });
       
       return success;
     } catch (error) {
@@ -634,6 +854,9 @@ export class AIWebSocketService {
     
     await this.disconnect();
     
+    // Clear streaming messages
+    this.streamingMessages.clear();
+    
     // Clear callbacks
     this.onMessageReceived = null;
     this.onConnectionChange = null;
@@ -641,6 +864,7 @@ export class AIWebSocketService {
     this.onReconnect = null;
     this.onSessionUpdate = null;
     this.onFunctionCall = null;
+    this.onStreamingUpdate = null;
     
     // Clear AI Assistant instance
     this.aiAssistantInstance = null;

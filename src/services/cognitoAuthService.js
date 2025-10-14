@@ -12,8 +12,7 @@ const poolData = {
 
 const userPool = new CognitoUserPool(poolData)
 
-// Cognito configuration
-const COGNITO_REGION = import.meta.env.VITE_COGNITO_REGION || 'eu-central-1'
+
 const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN || 'auth.simplu.io' // Custom domain or Cognito domain
 
 // Redirect URI MUST match EXACTLY what's configured in Cognito (including trailing slash!)
@@ -117,13 +116,86 @@ class CognitoAuthService {
   async checkAndRefreshToken() {
     // Skip if already refreshing to prevent multiple simultaneous refresh attempts
     if (this.isRefreshing) {
+      console.log('⏳ Already refreshing token, skipping...')
       return
     }
 
-    // Try to get current Cognito user (works for both email/password and Google OAuth through Cognito)
+    const isGoogleAuth = this.isGoogleAuth()
+    const authType = isGoogleAuth ? 'Google OAuth' : 'Email/Password'
+
+    // For Google OAuth, we don't rely on cognitoUser from the pool
+    // Instead, we use stored tokens and refresh via OAuth endpoint
+    if (isGoogleAuth) {
+      console.log(`🔍 Checking ${authType} token...`)
+      
+      try {
+        const savedCognitoData = localStorage.getItem('cognito-data')
+        if (!savedCognitoData) {
+          console.log('❌ No stored auth data found')
+          return
+        }
+
+        const userData = JSON.parse(savedCognitoData)
+        const idToken = userData.id_token
+        
+        if (!idToken) {
+          console.log('❌ No ID token found in stored data')
+          return
+        }
+
+        // Check if token is completely expired
+        if (this.isTokenExpired(idToken)) {
+          console.log('⚠️ Token is expired, attempting refresh...')
+          this.isRefreshing = true
+          try {
+            const refreshedSession = await this.refreshSession()
+            if (refreshedSession) {
+              console.log('✅ Token refreshed successfully after expiration')
+              return
+            }
+          } catch (refreshError) {
+            console.error('❌ Failed to refresh expired token:', refreshError)
+            console.log('🚪 Token refresh failed, redirecting to login')
+            await this.signOut()
+            window.location.href = '/login'
+            return
+          } finally {
+            this.isRefreshing = false
+          }
+        }
+        
+        // Check if token is expiring soon
+        if (this.isTokenExpiringSoon(idToken)) {
+          console.log(`🔄 Token ${authType} is expiring soon, refreshing...`)
+          this.isRefreshing = true
+          try {
+            await this.refreshSession()
+            console.log(`✅ Token ${authType} refreshed successfully`)
+          } catch (error) {
+            console.error(`❌ Failed to refresh ${authType} token:`, error)
+            console.log('🚪 Redirecting to login')
+            await this.signOut()
+            window.location.href = '/login'
+          } finally {
+            this.isRefreshing = false
+          }
+        }
+        
+        return
+      } catch (error) {
+        console.error('❌ Error checking/refreshing Google OAuth token:', error)
+        await this.signOut()
+        window.location.href = '/login'
+        return
+      }
+    }
+
+    // For Email/Password authentication, use Cognito SDK
+    console.log(`🔍 Checking ${authType} token...`)
+    
     const cognitoUser = userPool.getCurrentUser()
     if (!cognitoUser) {
-      // No Cognito user found, nothing to refresh
+      console.log('❌ No Cognito user found in pool')
       return
     }
 
@@ -137,7 +209,7 @@ class CognitoAuthService {
       })
 
       if (!session || !session.isValid()) {
-        console.log('Session is invalid, cannot refresh')
+        console.log('❌ Session is invalid, cannot refresh')
         return
       }
 
@@ -145,42 +217,34 @@ class CognitoAuthService {
       
       // Check if token is completely expired
       if (this.isTokenExpired(idToken)) {
-        console.log('Token is expired, attempting refresh...')
-        // Try to refresh the token using refresh token
+        console.log('⚠️ Token is expired, attempting refresh...')
+        this.isRefreshing = true
         try {
           const refreshedSession = await this.refreshSession()
           if (refreshedSession) {
-            console.log('✅ Token refreshed successfully')
+            console.log('✅ Token refreshed successfully after expiration')
             return
           }
         } catch (refreshError) {
-          console.error('Failed to refresh expired token:', refreshError)
+          console.error('❌ Failed to refresh expired token:', refreshError)
+          console.log('🚪 Token refresh failed, redirecting to login')
+          await this.signOut()
+          window.location.href = '/login'
+          return
+        } finally {
+          this.isRefreshing = false
         }
-        
-        // If refresh failed, user needs to re-authenticate
-        console.log('Token refresh failed, user needs to re-authenticate')
-        await this.signOut()
-        window.location.href = '/login'
-        return
       }
       
       // Check if token is expiring soon
       if (this.isTokenExpiringSoon(idToken)) {
-        const authProvider = this.isGoogleAuth() ? '(Google OAuth)' : '(Email/Password)'
-        console.log(`🔄 Token ${authProvider} is expiring soon, refreshing...`)
+        console.log(`🔄 Token ${authType} is expiring soon, refreshing...`)
         this.isRefreshing = true
         await this.refreshSession()
-        console.log(`✅ Token ${authProvider} refreshed successfully`)
+        console.log(`✅ Token ${authType} refreshed successfully`)
       }
     } catch (error) {
-      console.error('Error checking/refreshing token:', error)
-      // If refresh fails and we're using Google auth, user might need to re-authenticate
-      if (this.isGoogleAuth()) {
-        console.warn('⚠️ Google OAuth token refresh failed. User may need to sign in again.')
-        // For Google OAuth, if refresh fails, user needs to re-authenticate
-        await this.signOut()
-        window.location.href = '/login'
-      }
+      console.error(`❌ Error checking/refreshing ${authType} token:`, error)
     } finally {
       this.isRefreshing = false
     }
@@ -680,26 +744,43 @@ class CognitoAuthService {
 
   /**
    * Refresh the session
+   * For Google OAuth users, use OAuth2 token endpoint
+   * For email/password users, use Cognito SDK method
    * @returns {Promise<Object>}
    */
   async refreshSession() {
+    // Check if this is a Google OAuth user
+    const isGoogleAuth = this.isGoogleAuth()
+    
+    if (isGoogleAuth) {
+      console.log('🔄 Refreshing Google OAuth token via OAuth2 endpoint')
+      return this.refreshOAuthToken()
+    }
+
+    // Standard Cognito email/password refresh
+    console.log('🔄 Refreshing Cognito token via SDK')
     return new Promise((resolve, reject) => {
       const cognitoUser = userPool.getCurrentUser()
 
       if (!cognitoUser) {
+        console.error('❌ No current user found for refresh')
         reject(new Error('No current user'))
         return
       }
 
       cognitoUser.getSession((err, session) => {
         if (err) {
+          console.error('❌ Failed to get session for refresh:', err)
           reject(err)
           return
         }
 
         const refreshToken = session.getRefreshToken()
+        console.log('📝 Attempting to refresh session with refresh token')
+        
         cognitoUser.refreshSession(refreshToken, (err, session) => {
           if (err) {
+            console.error('❌ Refresh session failed:', err)
             reject(err)
             return
           }
@@ -719,10 +800,104 @@ class CognitoAuthService {
           localStorage.setItem('auth-token', userData.id_token)
           localStorage.setItem('cognito-data', JSON.stringify(userData))
 
+          console.log('✅ Cognito token refreshed successfully')
           resolve(userData)
         })
       })
     })
+  }
+
+  /**
+   * Refresh OAuth token using Cognito OAuth2 endpoint
+   * This is used for federated identity providers (Google, Facebook, etc.)
+   * @returns {Promise<Object>}
+   */
+  async refreshOAuthToken() {
+    try {
+      // Get stored refresh token
+      const savedCognitoData = localStorage.getItem('cognito-data')
+      if (!savedCognitoData) {
+        throw new Error('No stored auth data found')
+      }
+
+      const userData = JSON.parse(savedCognitoData)
+      if (!userData.refresh_token) {
+        throw new Error('No refresh token found')
+      }
+
+      console.log('📝 Refreshing OAuth token with grant_type=refresh_token')
+
+      // Build request body for token refresh
+      const requestBody = {
+        grant_type: 'refresh_token',
+        client_id: poolData.ClientId,
+        refresh_token: userData.refresh_token
+      }
+
+      // If client secret is provided, add it to the request
+      const clientSecret = import.meta.env.VITE_COGNITO_CLIENT_SECRET
+      if (clientSecret) {
+        requestBody.client_secret = clientSecret
+      }
+
+      console.log('🌐 Making refresh request to:', `https://${COGNITO_DOMAIN}/oauth2/token`)
+
+      // Call Cognito token endpoint
+      const tokenResponse = await fetch(`https://${COGNITO_DOMAIN}/oauth2/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams(requestBody)
+      })
+
+      console.log('📡 Refresh response status:', tokenResponse.status)
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text()
+        console.error('❌ Token refresh failed:', errorText)
+        try {
+          const errorJson = JSON.parse(errorText)
+          throw new Error(`Token refresh failed: ${errorJson.error || errorJson.message || 'Unknown error'}`)
+        } catch (e) {
+          throw new Error(`Token refresh failed: ${errorText}`)
+        }
+      }
+
+      const tokens = await tokenResponse.json()
+      console.log('✅ Token refresh successful, decoding new tokens')
+      
+      // Decode ID token to get user info
+      const payload = JSON.parse(atob(tokens.id_token.split('.')[1]))
+      
+      // Update stored authentication data
+      const newUserData = {
+        id_token: tokens.id_token,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token || userData.refresh_token, // Keep old refresh token if new one not provided
+        profile: {
+          email: payload.email,
+          name: payload.name || payload.email.split('@')[0],
+          sub: payload.sub,
+          picture: payload.picture,
+          provider: payload.identities ? payload.identities[0]?.providerName : 'cognito'
+        },
+        locations: userData.locations, // Preserve existing locations
+        isGoogleAuth: payload.identities && payload.identities[0]?.providerName === 'Google'
+      }
+
+      // Update localStorage
+      localStorage.setItem('auth-token', newUserData.id_token)
+      localStorage.setItem('cognito-data', JSON.stringify(newUserData))
+      localStorage.setItem('session-timestamp', Date.now().toString())
+
+      console.log('✅ OAuth token refreshed and stored successfully')
+
+      return newUserData
+    } catch (error) {
+      console.error('❌ OAuth token refresh error:', error)
+      throw error
+    }
   }
 
   /**
@@ -845,6 +1020,7 @@ class CognitoAuthService {
       localStorage.setItem('user-email', payload.email)
       localStorage.setItem('cognito-data', JSON.stringify(userData))
       localStorage.setItem('session-timestamp', Date.now().toString())
+      localStorage.setItem('remember-me', 'true') // Google OAuth users should stay logged in
       if (userData.isGoogleAuth) {
         localStorage.setItem('auth-provider', 'google')
       }
@@ -852,7 +1028,8 @@ class CognitoAuthService {
       console.log('✅ OAuth callback processed successfully:', {
         email: payload.email,
         name: payload.name,
-        provider: userData.profile.provider
+        provider: userData.profile.provider,
+        hasRefreshToken: !!userData.refresh_token
       })
 
       // Start token refresh monitoring

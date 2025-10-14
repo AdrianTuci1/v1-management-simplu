@@ -108,7 +108,8 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         service: uiData.service || '',
         serviceDuration: uiData.service?.duration || '',
         price: uiData.price || '',
-        status: uiData.status || appointmentData.status || 'scheduled'
+        status: uiData.status || appointmentData.status || 'scheduled',
+        mention: uiData.mention || appointmentData.mention || ''
       }
     }
     return {
@@ -121,7 +122,8 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       status: 'scheduled', // Statusul este întotdeauna 'scheduled' inițial
       postOperativeNotes: '',
       prescription: '',
-      price: ''
+      price: '',
+      mention: ''
     }
   })
 
@@ -547,6 +549,20 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
           className="w-full rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
       </div>
+
+      {/* Mention */}
+      {formData.mention !== undefined && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Mențiune</label>
+          <textarea
+            value={formData.mention}
+            onChange={(e) => handleInputChange('mention', e.target.value)}
+            placeholder="Introduceți mențiuni suplimentare..."
+            rows={2}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 pl-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          />
+        </div>
+      )}
 
       {/* Price */}
       <div className="space-y-2">

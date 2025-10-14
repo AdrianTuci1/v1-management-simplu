@@ -60,6 +60,9 @@ export class DataFacade {
     this.initializeInvokers();
     // Ensure SocketFacade is initialized once
     try { this.socketFacade.initialize(); } catch (_) {}
+    
+    // Connect AgentWebSocketHandler with DataFacade
+    agentWebSocketHandler.setDataFacade(this);
   }
 
   // ========================================
@@ -450,7 +453,17 @@ export class DataFacade {
    * @returns {Object} Statusul conexiunii
    */
   getAgentWebSocketStatus() {
-    return agentWebSocketHandler.getConnectionStatus();
+    return agentWebSocketHandler.getStatus();
+  }
+
+  /**
+   * Execută un AI function call prin AgentWebSocketHandler
+   * @param {Object} payload - Payload-ul de la AI
+   * @param {Function} responseCallback - Callback pentru răspuns
+   * @returns {Promise<Object>} Rezultatul execuției
+   */
+  async executeAIFunctionCall(payload, responseCallback = null) {
+    return await agentWebSocketHandler.executeAIFunctionCall(payload, responseCallback);
   }
 
 

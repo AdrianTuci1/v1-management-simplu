@@ -2,6 +2,14 @@ import { getConfig } from '../config/aiAssistantConfig';
 import { aiApiRequest } from '../data/infrastructure/apiClient.js';
 import { dataFacade } from '../data/DataFacade.js';
 import { socketFacade } from '../data/SocketFacade.js';
+import {
+  saveSessionToStorage,
+  loadSessionFromStorage,
+  removeSessionFromStorage,
+  getTodayKey,
+  hasTodaySession,
+  cleanupOldSessions
+} from '../utils/sessionStorage.js';
 
 // Logger utility
 class Logger {
@@ -59,6 +67,9 @@ export class AIAssistantService {
     this.socketFacade = socketFacade;
     
     Logger.log('info', 'AI Assistant Service initialized', { businessId, userId, locationId });
+    
+    // Cleanup old sessions from localStorage on initialization
+    cleanupOldSessions(this.businessId, this.userId, 30);
   }
 
 
@@ -117,50 +128,73 @@ export class AIAssistantService {
     }
   }
 
-  // Load today's session (updated to load latest session)
+  // Load today's session (updated to check localStorage first, then API)
   async loadTodaySession() {
     try {
-      Logger.log('info', 'Loading latest session');
+      Logger.log('info', '🔍 Loading today\'s session');
       
-      // First, try to get active session for user
+      // Step 1: Try to load session from localStorage for today
+      const storedSessionId = loadSessionFromStorage(this.businessId, this.userId);
+      
+      if (storedSessionId) {
+        Logger.log('info', '💾 Found stored session in localStorage', { 
+          sessionId: storedSessionId,
+          date: getTodayKey()
+        });
+        
+        // Try to verify and load this session from backend
+        try {
+          const sessionData = await this.getSessionById(storedSessionId);
+          
+          if (sessionData) {
+            // Session exists on backend, use it
+            this.currentSessionId = storedSessionId;
+            await this.loadMessageHistory(storedSessionId);
+            this.onSessionChange?.(storedSessionId);
+            
+            Logger.log('info', '✅ Loaded stored session from backend', { 
+              sessionId: storedSessionId 
+            });
+            
+            return this.currentSessionId;
+          }
+        } catch (error) {
+          // Session not found on backend or error occurred
+          Logger.log('warn', '⚠️ Stored session not found on backend, will create new one', { 
+            storedSessionId,
+            error: error.message 
+          });
+          
+          // Remove invalid session from localStorage
+          removeSessionFromStorage(this.businessId, this.userId);
+        }
+      }
+      
+      // Step 2: Try to get active session from backend
+      Logger.log('info', '🌐 No valid localStorage session, checking backend for active session');
       const activeSession = await this.loadActiveSession();
       
       if (activeSession) {
-        Logger.log('info', 'Active session found', { sessionId: this.currentSessionId });
-        return this.currentSessionId;
-      } else {
-        // No active session found, try to load the latest session from history
-        Logger.log('info', 'No active session found, loading latest session from history');
+        Logger.log('info', '✅ Active session found on backend', { sessionId: this.currentSessionId });
         
-        try {
-          const sessionHistory = await this.loadSessionHistory();
-          
-          if (sessionHistory && sessionHistory.length > 0) {
-            // Get the most recent session (first in the list)
-            const latestSession = sessionHistory[0];
-            Logger.log('info', 'Latest session found', { 
-              sessionId: latestSession.sessionId,
-              createdAt: latestSession.createdAt,
-              messageCount: latestSession.messageCount 
-            });
-            
-            // Switch to the latest session
-            await this.switchToSession(latestSession.sessionId);
-            return this.currentSessionId;
-          } else {
-            // No sessions in history, create new one
-            Logger.log('info', 'No sessions in history, creating new session');
-            await this.startNewSession();
-            return this.currentSessionId;
-          }
-        } catch (historyError) {
-          Logger.log('warn', 'Failed to load session history, creating new session', historyError);
-          await this.startNewSession();
-          return this.currentSessionId;
-        }
+        // Save to localStorage for faster access next time
+        saveSessionToStorage(this.businessId, this.userId, this.currentSessionId);
+        
+        return this.currentSessionId;
       }
+      
+      // Step 3: No active session, prepare for new session (will be created on first message)
+      Logger.log('info', '🆕 No active session found, will create new session on first message');
+      
+      // Don't create a temp session ID here - let the first message create it
+      this.currentSessionId = null;
+      this.messageHistory = [];
+      this.onMessageReceived?.([]);
+      this.onSessionChange?.(null);
+      
+      return null;
     } catch (error) {
-      Logger.log('error', 'Failed to load today session', error);
+      Logger.log('error', '❌ Failed to load today session', error);
       this.onError?.(getConfig('ERRORS.SESSION_LOAD_FAILED'), error);
       throw error;
     }
@@ -310,6 +344,11 @@ export class AIAssistantService {
     try {
       Logger.log('info', '🆕 Starting new session - will be created when first message is sent');
       
+      // Remove current session from localStorage if exists
+      if (this.currentSessionId) {
+        removeSessionFromStorage(this.businessId, this.userId);
+      }
+      
       // Clear current messages and session ID
       this.messageHistory = [];
       this.currentSessionId = null;
@@ -318,18 +357,13 @@ export class AIAssistantService {
       this.onMessageReceived?.([]);
       this.onSessionChange?.(null);
       
-      // Generate a temporary session ID that will be replaced by backend when first message is sent
-      const tempSessionId = `temp_${Date.now()}`;
-      this.currentSessionId = tempSessionId;
-      
-      Logger.log('info', '✅ New session prepared with temp ID', { 
-        tempSessionId,
-        note: 'Real session ID will be received from backend after first message'
+      Logger.log('info', '✅ New session prepared', { 
+        note: 'Session ID will be received from backend after first message'
       });
       
       return { 
         success: true, 
-        sessionId: tempSessionId,
+        sessionId: null,
         message: 'Session will be created when first message is sent via WebSocket'
       };
     } catch (error) {
@@ -354,6 +388,9 @@ export class AIAssistantService {
       
       // Send session loaded event via SocketFacade
       this.socketFacade.sendAIAssistantSessionLoaded(this.businessId, this.userId, sessionId, this.locationId);
+      
+      // Save to localStorage for today (only if this is today's session)
+      saveSessionToStorage(this.businessId, this.userId, sessionId);
       
       // Notify session change
       this.onSessionChange?.(sessionId);
@@ -464,6 +501,9 @@ export class AIAssistantService {
         // Send session loaded event via SocketFacade
         this.socketFacade.sendAIAssistantSessionLoaded(this.businessId, this.userId, sessionId, this.locationId);
         
+        // Save to localStorage for today
+        saveSessionToStorage(this.businessId, this.userId, sessionId);
+        
         // Notify session change
         this.onSessionChange?.(sessionId);
       }
@@ -484,26 +524,42 @@ export class AIAssistantService {
     }
 
     try {
-      // Note: This would need to be implemented based on your backend API
-      // For now, we'll just clear the current session
       const sessionId = this.currentSessionId;
       
-      Logger.log('info', 'Session closed', { 
+      Logger.log('info', '🔒 Closing session', { 
         sessionId, 
         status 
       });
 
+      // Try to mark session as resolved on backend if endpoint exists
+      try {
+        const endpoint = `${getConfig('API_ENDPOINTS.SESSIONS')}/${sessionId}/close`;
+        await aiApiRequest(endpoint, {
+          method: 'POST',
+          body: JSON.stringify({ status })
+        });
+        Logger.log('info', '✅ Session marked as closed on backend');
+      } catch (error) {
+        // Endpoint might not exist yet, just log and continue
+        Logger.log('warn', '⚠️ Could not mark session as closed on backend', error);
+      }
+
       // Send session closed event via SocketFacade
       this.socketFacade.sendAIAssistantSessionClosed(sessionId, status);
+
+      // Remove from localStorage
+      removeSessionFromStorage(this.businessId, this.userId);
 
       // Clear current session
       this.currentSessionId = null;
       this.messageHistory = [];
       this.onSessionChange?.(null);
       
+      Logger.log('info', '✅ Session closed locally and removed from storage');
+      
       return { sessionId, status };
     } catch (error) {
-      Logger.log('error', 'Failed to close session', error);
+      Logger.log('error', '❌ Failed to close session', error);
       this.onError?.('Failed to close session', error);
       throw error;
     }
@@ -585,39 +641,45 @@ export class AIAssistantService {
       Logger.log('warn', '⚠️ Attempted to update session ID with null/undefined value');
       return;
     }
-
-    // Check if this is a real session ID replacing a temp one
-    const isTempSession = this.currentSessionId && this.currentSessionId.startsWith('temp_');
-    const isRealSession = !newSessionId.startsWith('temp_');
+    
+    Logger.log('info', '🔄 updateSessionId called', {
+      newSessionId,
+      oldSessionId: this.currentSessionId,
+      businessId: this.businessId,
+      userId: this.userId,
+      willUpdate: newSessionId !== this.currentSessionId
+    });
     
     if (newSessionId !== this.currentSessionId) {
-      Logger.log('info', '🔄 Session ID updated from WebSocket', { 
+      Logger.log('info', '📝 Updating session ID from WebSocket', { 
         oldSessionId: this.currentSessionId, 
-        newSessionId,
-        wasTemp: isTempSession,
-        isReal: isRealSession
+        newSessionId
       });
       
       this.currentSessionId = newSessionId;
-      this.onSessionChange?.(newSessionId);
+      Logger.log('debug', '✅ Set this.currentSessionId');
       
-      // Send session loaded event if this is a new real session
-      if (isTempSession && isRealSession) {
-        this.socketFacade.sendAIAssistantSessionLoaded(
-          this.businessId, 
-          this.userId, 
-          newSessionId, 
-          this.locationId
-        );
-        Logger.log('info', '✅ Session loaded event sent for new real session');
-      }
+      this.onSessionChange?.(newSessionId);
+      Logger.log('debug', '✅ Called onSessionChange callback');
+      
+      // Save new session to localStorage for today
+      const saved = saveSessionToStorage(this.businessId, this.userId, newSessionId);
+      Logger.log('debug', `${saved ? '✅' : '❌'} saveSessionToStorage result: ${saved}`);
+      
+      Logger.log('info', '✅ New session ID saved to localStorage', {
+        sessionId: newSessionId,
+        date: getTodayKey(),
+        businessId: this.businessId,
+        userId: this.userId,
+        saved
+      });
+    } else {
+      Logger.log('debug', '⏭️ Session ID unchanged, skipping update');
     }
   }
 
   // Get current session info (utility method)
   getCurrentSessionInfo() {
-    const isTemp = this.currentSessionId && this.currentSessionId.startsWith('temp_');
-    
     return {
       sessionId: this.currentSessionId,
       businessId: this.businessId,
@@ -625,19 +687,14 @@ export class AIAssistantService {
       locationId: this.locationId,
       messageCount: this.messageHistory.length,
       lastMessage: this.messageHistory[this.messageHistory.length - 1] || null,
-      isTemporary: isTemp,
-      isReal: !isTemp && !!this.currentSessionId
+      hasSession: !!this.currentSessionId,
+      date: getTodayKey()
     };
   }
 
   // Check if session is active (utility method)
   hasActiveSession() {
-    return !!this.currentSessionId && !this.currentSessionId.startsWith('temp_');
-  }
-
-  // Check if session is temporary (waiting for real session ID)
-  hasTemporarySession() {
-    return !!this.currentSessionId && this.currentSessionId.startsWith('temp_');
+    return !!this.currentSessionId;
   }
 
   // Get message by ID (utility method)

@@ -248,6 +248,66 @@ export class WebSocketAIAssistant {
   }
 
   /**
+   * Gestionează AI function calls
+   */
+  async handleFunctionCall(payload) {
+    Logger.log('info', '🔧 Received AI function call', payload);
+    
+    try {
+      // Notifică callback-ul dacă există
+      if (this.onFunctionCall) {
+        // Callback-ul va executa funcția și va returna răspunsul
+        await this.onFunctionCall(payload);
+      } else {
+        Logger.log('warn', '⚠️ No onFunctionCall callback set - function call ignored');
+      }
+    } catch (error) {
+      Logger.log('error', '❌ Error handling function call', error);
+    }
+  }
+
+  /**
+   * Trimite răspunsul unui function call înapoi către AI
+   */
+  sendFunctionResponse(callId, functionName, success, result = null, error = null) {
+    if (this.isDemoMode) {
+      Logger.log('info', 'Demo mode: Function response simulated');
+      return true;
+    }
+
+    if (!this.isConnected || !this.worker) {
+      Logger.log('error', 'Cannot send function response - WebSocket not connected');
+      return false;
+    }
+
+    try {
+      const response = {
+        callId,
+        functionName,
+        success,
+        result,
+        error,
+        timestamp: new Date().toISOString()
+      };
+
+      this.worker.postMessage({
+        type: 'send',
+        data: {
+          event: 'function_response',
+          payload: response
+        }
+      });
+
+      Logger.log('info', '✅ Function response sent to AI', { callId, functionName, success });
+      
+      return true;
+    } catch (error) {
+      Logger.log('error', '❌ Failed to send function response', error);
+      return false;
+    }
+  }
+
+  /**
    * Gestionează mesajele noi de la WebSocket (cu suport pentru streaming)
    */
   handleNewMessage(payload) {

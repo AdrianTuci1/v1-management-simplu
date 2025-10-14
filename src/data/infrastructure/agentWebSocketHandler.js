@@ -1,454 +1,317 @@
 /**
- * AgentWebSocketHandler - Gestionează comunicarea cu agenții prin WebSocket
+ * AgentWebSocketHandler - Gestionează AI function calls și le execută prin DataFacade
  * 
- * Acest handler permite:
- * - Autentificarea agenților
- * - Executarea comenzilor de la agenți
- * - Modificarea query-urilor din aplicație
- * - Gestionarea aprobării/respingării schimbărilor
+ * Flow:
+ * 1. AI trimite ai_function_call prin WebSocket
+ * 2. websocketAiAssistant.handleFunctionCall() primește payload
+ * 3. Se apelează agentWebSocketHandler.executeAIFunctionCall()
+ * 4. Se execută prin DataFacade
+ * 5. Se returnează răspunsul către AI prin WebSocket
  */
 
 import { db } from './db.js';
-import { draftManager } from './draftManager.js';
 
 export class AgentWebSocketHandler {
   constructor() {
+    this.dataFacade = null; // Va fi injectat de DataFacade
     this.authenticatedAgents = new Map();
+    this.pendingFunctionCalls = new Map(); // functionCallId -> { resolve, reject, timestamp }
     this.messageHandlers = new Map();
-    this.websocket = null;
-    this.isConnected = false;
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.reconnectDelay = 1000;
     
     this.initializeMessageHandlers();
   }
 
   // ========================================
-  // WEBSOCKET CONNECTION
+  // INITIALIZATION
   // ========================================
 
   /**
-   * Conectează la WebSocket pentru agenți
-   * @param {string} url - URL-ul WebSocket-ului
-   * @param {Object} options - Opțiuni de conexiune
+   * Setează DataFacade pentru executarea comenzilor
+   * @param {DataFacade} dataFacade - Instanța DataFacade
    */
-  async connect(url, options = {}) {
-    try {
-      this.websocket = new WebSocket(url);
-      
-      this.websocket.onopen = (event) => {
-        console.log('Agent WebSocket connected');
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        this.onConnectionOpen(event);
-      };
-      
-      this.websocket.onmessage = (event) => {
-        this.handleMessage(event);
-      };
-      
-      this.websocket.onclose = (event) => {
-        console.log('Agent WebSocket disconnected');
-        this.isConnected = false;
-        this.onConnectionClose(event);
-      };
-      
-      this.websocket.onerror = (error) => {
-        console.error('Agent WebSocket error:', error);
-        this.onConnectionError(error);
-      };
-      
-    } catch (error) {
-      console.error('Error connecting to Agent WebSocket:', error);
-      throw error;
-    }
+  setDataFacade(dataFacade) {
+    this.dataFacade = dataFacade;
+    console.log('✅ AgentWebSocketHandler: DataFacade connected');
   }
-
-  /**
-   * Deconectează de la WebSocket
-   */
-  disconnect() {
-    if (this.websocket) {
-      this.websocket.close();
-      this.websocket = null;
-      this.isConnected = false;
-    }
-  }
-
-  /**
-   * Trimite un mesaj prin WebSocket
-   * @param {string} event - Tipul evenimentului
-   * @param {Object} payload - Datele mesajului
-   */
-  sendMessage(event, payload) {
-    if (!this.isConnected || !this.websocket) {
-      console.warn('Agent WebSocket not connected');
-      return false;
-    }
-
-    try {
-      const message = {
-        event,
-        payload,
-        timestamp: new Date().toISOString()
-      };
-      
-      this.websocket.send(JSON.stringify(message));
-      return true;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      return false;
-    }
-  }
-
-  // ========================================
-  // MESSAGE HANDLING
-  // ========================================
 
   /**
    * Inițializează handler-ii pentru mesaje
    */
   initializeMessageHandlers() {
-    this.messageHandlers.set('agent_authenticate', this.handleAuthentication.bind(this));
-    this.messageHandlers.set('agent_execute_command', this.handleExecuteCommand.bind(this));
-    this.messageHandlers.set('agent_modify_query', this.handleModifyQuery.bind(this));
-    this.messageHandlers.set('agent_approve_changes', this.handleApproveChanges.bind(this));
-    this.messageHandlers.set('agent_reject_changes', this.handleRejectChanges.bind(this));
-    this.messageHandlers.set('agent_ping', this.handlePing.bind(this));
+    this.messageHandlers.set('createResource', this.handleCreateResource.bind(this));
+    this.messageHandlers.set('updateResource', this.handleUpdateResource.bind(this));
+    this.messageHandlers.set('deleteResource', this.handleDeleteResource.bind(this));
+    this.messageHandlers.set('getResource', this.handleGetResource.bind(this));
+    this.messageHandlers.set('queryResources', this.handleQueryResources.bind(this));
+    this.messageHandlers.set('searchResources', this.handleSearchResources.bind(this));
   }
 
+  // ========================================
+  // AI FUNCTION CALL EXECUTION
+  // ========================================
+
   /**
-   * Gestionează mesajele primite
-   * @param {MessageEvent} event - Evenimentul mesajului
+   * Execută un AI function call și returnează rezultatul
+   * @param {Object} payload - Payload-ul de la AI
+   * @param {Function} responseCallback - Callback pentru trimiterea răspunsului înapoi
+   * @returns {Promise<Object>} Rezultatul execuției
    */
-  async handleMessage(event) {
+  async executeAIFunctionCall(payload, responseCallback = null) {
+    const { functionName, parameters, callId, timestamp } = payload;
+    
+    console.log('🔧 AgentWebSocketHandler: Executing AI function call', {
+      functionName,
+      callId,
+      hasParameters: !!parameters
+    });
+
     try {
-      const message = JSON.parse(event.data);
-      const { event: eventType, payload, timestamp } = message;
+      // Verifică dacă DataFacade este disponibil
+      if (!this.dataFacade) {
+        throw new Error('DataFacade not initialized');
+      }
+
+      // Loghează apelul funcției în DB
+      const functionCall = {
+        id: callId || `fc_${Date.now()}`,
+        functionName,
+        parameters,
+        timestamp: timestamp || new Date().toISOString(),
+        status: 'executing'
+      };
       
-      console.log('Received agent message:', eventType, payload);
+      await db.table('aiFunctionCalls').add(functionCall).catch(() => {
+        // Ignoră eroarea dacă tabela nu există
+        console.warn('Could not log function call to DB');
+      });
+
+      // Execută funcția prin handler specific
+      const handler = this.messageHandlers.get(functionName);
+      let result;
       
-      const handler = this.messageHandlers.get(eventType);
       if (handler) {
-        await handler(payload);
+        result = await handler(parameters);
       } else {
-        console.warn('Unknown agent message type:', eventType);
+        throw new Error(`Unknown function: ${functionName}`);
       }
-    } catch (error) {
-      console.error('Error handling agent message:', error);
-    }
-  }
 
-  // ========================================
-  // AGENT AUTHENTICATION
-  // ========================================
-
-  /**
-   * Gestionează autentificarea agenților
-   * @param {Object} payload - Datele de autentificare
-   */
-  async handleAuthentication(payload) {
-    try {
-      const { sessionId, agentId, apiKey, permissions } = payload;
-      
-      // Verifică cheia API (în producție, ar trebui să fie validată cu serverul)
-      const isValidKey = await this.validateApiKey(apiKey);
-      if (!isValidKey) {
-        this.sendMessage('agent_auth_failed', { 
-          sessionId, 
-          reason: 'Invalid API key' 
-        });
-        return;
-      }
-      
-      // Creează sesiunea agentului
-      const agentSession = {
-        id: `agent_session_${Date.now()}`,
-        sessionId,
-        agentId,
-        permissions: permissions || [],
-        createdAt: new Date().toISOString(),
-        lastActivity: new Date().toISOString()
-      };
-      
-      await db.table('agentSessions').add(agentSession);
-      
-      // Adaugă agentul la lista de agenți autentificați
-      this.authenticatedAgents.set(sessionId, agentSession);
-      
-      this.sendMessage('agent_auth_success', { 
-        sessionId, 
-        agentId,
-        permissions: agentSession.permissions
-      });
-      
-      console.log(`Agent ${agentId} authenticated successfully`);
-      
-    } catch (error) {
-      console.error('Error handling agent authentication:', error);
-      this.sendMessage('agent_auth_failed', { 
-        sessionId: payload.sessionId, 
-        reason: 'Authentication error' 
-      });
-    }
-  }
-
-  /**
-   * Validează cheia API (placeholder - în producție ar trebui validată cu serverul)
-   * @param {string} apiKey - Cheia API
-   * @returns {Promise<boolean>} True dacă cheia este validă
-   */
-  async validateApiKey(apiKey) {
-    // Placeholder - în producție ar trebui să valideze cu serverul
-    return apiKey && apiKey.length > 10;
-  }
-
-  // ========================================
-  // COMMAND EXECUTION
-  // ========================================
-
-  /**
-   * Execută comenzi de la agenți
-   * @param {Object} payload - Datele comenzii
-   */
-  async handleExecuteCommand(payload) {
-    try {
-      const { sessionId, commandId, repositoryType, operation, data } = payload;
-      
-      // Verifică dacă agentul este autentificat
-      if (!this.authenticatedAgents.has(sessionId)) {
-        this.sendMessage('agent_command_failed', { 
-          sessionId, 
-          commandId, 
-          reason: 'Agent not authenticated' 
-        });
-        return;
-      }
-      
-      // Salvează comanda în baza de date
-      const agentCommand = {
-        id: `command_${Date.now()}`,
-        sessionId,
-        commandId,
-        repositoryType,
-        operation,
-        data,
-        timestamp: new Date().toISOString(),
-        status: 'pending'
-      };
-      
-      await db.table('agentCommands').add(agentCommand);
-      
-      // Execută comanda (placeholder - în producție ar trebui să execute comanda reală)
-      const result = await this.executeCommand(operation, repositoryType, data);
-      
-      // Actualizează statusul comenzii
-      await db.table('agentCommands').update(agentCommand.id, { 
+      // Actualizează statusul în DB
+      await db.table('aiFunctionCalls').update(functionCall.id, {
         status: 'completed',
-        result 
+        result,
+        completedAt: new Date().toISOString()
+      }).catch(() => {});
+
+      console.log('✅ AgentWebSocketHandler: Function call executed successfully', {
+        functionName,
+        callId,
+        hasResult: !!result
       });
-      
-      this.sendMessage('agent_command_completed', { 
-        sessionId, 
-        commandId, 
-        result 
-      });
-      
+
+      // Trimite răspunsul înapoi prin callback dacă există
+      if (responseCallback) {
+        responseCallback({
+          callId: functionCall.id,
+          functionName,
+          success: true,
+          result,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return {
+        success: true,
+        result,
+        callId: functionCall.id
+      };
+
     } catch (error) {
-      console.error('Error executing agent command:', error);
-      this.sendMessage('agent_command_failed', { 
-        sessionId: payload.sessionId, 
-        commandId: payload.commandId, 
-        reason: error.message 
+      console.error('❌ AgentWebSocketHandler: Function call failed', {
+        functionName,
+        callId,
+        error: error.message
       });
+
+      // Loghează eroarea în DB
+      await db.table('aiFunctionCalls').update(callId || `fc_${Date.now()}`, {
+        status: 'failed',
+        error: error.message,
+        completedAt: new Date().toISOString()
+      }).catch(() => {});
+
+      // Trimite eroarea înapoi prin callback dacă există
+      if (responseCallback) {
+        responseCallback({
+          callId: callId || `fc_${Date.now()}`,
+          functionName,
+          success: false,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return {
+        success: false,
+        error: error.message,
+        callId: callId || `fc_${Date.now()}`
+      };
     }
   }
 
+  // ========================================
+  // RESOURCE HANDLERS
+  // ========================================
+
   /**
-   * Execută o comandă (placeholder)
-   * @param {string} operation - Operațiunea
-   * @param {string} repositoryType - Tipul repository-ului
-   * @param {Object} data - Datele
-   * @returns {Promise<Object>} Rezultatul comenzii
+   * Handler pentru createResource
+   * @param {Object} parameters - { resourceType, data }
    */
-  async executeCommand(operation, repositoryType, data) {
-    // Placeholder - în producție ar trebui să execute comanda reală
+  async handleCreateResource(parameters) {
+    const { resourceType, data } = parameters;
+    
+    console.log('📝 Creating resource:', resourceType, data);
+    
+    if (!resourceType || !data) {
+      throw new Error('Missing resourceType or data');
+    }
+
+    const result = await this.dataFacade.create(resourceType, data);
+    
     return {
-      success: true,
-      operation,
-      repositoryType,
-      data,
-      timestamp: new Date().toISOString()
+      operation: 'create',
+      resourceType,
+      resource: result
     };
   }
 
-  // ========================================
-  // QUERY MODIFICATION
-  // ========================================
-
   /**
-   * Modifică query-urile din aplicație
-   * @param {Object} payload - Datele modificării
+   * Handler pentru updateResource
+   * @param {Object} parameters - { resourceType, id, data }
    */
-  async handleModifyQuery(payload) {
-    try {
-      const { sessionId, repositoryType, modifications } = payload;
-      
-      // Verifică dacă agentul este autentificat
-      if (!this.authenticatedAgents.has(sessionId)) {
-        this.sendMessage('agent_query_modification_failed', { 
-          sessionId, 
-          reason: 'Agent not authenticated' 
-        });
-        return;
-      }
-      
-      // Salvează modificarea query-ului
-      const queryModification = {
-        id: `query_mod_${Date.now()}`,
-        sessionId,
-        repositoryType,
-        modifications,
-        timestamp: new Date().toISOString(),
-        status: 'pending'
-      };
-      
-      await db.table('agentQueryModifications').add(queryModification);
-      
-      // Aplică modificarea (placeholder - în producție ar trebui să aplice modificarea reală)
-      const result = await this.applyQueryModification(repositoryType, modifications);
-      
-      this.sendMessage('agent_query_modified', { 
-        sessionId, 
-        repositoryType, 
-        result 
-      });
-      
-    } catch (error) {
-      console.error('Error modifying query:', error);
-      this.sendMessage('agent_query_modification_failed', { 
-        sessionId: payload.sessionId, 
-        reason: error.message 
-      });
+  async handleUpdateResource(parameters) {
+    const { resourceType, id, data } = parameters;
+    
+    console.log('✏️ Updating resource:', resourceType, id);
+    
+    if (!resourceType || !id || !data) {
+      throw new Error('Missing resourceType, id, or data');
     }
-  }
 
-  /**
-   * Aplică modificarea query-ului (placeholder)
-   * @param {string} repositoryType - Tipul repository-ului
-   * @param {Object} modifications - Modificările
-   * @returns {Promise<Object>} Rezultatul modificării
-   */
-  async applyQueryModification(repositoryType, modifications) {
-    // Placeholder - în producție ar trebui să aplice modificarea reală
+    const result = await this.dataFacade.update(resourceType, id, data);
+    
     return {
-      success: true,
-      repositoryType,
-      modifications,
-      timestamp: new Date().toISOString()
+      operation: 'update',
+      resourceType,
+      id,
+      resource: result
     };
   }
 
-  // ========================================
-  // CHANGE APPROVAL
-  // ========================================
-
   /**
-   * Gestionează aprobarea schimbărilor
-   * @param {Object} payload - Datele aprobării
+   * Handler pentru deleteResource
+   * @param {Object} parameters - { resourceType, id }
    */
-  async handleApproveChanges(payload) {
-    try {
-      const { sessionId, resourceType, resourceId, operation } = payload;
-      
-      // Verifică dacă agentul este autentificat
-      if (!this.authenticatedAgents.has(sessionId)) {
-        this.sendMessage('agent_approval_failed', { 
-          sessionId, 
-          reason: 'Agent not authenticated' 
-        });
-        return;
-      }
-      
-      // Creează log-ul de management
-      const managementLog = {
-        id: `log_${Date.now()}`,
-        resourceType,
-        resourceId,
-        operation,
-        oldData: null, // Ar trebui să fie populat cu datele vechi
-        newData: null, // Ar trebui să fie populat cu datele noi
-        timestamp: new Date().toISOString(),
-        approvedBy: sessionId,
-        status: 'approved'
-      };
-      
-      await db.table('managementLog').add(managementLog);
-      
-      this.sendMessage('agent_approval_success', { 
-        sessionId, 
-        resourceType, 
-        resourceId, 
-        operation 
-      });
-      
-    } catch (error) {
-      console.error('Error approving changes:', error);
-      this.sendMessage('agent_approval_failed', { 
-        sessionId: payload.sessionId, 
-        reason: error.message 
-      });
+  async handleDeleteResource(parameters) {
+    const { resourceType, id } = parameters;
+    
+    console.log('🗑️ Deleting resource:', resourceType, id);
+    
+    if (!resourceType || !id) {
+      throw new Error('Missing resourceType or id');
     }
+
+    const result = await this.dataFacade.delete(resourceType, id);
+    
+    return {
+      operation: 'delete',
+      resourceType,
+      id,
+      success: result
+    };
   }
 
   /**
-   * Gestionează respingerea schimbărilor
-   * @param {Object} payload - Datele respingerii
+   * Handler pentru getResource
+   * @param {Object} parameters - { resourceType, id }
    */
-  async handleRejectChanges(payload) {
-    try {
-      const { sessionId, resourceType, resourceId, operation, reason } = payload;
-      
-      // Verifică dacă agentul este autentificat
-      if (!this.authenticatedAgents.has(sessionId)) {
-        this.sendMessage('agent_rejection_failed', { 
-          sessionId, 
-          reason: 'Agent not authenticated' 
-        });
-        return;
-      }
-      
-      // Creează log-ul de management
-      const managementLog = {
-        id: `log_${Date.now()}`,
-        resourceType,
-        resourceId,
-        operation,
-        oldData: null,
-        newData: null,
-        timestamp: new Date().toISOString(),
-        approvedBy: sessionId,
-        status: 'rejected',
-        reason
-      };
-      
-      await db.table('managementLog').add(managementLog);
-      
-      this.sendMessage('agent_rejection_success', { 
-        sessionId, 
-        resourceType, 
-        resourceId, 
-        operation 
-      });
-      
-    } catch (error) {
-      console.error('Error rejecting changes:', error);
-      this.sendMessage('agent_rejection_failed', { 
-        sessionId: payload.sessionId, 
-        reason: error.message 
-      });
+  async handleGetResource(parameters) {
+    const { resourceType, id } = parameters;
+    
+    console.log('🔍 Getting resource:', resourceType, id);
+    
+    if (!resourceType || !id) {
+      throw new Error('Missing resourceType or id');
     }
+
+    const result = await this.dataFacade.getById(resourceType, id);
+    
+    return {
+      operation: 'get',
+      resourceType,
+      id,
+      resource: result
+    };
+  }
+
+  /**
+   * Handler pentru queryResources
+   * @param {Object} parameters - { resourceType, params }
+   */
+  async handleQueryResources(parameters) {
+    const { resourceType, params = {} } = parameters;
+    
+    console.log('📋 Querying resources:', resourceType, params);
+    
+    if (!resourceType) {
+      throw new Error('Missing resourceType');
+    }
+
+    const result = await this.dataFacade.getAll(resourceType, params);
+    
+    return {
+      operation: 'query',
+      resourceType,
+      params,
+      resources: result,
+      count: result?.length || 0
+    };
+  }
+
+  /**
+   * Handler pentru searchResources
+   * @param {Object} parameters - { resourceType, searchField, searchTerm, limit, additionalFilters }
+   */
+  async handleSearchResources(parameters) {
+    const { 
+      resourceType, 
+      searchField, 
+      searchTerm, 
+      limit = 50, 
+      additionalFilters = {} 
+    } = parameters;
+    
+    console.log('🔎 Searching resources:', resourceType, searchField, searchTerm);
+    
+    if (!resourceType || !searchField || !searchTerm) {
+      throw new Error('Missing resourceType, searchField, or searchTerm');
+    }
+
+    const result = await this.dataFacade.searchByField(
+      resourceType,
+      searchField,
+      searchTerm,
+      limit,
+      additionalFilters
+    );
+    
+    return {
+      operation: 'search',
+      resourceType,
+      searchField,
+      searchTerm,
+      resources: result,
+      count: result?.length || 0
+    };
   }
 
   // ========================================
@@ -456,86 +319,31 @@ export class AgentWebSocketHandler {
   // ========================================
 
   /**
-   * Gestionează ping-ul de la agenți
-   * @param {Object} payload - Datele ping-ului
+   * Obține statusul handler-ului
+   * @returns {Object} Status info
    */
-  async handlePing(payload) {
-    const { sessionId } = payload;
-    
-    // Actualizează activitatea agentului
-    if (this.authenticatedAgents.has(sessionId)) {
-      const agent = this.authenticatedAgents.get(sessionId);
-      agent.lastActivity = new Date().toISOString();
-      
-      await db.table('agentSessions').update(agent.id, { 
-        lastActivity: agent.lastActivity 
-      });
-    }
-    
-    this.sendMessage('agent_pong', { sessionId });
-  }
-
-  /**
-   * Gestionează deschiderea conexiunii
-   * @param {Event} event - Evenimentul de deschidere
-   */
-  onConnectionOpen(event) {
-    console.log('Agent WebSocket connection opened');
-    // Poți adăuga logică suplimentară aici
-  }
-
-  /**
-   * Gestionează închiderea conexiunii
-   * @param {Event} event - Evenimentul de închidere
-   */
-  onConnectionClose(event) {
-    console.log('Agent WebSocket connection closed');
-    
-    // Încearcă reconectarea dacă nu a fost o închidere intenționată
-    if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
-      setTimeout(() => {
-        this.reconnectAttempts++;
-        console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-        // Aici ar trebui să reconectezi
-      }, this.reconnectDelay * this.reconnectAttempts);
-    }
-  }
-
-  /**
-   * Gestionează erorile conexiunii
-   * @param {Event} error - Evenimentul de eroare
-   */
-  onConnectionError(error) {
-    console.error('Agent WebSocket connection error:', error);
-  }
-
-  /**
-   * Obține statusul conexiunii
-   * @returns {Object} Statusul conexiunii
-   */
-  getConnectionStatus() {
+  getStatus() {
     return {
-      isConnected: this.isConnected,
+      hasDataFacade: !!this.dataFacade,
+      availableFunctions: Array.from(this.messageHandlers.keys()),
       authenticatedAgents: this.authenticatedAgents.size,
-      reconnectAttempts: this.reconnectAttempts
+      pendingCalls: this.pendingFunctionCalls.size
     };
   }
 
   /**
-   * Obține lista agenților autentificați
-   * @returns {Array} Lista agenților
+   * Curăță apelurile vechi pendinte
    */
-  getAuthenticatedAgents() {
-    return Array.from(this.authenticatedAgents.values());
-  }
-
-  /**
-   * Verifică dacă un agent este autentificat
-   * @param {string} sessionId - ID-ul sesiunii
-   * @returns {boolean} True dacă agentul este autentificat
-   */
-  isAgentAuthenticated(sessionId) {
-    return this.authenticatedAgents.has(sessionId);
+  cleanupPendingCalls() {
+    const now = Date.now();
+    const timeout = 30000; // 30 secunde
+    
+    for (const [callId, call] of this.pendingFunctionCalls.entries()) {
+      if (now - call.timestamp > timeout) {
+        call.reject(new Error('Function call timeout'));
+        this.pendingFunctionCalls.delete(callId);
+      }
+    }
   }
 }
 
@@ -544,3 +352,4 @@ export const agentWebSocketHandler = new AgentWebSocketHandler();
 
 // Export class for custom instances
 export default AgentWebSocketHandler;
+
