@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import { useDrawerStackStore } from '../stores/drawerStackStore.js'
+import { setCurrentDrawerInfo, clearDrawerInfo } from '../utils/viewTracking.js'
 
 const DrawerContext = createContext()
 
@@ -33,6 +34,15 @@ export const DrawerProvider = ({ children }) => {
     // Setează conținutul curent
     setDrawerContent(content)
     setDrawerOpen(true)
+    
+    // Salvează informații despre drawer în localStorage pentru AI Assistant
+    if (content && content.type) {
+      setCurrentDrawerInfo(
+        content.type, // drawer name
+        content.type, // drawerType (same as type)
+        content.data || null // drawerData
+      )
+    }
   }
 
   const closeDrawer = () => {
@@ -45,13 +55,26 @@ export const DrawerProvider = ({ children }) => {
       if (nextDrawer) {
         setDrawerContent(nextDrawer)
         setDrawerOpen(true)
+        
+        // Actualizează informațiile despre drawer pentru următorul drawer din stivă
+        if (nextDrawer && nextDrawer.type) {
+          setCurrentDrawerInfo(
+            nextDrawer.type,
+            nextDrawer.type,
+            nextDrawer.data || null
+          )
+        }
       } else {
         setDrawerOpen(false)
         setDrawerContent(null)
+        clearDrawerInfo()
       }
     } else {
       setDrawerOpen(false)
       setDrawerContent(null)
+      
+      // Șterge informațiile despre drawer din localStorage
+      clearDrawerInfo()
     }
   }
 

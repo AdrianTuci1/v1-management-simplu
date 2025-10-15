@@ -34,7 +34,6 @@ import {
   WifiOff,
 } from "lucide-react";
 import LocationSwitcher from './LocationSwitcher';
-import DraftsMenu from './DraftsMenu';
 import { useBusinessConfig } from '../config/businessConfig';
 import { useHealthRepository } from '../hooks/useHealthRepository';
 import { useAppointments } from '../hooks/useAppointments';
@@ -1170,35 +1169,7 @@ function DetailSidebar({ activeSection, currentView, onViewChange, currentLocati
           />
         ))}
 
-        {/* Drafts Section */}
-        {!isCollapsed && (
-          <div className="w-full">
-            <button
-              onClick={() => setShowDrafts(!showDrafts)}
-              className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-900">Draft-uri</span>
-              </div>
-              <div className={`transform transition-transform ${showDrafts ? 'rotate-180' : ''}`}>
-                <ChevronDownIcon className="h-4 w-4 text-gray-400" />
-              </div>
-            </button>
-            
-            {showDrafts && (
-              <div className="mt-2 border border-gray-200 rounded-lg">
-                <DraftsMenu 
-                  onDraftSelect={(draft) => {
-                    // Handle draft selection - could open drawer with draft data
-                    console.log('Draft selected:', draft);
-                  }}
-                  onClose={() => setShowDrafts(false)}
-                />
-              </div>
-            )}
-          </div>
-        )}
+
       </div>
 
       {/* Location Switcher */}

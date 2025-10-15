@@ -10,6 +10,7 @@ import {
   hasTodaySession,
   cleanupOldSessions
 } from '../utils/sessionStorage.js';
+import { getViewContext } from '../utils/viewTracking.js';
 
 // Logger utility
 class Logger {
@@ -272,7 +273,14 @@ export class AIAssistantService {
     }
 
     try {
-      Logger.log('debug', 'Sending message via API (fallback method)', { content, context });
+      // Get view from context or use current view
+      const viewContext = context.view || getViewContext();
+      
+      Logger.log('debug', 'Sending message via API (fallback method)', { 
+        content, 
+        context, 
+        view: viewContext 
+      });
 
       // If no active session, create new one
       if (!this.currentSessionId) {
@@ -286,6 +294,7 @@ export class AIAssistantService {
         message_id: `msg_${Date.now()}`,
         payload: {
           content: content.trim(),
+          view: viewContext, // View as a separate field
           context: {
             businessId: this.businessId,
             locationId: this.locationId,

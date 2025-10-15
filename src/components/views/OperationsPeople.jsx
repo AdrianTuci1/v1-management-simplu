@@ -20,43 +20,34 @@ const OperationsPeople = () => {
   const { 
     patients, 
     loading, 
-    error, 
-    stats,
-    loadPatients, 
     loadPatientsByPage, 
-    searchPatients,
-    deletePatient, 
   } = usePatients()
   
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [sortBy, setSortBy] = useState('name')
   const [sortOrder, setSortOrder] = useState('asc')
+  const [isFirstMount, setIsFirstMount] = useState(true)
 
-  // Încarcă pacienții la montarea componentei
+  // Încarcă pacienții când se schimbă pagina sau termenul de căutare
   useEffect(() => {
+    // Skip la prima încărcare (hook-ul se ocupă de asta)
+    if (isFirstMount) {
+      setIsFirstMount(false)
+      return
+    }
+    
     loadPatientsByPage(currentPage, 20, {
       name: searchTerm
     })
-  }, [currentPage, searchTerm, loadPatientsByPage])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, searchTerm])
 
   // Funcție pentru căutare
   const handleSearch = (term) => {
     setSearchTerm(term)
     setCurrentPage(1)
     // useEffect-ul va gestiona încărcarea automată
-  }
-
-  // Funcție pentru ștergerea unui pacient
-  const handleDeletePatient = async (patientId) => {
-    if (confirm('Ești sigur că vrei să ștergi acest pacient?')) {
-      try {
-        await deletePatient(patientId)
-        // Nu mai reîncărcăm imediat; lista este actualizată optimist prin hook și va fi reconciliată via websocket
-      } catch (error) {
-        console.error('Error deleting patient:', error)
-      }
-    }
   }
 
 

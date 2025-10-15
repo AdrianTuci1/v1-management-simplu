@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createAIAssistantService } from '../services/aiAssistantService';
 import { createAIWebSocketService } from '../services/aiWebSocketService';
 import { getConfig } from '../config/aiAssistantConfig';
+import { getViewContext } from '../utils/viewTracking.js';
 
 // Simple logger for debugging
 const Logger = {
@@ -269,13 +270,21 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       throw new Error('Message content cannot be empty');
     }
 
+    // Get current view context and merge with provided context
+    const viewContext = getViewContext();
+    const enrichedContext = {
+      ...context,
+      view: viewContext
+    };
+
     Logger.log('info', 'Sending message', { 
       content: content.substring(0, 50) + '...', 
       currentSessionId: currentSessionId || 'will_be_created', 
       isDemoMode,
       hasWebSocket: !!webSocketRef.current,
       isConnected,
-      isFirstMessage: !currentSessionId
+      isFirstMessage: !currentSessionId,
+      viewContext: viewContext
     });
 
     setIsLoading(true);
@@ -291,6 +300,7 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       content: content.trim(),
       type: 'user',
       timestamp: new Date().toISOString(),
+      view: viewContext, // View is a separate field, not in metadata
       metadata: { 
         source: 'ui',
         isFirstMessage: !currentSessionId
@@ -303,20 +313,22 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
       Logger.log('info', '✅ User message added to UI', {
         messageId: userMessage.messageId,
         sessionId: currentSessionId || 'pending',
-        isFirstMessage: !currentSessionId
+        isFirstMessage: !currentSessionId,
+        view: viewContext
       });
 
       // Try WebSocket first (if not in demo mode), fallback to API
       if (!isDemoMode && webSocketRef.current && isConnected) {
         Logger.log('info', '📤 Sending message via WebSocket', {
           content: content.substring(0, 50) + '...',
-          sessionId: currentSessionId || 'will_be_created'
+          sessionId: currentSessionId || 'will_be_created',
+          view: viewContext
         });
         
         // Set current session ID in WebSocket (may be null for first message)
         webSocketRef.current.setCurrentSessionId(currentSessionId);
         
-        await webSocketRef.current.sendMessage(content.trim(), context);
+        await webSocketRef.current.sendMessage(content.trim(), enrichedContext);
         
         Logger.log('info', '✅ Message sent via WebSocket', {
           waitingForSessionId: !currentSessionId
@@ -325,10 +337,11 @@ export const useAIAssistant = (businessId = null, userId = null, locationId = nu
         Logger.log('info', '📤 Sending message via API (fallback)', {
           content: content.substring(0, 50) + '...',
           sessionId: currentSessionId || 'will_be_created',
-          reason: isDemoMode ? 'demo mode' : !webSocketRef.current ? 'no websocket' : 'not connected'
+          reason: isDemoMode ? 'demo mode' : !webSocketRef.current ? 'no websocket' : 'not connected',
+          view: viewContext
         });
         
-        await aiServiceRef.current.sendMessage(content.trim(), context);
+        await aiServiceRef.current.sendMessage(content.trim(), enrichedContext);
         
         Logger.log('info', '✅ Message sent via API');
       } else {

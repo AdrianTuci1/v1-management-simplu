@@ -538,6 +538,9 @@ export class WebSocketAIAssistant {
     }
 
     try {
+      // Get view from context or set to null
+      const view = context.view || null;
+      
       const message = {
         businessId: this.businessId,
         locationId: this.locationId,
@@ -545,6 +548,7 @@ export class WebSocketAIAssistant {
         message: content,
         sessionId: this.currentSessionId,
         timestamp: new Date().toISOString(),
+        view: view, // View as a separate field
         context: context
       };
 

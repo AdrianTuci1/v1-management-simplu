@@ -3,6 +3,7 @@ import patientService from '../services/patientService.js'
 import patientManager from '../business/patientManager.js'
 import { indexedDb } from '../data/infrastructure/db.js'
 import { onResourceMessage } from '../data/infrastructure/websocketClient.js'
+import { dataFacade } from '../data/DataFacade.js'
 
 // Shared state for all instances
 let sharedPatients = []
@@ -63,15 +64,61 @@ export const usePatients = () => {
     }
   }, [])
 
-  // Funcție pentru încărcarea pacienților cu paginare
-  const loadPatientsByPage = useCallback(async (page = 1, limit = 20, filters = {}) => {
+  // Funcție pentru încărcarea pacienților cu paginare folosind ResourceSearchRepository
+  const loadPatientsByPage = useCallback(async (page = 1, limit = 50, filters = {}) => {
     setLoading(true)
     setError(null)
     try {
-      const data = await patientService.getPatientsByPage(page, limit, filters)
-      sharedPatients = data
-      setPatients([...data])
-      notifySubscribers()
+      const businessId = localStorage.getItem("businessId") || 'B0100001'
+      const locationId = localStorage.getItem("locationId") || 'L0100001'
+      
+      // Construiește query parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString()
+      })
+      
+      // Adaugă filtre pentru căutare după nume
+      if (filters.name) {
+        queryParams.append('data.patientName', filters.name)
+      }
+      
+      // Adaugă alte filtre
+      Object.entries(filters).forEach(([key, value]) => {
+        if (key !== 'name' && value) {
+          queryParams.append(`data.${key}`, value)
+        }
+      })
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/resources/${businessId}-${locationId}?${queryParams.toString()}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Resource-Type": "patient",
+          ...(localStorage.getItem('cognito-data') && {
+            "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
+          })
+        }
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        let data = []
+        if (result && result.data) {
+          data = Array.isArray(result.data) ? result.data : []
+        } else if (Array.isArray(result)) {
+          data = result
+        }
+        
+        console.log(`✅ Loaded patients (page ${page}, limit ${limit}):`, data.length, filters)
+        
+        const transformedData = data.map(p => patientManager.transformPatientForUI(p))
+        sharedPatients = transformedData
+        setPatients([...transformedData])
+        notifySubscribers()
+      } else {
+        throw new Error(`API error ${response.status}`)
+      }
     } catch (err) {
       // Încearcă să încarce din cache local cu filtrare
       try {
@@ -315,9 +362,17 @@ export const usePatients = () => {
     subscribers.add(subscriber)
     const unsub = () => subscribers.delete(subscriber)
     
-    // Initial data load
-    loadPatients()
-    loadStats()
+    // Load only stats (components will load their own patient data)
+    const initStats = async () => {
+      try {
+        const statsData = await patientService.getPatientStats()
+        sharedStats = statsData
+        setStats(statsData)
+      } catch (err) {
+        console.error('Error loading stats:', err)
+      }
+    }
+    initStats()
     
     // Subscribe la actualizări prin websocket
     const handler = async (message) => {
@@ -398,7 +453,77 @@ export const usePatients = () => {
       unsubSingular(); 
       unsub() 
     }
-  }, [loadPatients, loadStats])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Încarcă pacienții la prima montare folosind ResourceSearchRepository
+  useEffect(() => {
+    const initLoad = async () => {
+      if (sharedPatients.length === 0) {
+        setLoading(true)
+        try {
+          // Folosește ResourceSearchRepository pentru a încărca toți pacienții
+          // Căutăm cu un query gol sau folosim searchByMultipleFields
+          const businessId = localStorage.getItem("businessId") || 'B0100001'
+          const locationId = localStorage.getItem("locationId") || 'L0100001'
+          
+          const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/resources/${businessId}-${locationId}?page=1&limit=50`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Resource-Type": "patient",
+              ...(localStorage.getItem('cognito-data') && {
+                "Authorization": `Bearer ${JSON.parse(localStorage.getItem('cognito-data')).id_token || JSON.parse(localStorage.getItem('cognito-data')).access_token}`
+              })
+            }
+          })
+          
+          if (response.ok) {
+            const result = await response.json()
+            // Extract data based on response structure
+            let data = []
+            if (result && result.data) {
+              data = Array.isArray(result.data) ? result.data : []
+            } else if (Array.isArray(result)) {
+              data = result
+            }
+            
+            console.log('✅ Loaded patients via ResourceSearchRepository:', data.length)
+            
+            // Transform pentru UI
+            const transformedData = data.map(p => patientManager.transformPatientForUI(p))
+            sharedPatients = transformedData
+            setPatients([...transformedData])
+            notifySubscribers()
+          } else {
+            throw new Error(`API error ${response.status}`)
+          }
+        } catch (err) {
+          console.error('Error loading initial patients:', err)
+          
+          // Fallback la cache local
+          try {
+            const cachedData = await indexedDb.getAll('patient')
+            if (cachedData.length > 0) {
+              const transformedData = cachedData.map(p => patientManager.transformPatientForUI(p))
+              sharedPatients = transformedData
+              setPatients([...transformedData])
+              notifySubscribers()
+              console.log('✅ Loaded patients from cache:', transformedData.length)
+            } else {
+              setError('Nu s-au putut încărca datele.')
+            }
+          } catch (cacheErr) {
+            setError('Nu s-au putut încărca datele.')
+          }
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+    initLoad()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return {
     patients,
