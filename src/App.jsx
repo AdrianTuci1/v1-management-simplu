@@ -20,6 +20,7 @@ import authService from './services/authService'
 import cognitoAuthService from './services/cognitoAuthService'
 import { DrawerProvider, useDrawer } from './contexts/DrawerContext'
 import { connectWebSocket } from './data/infrastructure/websocketClient'
+import PWAUpdatePrompt from './components/PWAUpdatePrompt'
 
 function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -431,6 +432,7 @@ function App() {
           {/* Main app route */}
           <Route path="/*" element={<AppContent />} />
         </Routes>
+        <PWAUpdatePrompt />
       </DrawerProvider>
     </BrowserRouter>
   )

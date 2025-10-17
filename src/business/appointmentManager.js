@@ -47,13 +47,31 @@ class AppointmentManager {
       transformed.doctor = transformIdToObject(appointmentData.doctor, 'doctor')
     }
 
-    if (appointmentData.service && appointmentData.service !== '') {
+    // Gestionăm atât services array (nou) cât și service (backwards compatibility)
+    if (appointmentData.services && Array.isArray(appointmentData.services) && appointmentData.services.length > 0) {
+      // Nou: array de servicii
+      transformed.services = appointmentData.services.map(service => ({
+        id: service.id,
+        name: service.name,
+        duration: service.duration,
+        price: service.price
+      }))
+      // Pentru backwards compatibility, setăm și service cu primul serviciu
+      transformed.service = {
+        id: appointmentData.services[0].id,
+        name: appointmentData.services[0].name,
+        duration: appointmentData.services[0].duration
+      }
+    } else if (appointmentData.service && appointmentData.service !== '') {
+      // Backwards compatibility: service singular
       const serviceObject = transformIdToObject(appointmentData.service, 'treatment')
       // Adăugăm durata dacă este disponibilă
       if (appointmentData.serviceDuration) {
         serviceObject.duration = appointmentData.serviceDuration
       }
       transformed.service = serviceObject
+      // Convertim și la services array pentru consistență
+      transformed.services = [serviceObject]
     }
 
     return transformed
@@ -119,17 +137,47 @@ class AppointmentManager {
       transformed.doctor = { id: doctorId || null, name: doctorName }
     }
 
-    if (data.service || appointmentData.service) {
+    // Gestionăm atât services array (nou) cât și service (backwards compatibility)
+    if (data.services || appointmentData.services) {
+      // Nou: array de servicii
+      const servicesArray = data.services || appointmentData.services
+      if (Array.isArray(servicesArray)) {
+        transformed.services = servicesArray.map(service => {
+          const serviceId = transformObjectToId(service)
+          const serviceName = typeof service === 'object' && (service.name || service.treatmentType) ? 
+            (service.name || service.treatmentType) : 'Serviciu necunoscut'
+          const serviceDuration = typeof service === 'object' && service.duration ? service.duration : null
+          const servicePrice = typeof service === 'object' && service.price ? service.price : null
+          return {
+            id: serviceId || null,
+            name: serviceName,
+            duration: serviceDuration,
+            price: servicePrice
+          }
+        })
+        // Pentru backwards compatibility și afișare, setăm service cu primul serviciu
+        if (transformed.services.length > 0) {
+          transformed.service = transformed.services[0]
+          transformed.treatmentType = transformed.services[0].name
+          transformed.type = transformed.services[0].name
+        }
+      }
+    } else if (data.service || appointmentData.service) {
+      // Backwards compatibility: service singular
       const service = data.service || appointmentData.service
       const serviceId = transformObjectToId(service)
       const serviceName = typeof service === 'object' && (service.name || service.treatmentType) ? 
         (service.name || service.treatmentType) : 'Serviciu necunoscut'
       const serviceDuration = typeof service === 'object' && service.duration ? service.duration : null
+      const servicePrice = typeof service === 'object' && service.price ? service.price : null
       transformed.service = { 
         id: serviceId || null, 
         name: serviceName,
-        duration: serviceDuration
+        duration: serviceDuration,
+        price: servicePrice
       }
+      // Convertim și la services array pentru consistență
+      transformed.services = [transformed.service]
       // Adăugăm și pentru UI
       transformed.treatmentType = serviceName
       transformed.type = serviceName

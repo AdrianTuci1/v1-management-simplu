@@ -248,7 +248,15 @@ export default function Timeline({ date, appointments = [], doctors = [], onDate
                             <div className="truncate font-medium text-slate-900">{a?.patient?.name || a?.patient || 'Pacient'}</div>
                             <div className="truncate text-slate-600">{a?.doctor?.name || a?.doctor || 'Medic'}</div>
                             <div className="flex items-center justify-between text-slate-600">
-                              <span className="truncate">{a?.service?.name || a?.service || a?.treatmentType}</span>
+                              <div className="flex items-center gap-1 truncate">
+                                <span className="truncate">{a?.service?.name || a?.service || a?.treatmentType}</span>
+                                {/* Indicator pentru servicii suplimentare */}
+                                {a.services && a.services.length > 1 && (
+                                  <span className="inline-flex items-center justify-center h-4 px-1 rounded-full text-[9px] font-medium bg-blue-100 text-blue-700 border border-blue-200 shrink-0">
+                                    +{a.services.length - 1}
+                                  </span>
+                                )}
+                              </div>
                               <span className="ml-2 shrink-0 font-mono text-[10px]">{(a.time || a.startTime) ?? ''}</span>
                               </div>
                             </div>

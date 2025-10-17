@@ -272,7 +272,10 @@ class ExternalServices {
       throw new Error('Location ID not available for Meta authorization');
     }
 
-    const url = `${this.baseUrl}/external/meta/auth-url?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}`;
+    // Get current app URL for redirect after OAuth
+    const redirectUri = window.location.origin;
+    
+    const url = `${this.baseUrl}/external/meta/auth-url?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}&redirectUri=${encodeURIComponent(redirectUri)}`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -298,6 +301,7 @@ class ExternalServices {
     try {
       const authUrl = await this.getMetaAuthUrl();
       // Redirect to Meta OAuth
+      // Backend will handle the callback and redirect back to the app
       window.location.href = authUrl;
     } catch (error) {
       console.error('Meta connection error:', error);

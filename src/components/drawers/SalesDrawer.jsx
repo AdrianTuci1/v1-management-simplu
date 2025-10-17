@@ -174,18 +174,35 @@ const SalesDrawer = () => {
 
   // Adaugă programarea în coș când se deschide cu date din programare
   useEffect(() => {
-    if (isOpen && appointmentData && appointmentData.treatmentName) {
-      const treatmentItem = {
-        id: `appointment-${appointmentData.appointmentId}`,
-        name: appointmentData.treatmentName,
-        price: parseFloat(appointmentData.price) || 0,
-        quantity: 1,
-        category: 'Servicii Medicale',
-        stock: 1,
-        isAppointment: true // Flag pentru a identifica că este o programare
+    if (isOpen && appointmentData) {
+      // Verificăm dacă avem services array (nou) sau treatmentName (backwards compatibility)
+      if (appointmentData.services && Array.isArray(appointmentData.services) && appointmentData.services.length > 0) {
+        // Nou: creem un item pentru fiecare serviciu
+        const serviceItems = appointmentData.services.map((service, index) => ({
+          id: `appointment-${appointmentData.appointmentId}-service-${index}`,
+          name: service.name,
+          price: parseFloat(service.price) || 0,
+          quantity: 1,
+          category: 'Servicii Medicale',
+          stock: 1,
+          isAppointment: true // Flag pentru a identifica că este din programare
+        }))
+        
+        setCart(serviceItems)
+      } else if (appointmentData.treatmentName) {
+        // Backwards compatibility: un singur tratament
+        const treatmentItem = {
+          id: `appointment-${appointmentData.appointmentId}`,
+          name: appointmentData.treatmentName,
+          price: parseFloat(appointmentData.price) || 0,
+          quantity: 1,
+          category: 'Servicii Medicale',
+          stock: 1,
+          isAppointment: true // Flag pentru a identifica că este o programare
+        }
+        
+        setCart([treatmentItem])
       }
-      
-      setCart([treatmentItem])
     }
   }, [isOpen, appointmentData])
 

@@ -22,7 +22,8 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
     email: '',
     phone: '',
     role: null,
-    dutyDays: []
+    dutyDays: [],
+    canTakeAppointments: false
   })
   
   const [validationErrors, setValidationErrors] = useState({})
@@ -38,7 +39,8 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
         email: user.email || '',
         phone: user.phone || '',
         role: user.role || null,
-        dutyDays: user.dutyDays || []
+        dutyDays: user.dutyDays || [],
+        canTakeAppointments: user.canTakeAppointments || false
       })
       
       // Setează status-ul invitației din datele utilizatorului
@@ -50,7 +52,8 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
         email: '',
         phone: '',
         role: roles.length > 0 ? { id: roles[0].resourceId, name: roles[0].name } : null,
-        dutyDays: []
+        dutyDays: [],
+        canTakeAppointments: false
       })
       setInvitationStatus('not_sent')
     }
@@ -408,6 +411,20 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
               {validationErrors.dutyDays && (
                 <p className="text-red-500 text-sm mt-1">{validationErrors.dutyDays}</p>
               )}
+            </div>
+
+            <div>
+              <label className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="canTakeAppointments"
+                  checked={formData.canTakeAppointments}
+                  onChange={(e) => setFormData(prev => ({ ...prev, canTakeAppointments: e.target.checked }))}
+                  className="rounded border-gray-300"
+                  disabled={isSubmitting}
+                />
+                <span className="text-sm font-medium">Poate prelua programări</span>
+              </label>
             </div>
           </div>
 

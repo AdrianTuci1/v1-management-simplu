@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# PWA (generated files are already in dist/)
+# Keep the icons in public/icons as they're source files

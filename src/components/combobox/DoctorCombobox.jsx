@@ -26,8 +26,9 @@ const DoctorCombobox = ({
   const [searchTerm, setSearchTerm] = React.useState('');
   const { users, loading, error, searchUsers } = useUsers();
 
-  // Toți utilizatorii (nu filtrăm după rol în combobox)
-  const selectedDoctor = users.find((user) => (user.resourceId || user.id).toString() === (typeof value === 'string' ? value : value?.id));
+  // Filtrăm doar utilizatorii care pot prelua programări
+  const availableDoctors = users.filter((user) => user.canTakeAppointments === true);
+  const selectedDoctor = availableDoctors.find((user) => (user.resourceId || user.id).toString() === (typeof value === 'string' ? value : value?.id));
 
   // Căutare când se deschide combobox-ul sau când se schimbă termenul de căutare
   React.useEffect(() => {
@@ -68,7 +69,7 @@ const DoctorCombobox = ({
               {loading ? "Se încarcă..." : error ? "Eroare la încărcare" : "Nu s-a găsit niciun doctor."}
             </CommandEmpty>
             <CommandGroup>
-              {users.map((user) => (
+              {availableDoctors.map((user) => (
                 <CommandItem
                   key={user.resourceId || user.id}
                   value={user.medicName}

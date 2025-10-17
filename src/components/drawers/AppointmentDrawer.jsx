@@ -18,7 +18,7 @@ import { useSales } from '../../hooks/useSales.js'
 import { useInvoices } from '../../hooks/useInvoices.js'
 import PatientCombobox from '../combobox/PatientCombobox.jsx'
 import DoctorCombobox from '../combobox/DoctorCombobox.jsx'
-import TreatmentCombobox from '../combobox/TreatmentCombobox.jsx'
+import MultipleTreatmentCombobox from '../combobox/MultipleTreatmentCombobox.jsx'
 import appointmentManager from '../../business/appointmentManager.js'
 import { 
   Drawer, 
@@ -105,8 +105,10 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         // Extragem obiectele complete pentru combobox-uri
         patient: uiData.patient || '',
         doctor: uiData.doctor || '',
-        service: uiData.service || '',
-        serviceDuration: uiData.service?.duration || '',
+        // Păstrăm service ca array (services) sau convertim din singular
+        services: uiData.services 
+          ? uiData.services
+          : (uiData.service ? [uiData.service] : []),
         price: uiData.price || '',
         status: uiData.status || appointmentData.status || 'scheduled',
         mention: uiData.mention || appointmentData.mention || ''
@@ -117,8 +119,7 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       doctor: '',
       date: new Date().toISOString().split('T')[0],
       time: '',
-      service: '',
-      serviceDuration: '',
+      services: [], // Array de servicii
       status: 'scheduled', // Statusul este întotdeauna 'scheduled' inițial
       postOperativeNotes: '',
       prescription: '',
@@ -284,16 +285,18 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
       return
     }
     
-    // Găsim numele tratamentului - verificăm dacă este obiect sau string
+    // Construim numele serviciilor - acum avem un array
     let treatmentName = ''
-    if (typeof formData.service === 'object' && formData.service?.name) {
-      treatmentName = formData.service.name
-    } else if (typeof formData.service === 'string') {
-      treatmentName = formData.service
+    if (formData.services && formData.services.length > 0) {
+      treatmentName = formData.services.map(t => t.name).join(', ')
     } else {
-      // Căutăm în treatments array
-      const treatment = treatments.find(t => t.id === formData.service)
-      treatmentName = treatment?.treatmentType || treatment?.name || 'Tratament necunoscut'
+      treatmentName = 'Niciun serviciu selectat'
+    }
+    
+    // Calculăm prețul total din servicii dacă nu este setat manual
+    let totalPrice = formData.price || '0'
+    if (!formData.price && formData.services && formData.services.length > 0) {
+      totalPrice = formData.services.reduce((sum, t) => sum + (parseFloat(t.price) || 0), 0).toString()
     }
     
     // Găsim numele pacientului - verificăm dacă este obiect sau string
@@ -308,14 +311,15 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     
     const paymentData = {
       treatmentName: treatmentName,
-      price: formData.price || '0',
+      price: totalPrice,
       appointmentId: formData.id || '',
-      patientName: patientName
+      patientName: patientName,
+      services: formData.services || [] // Adăugăm array-ul de servicii
     }
     
     // Debug: să vedem ce date se transmit către SalesDrawer
     console.log('AppointmentDrawer - handlePayment - paymentData:', paymentData)
-    console.log('AppointmentDrawer - handlePayment - formData.price:', formData.price)
+    console.log('AppointmentDrawer - handlePayment - totalPrice:', totalPrice)
     
     // Deschidem SalesDrawer cu datele programării
     openSalesDrawer(paymentData)
@@ -332,16 +336,18 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     }
     
     // Nu există factură - creează una nouă
-    // Găsim numele tratamentului - verificăm dacă este obiect sau string
+    // Construim numele serviciilor - acum avem un array
     let treatmentName = ''
-    if (typeof formData.service === 'object' && formData.service?.name) {
-      treatmentName = formData.service.name
-    } else if (typeof formData.service === 'string') {
-      treatmentName = formData.service
+    if (formData.services && formData.services.length > 0) {
+      treatmentName = formData.services.map(t => t.name).join(', ')
     } else {
-      // Căutăm în treatments array
-      const treatment = treatments.find(t => t.id === formData.service)
-      treatmentName = treatment?.treatmentType || treatment?.name || 'Tratament necunoscut'
+      treatmentName = 'Niciun serviciu selectat'
+    }
+    
+    // Calculăm prețul total din servicii dacă nu este setat manual
+    let totalPrice = formData.price || '0'
+    if (!formData.price && formData.services && formData.services.length > 0) {
+      totalPrice = formData.services.reduce((sum, t) => sum + (parseFloat(t.price) || 0), 0).toString()
     }
     
     // Găsim numele pacientului - verificăm dacă este obiect sau string
@@ -356,14 +362,15 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
     
     const invoiceData = {
       treatmentName: treatmentName,
-      price: formData.price || '0',
+      price: totalPrice,
       appointmentId: formData.id || '',
-      patientName: patientName
+      patientName: patientName,
+      services: formData.services || [] // Adăugăm array-ul de servicii
     }
     
     // Debug: să vedem ce date se transmit către InvoiceDrawer
     console.log('AppointmentDrawer - handleInvoice - invoiceData:', invoiceData)
-    console.log('AppointmentDrawer - handleInvoice - formData.price:', formData.price)
+    console.log('AppointmentDrawer - handleInvoice - totalPrice:', totalPrice)
     
     // Deschidem InvoiceDrawer cu datele programării pentru creare
     openInvoiceDrawer(invoiceData)
@@ -436,23 +443,18 @@ const AppointmentDrawer = ({ onClose, isNewAppointment = false, appointmentData 
         />
       </div>
 
-      {/* Service */}
+      {/* Services */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Serviciu</label>
-        <TreatmentCombobox
-          value={formData.service}
+        <label className="text-sm font-medium">Servicii</label>
+        <MultipleTreatmentCombobox
+          value={formData.services}
           onValueChange={(value) => {
-            if (typeof value === 'object' && value.id) {
-              handleInputChange('service', value.id);
-              handleInputChange('serviceDuration', value.duration || '');
-              handleInputChange('price', value.price || '');
-            } else {
-              handleInputChange('service', value);
-              handleInputChange('serviceDuration', '');
-              handleInputChange('price', '');
-            }
+            handleInputChange('services', value);
+            // Calculăm automat prețul total din servicii
+            const totalPrice = value.reduce((sum, t) => sum + (parseFloat(t.price) || 0), 0);
+            handleInputChange('price', totalPrice.toString());
           }}
-          placeholder="Selectează serviciu"
+          placeholder="Selectează servicii"
         />
       </div>
 

@@ -500,14 +500,22 @@ const OperationsPlanning = () => {
                             <div className={`font-medium ${appointment._isDeleting ? 'line-through' : ''}`}>
                               {appointment.patient?.name || appointment.patient || 'Pacient necunoscut'}
                             </div>
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <div 
-                                className="w-2 h-2 rounded-full shrink-0"
-                                style={{ backgroundColor: appointment.service?.color || '#3b82f6' }}
-                              />
-                              <span>
-                                {appointment.service?.name || appointment.service || 'Serviciu necunoscut'}
-                              </span>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <div 
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{ backgroundColor: appointment.service?.color || '#3b82f6' }}
+                                />
+                                <span>
+                                  {appointment.service?.name || appointment.service || 'Serviciu necunoscut'}
+                                </span>
+                              </div>
+                              {/* Indicator pentru servicii suplimentare */}
+                              {appointment.services && appointment.services.length > 1 && (
+                                <span className="inline-flex items-center justify-center h-5 px-1.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                                  +{appointment.services.length - 1}
+                                </span>
+                              )}
                             </div>
 
                           </div>

@@ -57,27 +57,54 @@ const InvoiceDrawer = () => {
         })
       } else if (appointmentData) {
         // Mod creare din programare
-        const price = parseFloat(appointmentData.price) || 0
-        const quantity = 1
-        
         // Găsește cota TVA pentru servicii din settings
         const serviceVATRateObj = taxSettings.vatRates.find(r => r.id === taxSettings.serviceVATRateId);
         const vatRate = serviceVATRateObj ? serviceVATRateObj.rate / 100 : 0.19;
         
-        setFormData(prev => ({
-          ...prev,
-          items: [{
-            id: Date.now(),
-            description: appointmentData.treatmentName || 'Serviciu medical',
-            quantity: quantity,
-            price: price,
-            unit: 'buc',
-            itemType: 'service',
-            vatRate: vatRate,
-            total: price * quantity,
-            appointmentId: appointmentData.appointmentId || null // Salvăm ID-ul programării
-          }]
-        }))
+        // Verificăm dacă avem services array (nou) sau treatmentName (backwards compatibility)
+        if (appointmentData.services && Array.isArray(appointmentData.services) && appointmentData.services.length > 0) {
+          // Nou: creem un item pentru fiecare serviciu
+          const items = appointmentData.services.map((service, index) => {
+            const price = parseFloat(service.price) || 0
+            const quantity = 1
+            
+            return {
+              id: Date.now() + index,
+              description: service.name || 'Serviciu medical',
+              quantity: quantity,
+              price: price,
+              unit: 'buc',
+              itemType: 'service',
+              vatRate: vatRate,
+              total: price * quantity,
+              appointmentId: appointmentData.appointmentId || null // Salvăm ID-ul programării
+            }
+          })
+          
+          setFormData(prev => ({
+            ...prev,
+            items: items
+          }))
+        } else {
+          // Backwards compatibility: un singur tratament
+          const price = parseFloat(appointmentData.price) || 0
+          const quantity = 1
+          
+          setFormData(prev => ({
+            ...prev,
+            items: [{
+              id: Date.now(),
+              description: appointmentData.treatmentName || 'Serviciu medical',
+              quantity: quantity,
+              price: price,
+              unit: 'buc',
+              itemType: 'service',
+              vatRate: vatRate,
+              total: price * quantity,
+              appointmentId: appointmentData.appointmentId || null // Salvăm ID-ul programării
+            }]
+          }))
+        }
       }
     }
   }, [isOpen, appointmentData, invoiceData, taxSettings])
