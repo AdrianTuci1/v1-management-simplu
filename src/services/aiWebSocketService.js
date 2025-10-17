@@ -214,7 +214,7 @@ export class AIWebSocketService {
       };
       
       // Connect to WebSocket server
-      const channelName = `messages:${this.businessId}`;
+      const channelName = `messages:${this.userId}`;
       
       this.worker.postMessage({
         type: 'connect',

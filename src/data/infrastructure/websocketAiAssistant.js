@@ -142,8 +142,8 @@ export class WebSocketAIAssistant {
         this.onError?.('Worker error', error);
       };
       
-      // Connect to WebSocket server
-      const channelName = `messages:${this.businessId}`;
+      // Connect to WebSocket server - use userId instead of businessId
+      const channelName = `messages:${this.userId}`;
       
       this.worker.postMessage({
         type: 'connect',

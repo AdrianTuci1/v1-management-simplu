@@ -111,41 +111,6 @@ function connectWebSocket(url, channelName) {
       sendToMain('message', { type: 'ai_assistant_stats_retrieved', data: payload });
     });
     
-    // Listen for AI Agent resource and draft events
-    channel.on("agent_resource_query_result", (payload) => {
-      sendToMain('log', { kind: 'info', msg: 'Received agent_resource_query_result event', data: payload });
-      sendToMain('message', { type: 'agent_resource_query_result', data: payload });
-    });
-    
-    channel.on("agent_resource_query_error", (payload) => {
-      sendToMain('log', { kind: 'error', msg: 'Received agent_resource_query_error event', data: payload });
-      sendToMain('message', { type: 'agent_resource_query_error', data: payload });
-    });
-    
-    channel.on("agent_draft_created", (payload) => {
-      sendToMain('log', { kind: 'info', msg: 'Received agent_draft_created event', data: payload });
-      sendToMain('message', { type: 'agent_draft_created', data: payload });
-    });
-    
-    channel.on("agent_draft_updated", (payload) => {
-      sendToMain('log', { kind: 'info', msg: 'Received agent_draft_updated event', data: payload });
-      sendToMain('message', { type: 'agent_draft_updated', data: payload });
-    });
-    
-    channel.on("agent_draft_committed", (payload) => {
-      sendToMain('log', { kind: 'info', msg: 'Received agent_draft_committed event', data: payload });
-      sendToMain('message', { type: 'agent_draft_committed', data: payload });
-    });
-    
-    channel.on("agent_draft_cancelled", (payload) => {
-      sendToMain('log', { kind: 'info', msg: 'Received agent_draft_cancelled event', data: payload });
-      sendToMain('message', { type: 'agent_draft_cancelled', data: payload });
-    });
-    
-    channel.on("agent_drafts_listed", (payload) => {
-      sendToMain('log', { kind: 'info', msg: 'Received agent_drafts_listed event', data: payload });
-      sendToMain('message', { type: 'agent_drafts_listed', data: payload });
-    });
     
     channel.on("agent_request_error", (payload) => {
       sendToMain('log', { kind: 'error', msg: 'Received agent_request_error event', data: payload });

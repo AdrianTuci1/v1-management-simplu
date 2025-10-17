@@ -248,7 +248,7 @@ await aiService.closeSession('resolved');
 const wsService = createAIWebSocketService(businessId, userId, locationId);
 await wsService.connect();
 
-// Automatically joins channel: messages:{businessId}
+// Automatically joins channel: messages:{userId}
 // Listens for events: new_message, session_update, ai_response
 // Handles connection in separate thread for better performance
 ```
