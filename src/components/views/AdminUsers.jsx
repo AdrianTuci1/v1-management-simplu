@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
-  User, Plus, RefreshCw, Edit, Eye, Mail, Phone, GraduationCap, RotateCw, Loader2, Download, Filter, Search
+  User, Plus, Mail, Phone, RotateCw, Loader2, Filter, Search
 } from 'lucide-react'
 import { useUsers } from '../../hooks/useUsers.js'
 import { useDrawer } from '../../contexts/DrawerContext'
+import resourceFilesService from '../../services/resourceFilesService.js'
 import { userManager } from '../../business/userManager.js'
 import PermissionGate from '../PermissionGate'
 
@@ -169,6 +170,66 @@ const AdminUsers = () => {
     return 'bg-gray-100 text-gray-700'
   }
 
+  const getInitials = (name) => {
+    if (!name) return ''
+    const parts = String(name).trim().split(/\s+/).filter(Boolean)
+    if (parts.length === 0) return ''
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+
+  const AvatarCell = ({ user }) => {
+    const [url, setUrl] = useState(null)
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+      let cancelled = false
+      const load = async () => {
+        const resourceId = user?.resourceId || user?.id
+        if (!resourceId) {
+          setUrl(null)
+          return
+        }
+        setLoading(true)
+        try {
+          const result = await resourceFilesService.listFiles('medic', String(resourceId))
+          const files = Array.isArray(result?.files) ? result.files : []
+          const imageFiles = files.filter(f => (f.type || '').startsWith('image/'))
+          if (imageFiles.length === 0) {
+            if (!cancelled) setUrl(null)
+          } else {
+            const latest = imageFiles.sort((a, b) => {
+              const ta = Date.parse(a.uploadedAt || '') || 0
+              const tb = Date.parse(b.uploadedAt || '') || 0
+              return tb - ta
+            })[0]
+            const presigned = await resourceFilesService.getCachedFileUrl('medic', String(resourceId), String(latest.id))
+            if (!cancelled) setUrl(presigned || null)
+          }
+        } catch (_) {
+          if (!cancelled) setUrl(null)
+        } finally {
+          if (!cancelled) setLoading(false)
+        }
+      }
+      load()
+      return () => { cancelled = true }
+    }, [user?.id, user?.resourceId])
+
+    const displayName = user?.fullName || user?.medicName || 'Nume indisponibil'
+    const initials = getInitials(displayName)
+
+    return (
+      <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-600 text-white flex items-center justify-center shrink-0 border border-white/50">
+        {url ? (
+          <img src={url} alt={displayName} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-xs font-medium">{initials}</span>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -306,6 +367,7 @@ const AdminUsers = () => {
                       <td className="p-3">
                         <div>
                           <div className="font-medium flex items-center gap-2">
+                            <AvatarCell user={user} />
                             <span className={user._isDeleting ? 'line-through opacity-50' : ''}>
                               {user.fullName || user.medicName || 'Nume indisponibil'}
                             </span>
@@ -321,16 +383,7 @@ const AdminUsers = () => {
                               </span>
                             )}
                           </div>
-                          {user.resourceId && !user._tempId && (
-                            <div className="text-sm text-muted-foreground">
-                              ID: {user.resourceId}
-                            </div>
-                          )}
-                          {user._tempId && (
-                            <div className="text-sm text-muted-foreground">
-                              ID temporar: {user._tempId}
-                            </div>
-                          )}
+                          {/* ID display removed as requested */}
                         </div>
                       </td>
                       <td className="p-3">

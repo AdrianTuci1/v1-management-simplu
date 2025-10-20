@@ -96,7 +96,6 @@ export class WebSocketAIAssistant {
       Logger.log('error', 'Failed to connect to AI WebSocket server', error);
       this.isConnected = false;
       this.onConnectionChange?.(false);
-      this.onError?.('WebSocket indisponibil. Verificați conexiunea la server.', error);
       // Nu mai programăm reconectare automată
       // this.scheduleReconnect();
     }
@@ -216,13 +215,11 @@ export class WebSocketAIAssistant {
       case 'error':
         this.isConnected = false;
         this.onConnectionChange?.(false);
-        this.onError?.('WebSocket indisponibil. Verificați conexiunea la server.', data.data);
         break;
         
       case 'timeout':
         this.isConnected = false;
         this.onConnectionChange?.(false);
-        this.onError?.('WebSocket indisponibil. Verificați conexiunea la server.');
         break;
     }
   }
@@ -643,9 +640,8 @@ export class WebSocketAIAssistant {
       this.heartbeatInterval = null;
     }
     
-    // Nu mai programăm reconectare automată - doar notificăm utilizatorul
+    // Nu mai programăm reconectare automată
     Logger.log('warn', 'WebSocket disconnected - no automatic reconnection');
-    this.onError?.('WebSocket indisponibil. Verificați conexiunea la server.');
   }
 
   /**

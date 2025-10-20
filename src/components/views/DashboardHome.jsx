@@ -6,8 +6,6 @@ import {
   CreditCard, 
   DollarSign,
   Activity,
-  BarChart3,
-  Plus,
   CheckCircle,
   XCircle,
   Clock,
@@ -129,12 +127,9 @@ const DashboardHome = () => {
    *     percentage: 78
    *   },
    *   occupancyRate: 85,
-   *   doctorProgress: [
-   *     { doctor: 'Dr. Popescu', progress: 75, appointments: 12 },
-   *     { doctor: 'Dr. Ionescu', progress: 60, appointments: 8 },
-   *     { doctor: 'Dr. Georgescu', progress: 85, appointments: 15 },
-   *     { doctor: 'Dr. Marinescu', progress: 45, appointments: 6 }
-   *   ],
+   *   aiUsage: {
+   *     minutes: 45
+   *   },
    *   popularTreatments: [
    *     { treatment: 'Detartraj', count: 45 },
    *     { treatment: 'Obturație', count: 38 },
@@ -175,15 +170,6 @@ const DashboardHome = () => {
     return extractNumber(businessStatistics?.appointmentStats?.cancelled)
   }
 
-  const getPendingAppointments = () => {
-    return extractNumber(businessStatistics?.appointmentStats?.pending)
-  }
-
-  const getAppointmentsToday = () => {
-    return Array.isArray(businessStatistics?.appointmentsToday) 
-      ? businessStatistics.appointmentsToday 
-      : []
-  }
 
   const getMonthlyRevenue = () => {
     return extractNumber(businessStatistics?.revenue?.monthly)
@@ -214,6 +200,12 @@ const DashboardHome = () => {
 
   const getOccupancyRate = () => {
     return extractNumber(businessStatistics?.occupancyRate)
+  }
+
+  // AI calls minutes (sourced from businessStatistics)
+  const getAICallMinutes = () => {
+    const value = businessStatistics?.aiUsage?.minutes ?? businessStatistics?.aiMinutes ?? businessStatistics?.ai?.minutes
+    return extractNumber(value)
   }
 
   const getDoctorProgress = () => {
@@ -582,21 +574,21 @@ const DashboardHome = () => {
             </div>
           </div>
 
-          {/* Absete */}
+          {/* Grad de Ocupare */}
           <div className="card group hover:shadow-lg transition-shadow flex align-center justify-center">
             <div className="card-content p-4 flex align-center justify-center">
               <div className="flex flex-col gap-2 flex align-center justify-center">
                 <div className="flex items-center justify-between">
-                  <Activity className="h-5 w-5 text-orange-600" />
-                  <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
+                  <Percent className="h-5 w-5 text-green-600" />
+                  <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
                     {getCurrentMonthName()}
                   </span>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-orange-600">
-                    {loading ? '...' : getAbsentAppointments()}
+                  <p className="text-3xl font-bold text-green-600">
+                    {loading ? '...' : `${getOccupancyRate()}%`}
                   </p>
-                  <p className="text-sm text-muted-foreground mt-1">Absenti</p>
+                  <p className="text-sm text-muted-foreground mt-1">Grad de Ocupare</p>
                 </div>
               </div>
             </div>
@@ -705,21 +697,16 @@ const DashboardHome = () => {
                   <p className="text-xs text-muted-foreground">{getSmsStats().percentage}% limită ({getSmsStats().sent}/{getSmsStats().limit})</p>
                 </div>
 
-                {/* Grad de Ocupare */}
+                {/* Apeluri AI - Minute folosite */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Percent className="h-4 w-4 text-green-500" />
-                      <p className="text-sm font-medium">Ocupare</p>
+                      <Activity className="h-4 w-4 text-indigo-500" />
+                      <p className="text-sm font-medium">Apeluri AI</p>
                     </div>
-                    <p className="text-xl font-bold">{getOccupancyRate()}%</p>
+                    <p className="text-xl font-bold">{getAICallMinutes()}</p>
                   </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `${getOccupancyRate()}%` }}></div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {getOccupancyRate() >= 80 ? 'Foarte bine' : getOccupancyRate() >= 60 ? 'Bine' : 'Acceptabil'}
-                  </p>
+                  <p className="text-xs text-muted-foreground">minute folosite</p>
                 </div>
               </div>
             </div>

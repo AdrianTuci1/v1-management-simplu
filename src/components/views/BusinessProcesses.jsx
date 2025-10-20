@@ -72,6 +72,27 @@ const BusinessProcesses = () => {
     loadAllConfigs();
   }, []);
 
+  // Check for OAuth redirect parameters (Meta authorization callback)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const metaAuth = urlParams.get('meta_auth');
+    const message = urlParams.get('message');
+    
+    if (metaAuth === 'success') {
+      console.log('✅ Meta authorization successful!');
+      // Clean up the URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Reload services status to reflect the new authorization
+      checkAllServicesStatus();
+      // TODO: Show success toast notification
+    } else if (metaAuth === 'error') {
+      console.error('❌ Meta authorization failed:', message);
+      // Clean up the URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // TODO: Show error toast notification with message
+    }
+  }, []);
+
   // Check all services authorization status
   const checkAllServicesStatus = async () => {
     setCheckingStatus(true);

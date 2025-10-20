@@ -1,317 +1,34 @@
-import { Activity, MessageSquare, Mic, Mail, Facebook, Clock, CheckCircle, AlertCircle, Calendar, Users, Phone, Mail as MailIcon, MessageCircle, Zap, Eye, MoreHorizontal } from 'lucide-react'
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Activity, MessageSquare, Mic, Mail, Facebook, Clock, CheckCircle, AlertCircle, Calendar, Users, Phone, Mail as MailIcon, MessageCircle, Zap, Eye, MoreHorizontal, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
 import { Calendar as CalendarComponent } from '../ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import ActivityDrawer from '../drawers/ActivityDrawer.jsx'
+import { useAgentLogs } from '../../hooks/useAgentLogs.js'
 
 const OperationsActivities = () => {
-  // Mock data pentru activitățile agentului
-  const [activities] = useState([
-    {
-      id: 1,
-      timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minute în urmă
-      action: 'POST',
-      resourceType: 'appointment',
-      service: 'sms',
-      description: 'Batch SMS trimis pentru confirmare programări',
-      details: '12 mesaje SMS trimise pentru confirmarea programărilor de mâine',
-      status: 'success',
-      priority: 'high',
-      category: 'communication'
-    },
-    {
-      id: 2,
-      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minute în urmă
-      action: 'PATCH',
-      resourceType: 'appointment',
-      service: 'elevenLabs',
-      description: 'Rezervare preluată telefonic',
-      details: 'Pacientul a confirmat programarea prin apel vocal automat',
-      status: 'success',
-      priority: 'medium',
-      category: 'appointment'
-    },
-    {
-      id: 3,
-      timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minute în urmă
-      action: 'POST',
-      resourceType: 'appointment',
-      service: 'meta',
-      description: 'Rezervare Instagram',
-      details: 'Programare creată prin comentariu Instagram și confirmată automat',
-      status: 'success',
-      priority: 'medium',
-      category: 'social'
-    },
-    {
-      id: 4,
-      timestamp: new Date(Date.now() - 45 * 60 * 1000), // 45 minute în urmă
-      action: 'POST',
-      resourceType: 'email',
-      service: 'gmail',
-      description: 'Răspuns automat Gmail',
-      details: 'Răspuns automat trimis la cererea de informații despre tratamente',
-      status: 'success',
-      priority: 'low',
-      category: 'communication'
-    },
-    {
-      id: 5,
-      timestamp: new Date(Date.now() - 60 * 60 * 1000), // 1 oră în urmă
-      action: 'PATCH',
-      resourceType: 'appointment',
-      service: 'elevenLabs',
-      description: 'Rezervare anulată telefonic',
-      details: 'Pacientul a anulat programarea prin apel vocal automat',
-      status: 'success',
-      priority: 'high',
-      category: 'appointment'
-    },
-    {
-      id: 6,
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 ore în urmă
-      action: 'POST',
-      resourceType: 'reminder',
-      service: 'sms',
-      description: 'Reminder SMS trimis',
-      details: 'Mesaj de reamintire trimis pentru programarea de mâine',
-      status: 'success',
-      priority: 'medium',
-      category: 'communication'
-    },
-    {
-      id: 7,
-      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 ore în urmă
-      action: 'POST',
-      resourceType: 'appointment',
-      service: 'meta',
-      description: 'Rezervare Facebook',
-      details: 'Programare creată prin mesaj privat Facebook',
-      status: 'error',
-      priority: 'high',
-      category: 'social'
-    }
-  ]);
-
-  // Obiect separat pentru datele detaliate - indexat după ID
-  const [detailedData] = useState({
-    1: {
-      // Detalii specifice SMS
-      smsDetails: {
-        recipientCount: 12,
-        messageTemplate: 'Confirmare programare pentru {{date}} la {{time}}',
-        deliveryRate: 100,
-        costPerSMS: 0.05,
-        totalCost: 0.60,
-        provider: 'Twilio',
-        language: 'ro'
-      },
-      // Metadata tehnică
-      technical: {
-        duration: 250,
-        apiCalls: 1,
-        creditsUsed: 15,
-        errorRate: 0,
-        retryCount: 0
-      },
-      // Context
-      context: {
-        trigger: 'scheduled_batch',
-        patientIds: [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112],
-        location: 'Clinică Centrală'
-      }
-    },
-    2: {
-      // Detalii specifice ElevenLabs
-      elevenLabsDetails: {
-        audioDuration: 125,
-        voiceModel: 'Nova',
-        language: 'ro',
-        transcription: 'Da, confirm programarea pentru mâine la ora 10.',
-        sentiment: 'positive',
-        confidence: 0.92,
-        costPerMinute: 0.30,
-        totalCost: 0.0625
-      },
-      // Metadata tehnică
-      technical: {
-        duration: 890,
-        apiCalls: 3,
-        creditsUsed: 45,
-        errorRate: 0,
-        retryCount: 0
-      },
-      // Context
-      context: {
-        trigger: 'incoming_call',
-        patientId: 203,
-        appointmentId: 456,
-        phoneNumber: '+40712345678'
-      }
-    },
-    3: {
-      // Detalii specifice Meta
-      metaDetails: {
-        platform: 'Instagram',
-        postId: 'ig_7890123456789',
-        commentText: '@clinica_mea vreau o programare pentru mâine',
-        responseTime: 45,
-        engagement: {
-          likes: 2,
-          replies: 0,
-          shares: 0
-        },
-        userProfile: {
-          followers: 150,
-          verified: false,
-          location: 'București'
-        }
-      },
-      // Metadata tehnică
-      technical: {
-        duration: 320,
-        apiCalls: 2,
-        creditsUsed: 25,
-        errorRate: 0,
-        retryCount: 0
-      },
-      // Context
-      context: {
-        trigger: 'social_mention',
-        patientId: 304,
-        socialMediaId: 'ig_user_789',
-        campaign: 'social_booking'
-      }
-    },
-    4: {
-      // Detalii specifice Gmail
-      gmailDetails: {
-        recipientEmail: 'pacient@email.com',
-        subject: 'Informații despre tratamentele disponibile',
-        templateUsed: 'treatment_info_template',
-        attachments: ['price_list.pdf', 'treatment_options.pdf'],
-        openRate: 0,
-        clickRate: 0,
-        responseTime: 120
-      },
-      // Metadata tehnică
-      technical: {
-        duration: 180,
-        apiCalls: 1,
-        creditsUsed: 8,
-        errorRate: 0,
-        retryCount: 0
-      },
-      // Context
-      context: {
-        trigger: 'email_inquiry',
-        patientId: 405,
-        inquiryType: 'treatment_info',
-        sourceEmail: 'info@clinica.com'
-      }
-    },
-    5: {
-      // Detalii specifice ElevenLabs
-      elevenLabsDetails: {
-        audioDuration: 95,
-        voiceModel: 'Nova',
-        language: 'ro',
-        transcription: 'Nu mai pot veni mâine, vă rog să anulați programarea.',
-        sentiment: 'neutral',
-        confidence: 0.88,
-        costPerMinute: 0.30,
-        totalCost: 0.0475
-      },
-      // Metadata tehnică
-      technical: {
-        duration: 650,
-        apiCalls: 4,
-        creditsUsed: 38,
-        errorRate: 0,
-        retryCount: 0
-      },
-      // Context
-      context: {
-        trigger: 'incoming_call',
-        patientId: 506,
-        appointmentId: 789,
-        phoneNumber: '+40787654321',
-        cancellationReason: 'schedule_conflict'
-      }
-    },
-    6: {
-      // Detalii specifice SMS
-      smsDetails: {
-        recipientCount: 1,
-        messageTemplate: 'Reamintire: Programarea dumneavoastră este mâine la {{time}}',
-        deliveryRate: 100,
-        costPerSMS: 0.05,
-        totalCost: 0.05,
-        provider: 'Twilio',
-        language: 'ro'
-      },
-      // Metadata tehnică
-      technical: {
-        duration: 150,
-        apiCalls: 1,
-        creditsUsed: 12,
-        errorRate: 0,
-        retryCount: 0
-      },
-      // Context
-      context: {
-        trigger: 'scheduled_reminder',
-        patientId: 607,
-        appointmentId: 890,
-        reminderType: '24h_before'
-      }
-    },
-    7: {
-      // Detalii specifice Meta
-      metaDetails: {
-        platform: 'Facebook',
-        messageId: 'fb_msg_123456789',
-        errorMessage: 'Rate limit exceeded for Facebook API',
-        retryAttempts: 3,
-        lastRetry: new Date(Date.now() - 2 * 60 * 60 * 1000)
-      },
-      // Metadata tehnică
-      technical: {
-        duration: 5000,
-        apiCalls: 5,
-        creditsUsed: 0,
-        errorRate: 100,
-        retryCount: 3,
-        errorDetails: {
-          code: 'RATE_LIMIT_EXCEEDED',
-          message: 'Too many requests to Facebook API',
-          retryAfter: 3600
-        }
-      },
-      // Context
-      context: {
-        trigger: 'direct_message',
-        patientId: 708,
-        socialMediaId: 'fb_user_456',
-        campaign: 'social_booking'
-      }
-    }
-  });
-
+  // Folosim hook-ul pentru a încărca datele reale
+  const { logs: activities, loading, error, loadAgentLogs } = useAgentLogs()
+  
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
-  // Funcție pentru a obține iconița serviciului
-  const getServiceIcon = (service) => {
-    switch (service) {
+  // Încarcă activitățile la prima montare și când se schimbă data
+  useEffect(() => {
+    const selectedDateStr = selectedDate.toISOString().split('T')[0]
+    loadAgentLogs(1, 100, { date: selectedDateStr })
+  }, [selectedDate, loadAgentLogs])
+
+  // Funcție pentru a obține iconița acțiunii (bazată pe actionType)
+  const getActionIcon = (actionType) => {
+    switch (actionType) {
       case 'sms': return MessageSquare;
-      case 'elevenLabs': return Mic;
-      case 'gmail': return Mail;
-      case 'meta': return Facebook;
+      case 'email': return Mail;
+      case 'voice_call': return Mic;
+      case 'meta_message': return Facebook;
       default: return Activity;
     }
   };
@@ -381,89 +98,96 @@ const OperationsActivities = () => {
   };
 
   // Filtrare activități după dată
-  const filteredActivities = activities.filter(activity => {
+  const filteredActivities = (activities || []).filter(activity => {
     const activityDate = new Date(activity.timestamp);
     const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
     const activityDateOnly = new Date(activityDate.getFullYear(), activityDate.getMonth(), activityDate.getDate());
     return activityDateOnly.getTime() === selectedDateOnly.getTime();
   });
 
-  // Statistici rapide
+  // Statistici rapide - folosim datele reale în loc de mock
   const stats = {
-    total: activities.length,
-    success: activities.filter(a => a.status === 'success').length,
-    error: activities.filter(a => a.status === 'error').length
-  };
+    total: activities?.length || 0,
+    success: activities?.filter(a => a.status === 'success').length || 0,
+    error: activities?.filter(a => a.status === 'error').length || 0
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header cu statistici */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Activități Agent</h1>
-          <p className="text-muted-foreground">
-            Jurnalul acțiunilor automate realizate de agentul inteligent
-          </p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="text-right">
-            <div className="text-2xl font-bold text-green-600">{stats.success}</div>
-            <div className="text-sm text-muted-foreground">Succes</div>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {/* Chip cu titlul */}
+          <div className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full shadow-sm">
+            <span className="font-semibold text-sm">Activități Agent</span>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-red-600">{stats.error}</div>
-            <div className="text-sm text-muted-foreground">Erori</div>
-          </div>
-        </div>
-      </div>
 
-      {/* Date Picker Button */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Data selectată:</span>
-            </div>
-            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start text-left font-normal">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {formatDateForButton(selectedDate)}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <CalendarComponent
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    setSelectedDate(date);
-                    setDatePickerOpen(false);
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Separator subtil */}
+          <div className="h-6 w-px bg-gray-200"></div>
+
+          {/* Date Picker Button */}
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-9 rounded-full text-sm shadow-sm">
+                <Calendar className="mr-2 h-4 w-4" />
+                {formatDateForButton(selectedDate)}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  setSelectedDate(date);
+                  setDatePickerOpen(false);
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+      </div>
 
       {/* Tabel compact */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-hidden">
-            <table className="w-full">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Acțiune</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Serviciu</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Descriere</th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Ora</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredActivities.map((activity, index) => {
-                  const ServiceIcon = getServiceIcon(activity.service);
+          {loading && filteredActivities.length === 0 ? (
+            <div className="text-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Se încarcă activitățile...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Eroare</h3>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => loadAgentLogs(1, 100, { date: selectedDate.toISOString().split('T')[0] })}>
+                Încearcă din nou
+              </Button>
+            </div>
+          ) : filteredActivities.length === 0 ? (
+            <div className="text-center py-12">
+              <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Nu există activități</h3>
+              <p className="text-muted-foreground">
+                Nu au fost găsite activități pentru data selectată.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-hidden">
+              <table className="w-full">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Acțiune</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Tip</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Descriere</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Ora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredActivities.map((activity, index) => {
+                  const ActionIcon = getActionIcon(activity.service); // service conține acum actionType
                   const CategoryIcon = getCategoryIcon(activity.category);
                   const actionInfo = getActionInfo(activity.action);
                   
@@ -486,11 +210,15 @@ const OperationsActivities = () => {
                         </span>
                       </td>
 
-                      {/* Serviciu */}
+                      {/* Tip Acțiune */}
                       <td className="p-4 align-middle">
                         <div className="flex items-center space-x-2">
-                          <ServiceIcon className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">{activity.service}</span>
+                          <ActionIcon className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium capitalize">
+                            {activity.service === 'voice_call' ? 'Apel' : 
+                             activity.service === 'meta_message' ? 'Social' : 
+                             activity.service}
+                          </span>
                         </div>
                       </td>
 
@@ -513,9 +241,10 @@ const OperationsActivities = () => {
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -527,7 +256,7 @@ const OperationsActivities = () => {
             setSelectedActivity(null);
           }}
           activity={selectedActivity}
-          detailedData={detailedData[selectedActivity.id]}
+          detailedData={selectedActivity._rawData || selectedActivity.metadata}
         />
       )}
     </div>

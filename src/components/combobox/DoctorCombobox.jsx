@@ -27,7 +27,16 @@ const DoctorCombobox = ({
   const { users, loading, error, searchUsers } = useUsers();
 
   // Filtrăm doar utilizatorii care pot prelua programări
-  const availableDoctors = users.filter((user) => user.canTakeAppointments === true);
+  // canTakeAppointments poate fi boolean sau string "true"/"false"
+  const availableDoctors = users.filter((user) => {
+    if (typeof user.canTakeAppointments === 'boolean') {
+      return user.canTakeAppointments === true;
+    }
+    if (typeof user.canTakeAppointments === 'string') {
+      return user.canTakeAppointments === 'true';
+    }
+    return false;
+  });
   const selectedDoctor = availableDoctors.find((user) => (user.resourceId || user.id).toString() === (typeof value === 'string' ? value : value?.id));
 
   // Căutare când se deschide combobox-ul sau când se schimbă termenul de căutare

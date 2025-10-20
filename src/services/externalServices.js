@@ -301,10 +301,40 @@ class ExternalServices {
     try {
       const authUrl = await this.getMetaAuthUrl();
       // Redirect to Meta OAuth
-      // Backend will handle the callback and redirect back to the app
+      // Meta will redirect back to frontend with code & state
       window.location.href = authUrl;
     } catch (error) {
       console.error('Meta connection error:', error);
+      throw error;
+    }
+  }
+
+  // Send Meta OAuth code to backend for processing
+  async sendMetaAuthCode(code, state) {
+    try {
+      const businessId = this.getBusinessId();
+      const locationId = this.getLocationId();
+      
+      // New format with businessId and locationId in path
+      const url = `${this.baseUrl}/credentials/meta/${encodeURIComponent(businessId)}/${encodeURIComponent(locationId)}`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code, state })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Failed to process Meta authorization: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error sending Meta auth code to backend:', error);
       throw error;
     }
   }

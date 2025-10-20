@@ -90,9 +90,46 @@ function AppContent() {
         // Check for OAuth callback (code parameter from Cognito/Google)
         const urlParams = new URLSearchParams(window.location.search)
         const code = urlParams.get('code')
+        const state = urlParams.get('state')
         
-        if (code && !isDemoMode) {
-          console.log('OAuth callback detected, processing...')
+        // Flag to track if we processed a Meta callback
+        let isMetaCallback = false
+        
+        // Check if this is a Meta OAuth callback (has state parameter with Meta info)
+        if (code && state && !isDemoMode) {
+          try {
+            // Try to decode state to see if it's from Meta OAuth
+            const stateData = JSON.parse(atob(state.replace(/-/g, '+').replace(/_/g, '/')))
+            if (stateData.businessId || stateData.redirectUri) {
+              isMetaCallback = true
+              console.log('Meta OAuth callback detected, sending code to backend...')
+              
+              try {
+                // Import externalServices dynamically
+                const { externalServices } = await import('./services/externalServices.js')
+                
+                // Send code and state to backend for processing
+                await externalServices.sendMetaAuthCode(code, state)
+                console.log('✅ Meta authorization code sent successfully to backend')
+                
+                // Clean URL and continue app initialization
+                window.history.replaceState({}, document.title, window.location.pathname)
+                // Don't return here - continue with normal initialization
+              } catch (metaError) {
+                console.error('❌ Failed to process Meta authorization:', metaError)
+                // Clean URL even on error
+                window.history.replaceState({}, document.title, window.location.pathname)
+                // Continue with app initialization
+              }
+            }
+          } catch (e) {
+            // State is not decodable or not from Meta, continue with Cognito flow
+          }
+        }
+        
+        // Handle Cognito OAuth callback (for user authentication) - only if NOT a Meta callback
+        if (code && !isDemoMode && !isMetaCallback) {
+          console.log('Cognito OAuth callback detected, processing...')
           try {
             // Handle OAuth callback from Cognito
             await cognitoAuthService.handleOAuthCallback(code)

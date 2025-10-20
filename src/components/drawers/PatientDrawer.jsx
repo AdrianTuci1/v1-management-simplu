@@ -15,7 +15,8 @@ import {
   Upload,
   Image,
   ClipboardList,
-  FileText
+  FileText,
+  Check
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { usePatients } from '../../hooks/usePatients.js'
@@ -25,12 +26,12 @@ import { useDrawer } from '../../contexts/DrawerContext.jsx'
 import { 
   Drawer, 
   DrawerHeader, 
-  DrawerNavigation, 
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
-import FullscreenTreatmentPlan from '../dental-chart/FullscreenTreatmentPlan'
 import { normalizePhoneNumber } from '../../utils/phoneUtils.js'
+import resourceFilesService from '../../services/resourceFilesService.js'
+import { FaTooth } from 'react-icons/fa'
 
 const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, position = "side", externalCurrentMenu, onExternalMenuChange }) => {
   const [currentMenu, setCurrentMenu] = useState(1)
@@ -62,6 +63,12 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
   const [showTreatmentPlan, setShowTreatmentPlan] = useState(false)
   const [planItems, setPlanItems] = useState([])
   const [planLoading, setPlanLoading] = useState(false)
+  const [files, setFiles] = useState([])
+  const [filesLoading, setFilesLoading] = useState(false)
+  const [filesError, setFilesError] = useState(null)
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [selectedTreatments, setSelectedTreatments] = useState([])
+  const [completedTreatments, setCompletedTreatments] = useState([])
   
   // Hook pentru gestionarea pacienților
   const { addPatient, updatePatient, deletePatient } = usePatients()
@@ -144,6 +151,38 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     loadPlan()
   }, [patientData?.id, showTreatmentPlan])
 
+  // Load patient files when patient changes
+  useEffect(() => {
+    const loadFiles = async () => {
+      const resourceId = patientData?.resourceId || patientData?.id
+      if (!resourceId) {
+        setFiles([])
+        return
+      }
+      setFilesLoading(true)
+      setFilesError(null)
+      try {
+        const result = await resourceFilesService.listFiles('patient', String(resourceId))
+        setFiles(Array.isArray(result?.files) ? result.files : [])
+      } catch (e) {
+        console.error('Error loading patient files:', e)
+        setFilesError(e.message || 'Eroare la încărcarea fișierelor')
+        setFiles([])
+      } finally {
+        setFilesLoading(false)
+      }
+    }
+    loadFiles()
+  }, [patientData?.id, patientData?.resourceId])
+
+  // Reset treatment selections when menu changes
+  useEffect(() => {
+    if (currentMenu !== 2) {
+      setSelectedTreatments([])
+      setError(null)
+    }
+  }, [currentMenu])
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -168,24 +207,54 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     }))
   }
 
-  const handleImageUpload = (event) => {
-    const files = Array.from(event.target.files)
-    const newImages = files.map(file => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      url: URL.createObjectURL(file)
-    }))
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...newImages]
-    }))
+  const handleBackendFileUpload = async (event) => {
+    const resourceId = patientData?.resourceId || patientData?.id
+    if (!resourceId) {
+      setFilesError('Salvează pacientul înainte de a încărca fișiere')
+      event.target.value = ''
+      return
+    }
+    const selected = Array.from(event.target.files || [])
+    if (selected.length === 0) return
+    setUploadingFiles(true)
+    setFilesError(null)
+    try {
+      for (const file of selected) {
+        await resourceFilesService.uploadFile('patient', String(resourceId), file)
+      }
+      // Reload files
+      const result = await resourceFilesService.listFiles('patient', String(resourceId))
+      setFiles(Array.isArray(result?.files) ? result.files : [])
+    } catch (e) {
+      setFilesError(e.message || 'Încărcarea a eșuat')
+    } finally {
+      setUploadingFiles(false)
+      event.target.value = ''
+    }
   }
 
-  const removeImage = (imageId) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter(img => img.id !== imageId)
-    }))
+  const handleFileDelete = async (fileId) => {
+    const resourceId = patientData?.resourceId || patientData?.id
+    if (!resourceId || !fileId) return
+    if (!confirm('Ești sigur că vrei să ștergi acest fișier?')) return
+    try {
+      await resourceFilesService.deleteFile('patient', String(resourceId), String(fileId))
+      const result = await resourceFilesService.listFiles('patient', String(resourceId))
+      setFiles(Array.isArray(result?.files) ? result.files : [])
+    } catch (e) {
+      setFilesError(e.message || 'Ștergerea a eșuat')
+    }
+  }
+
+  const handleFileDownload = async (fileId) => {
+    const resourceId = patientData?.resourceId || patientData?.id
+    if (!resourceId || !fileId) return
+    try {
+      const url = await resourceFilesService.getFileUrl('patient', String(resourceId), String(fileId))
+      if (url) window.open(url, '_blank')
+    } catch (e) {
+      setFilesError(e.message || 'Descărcarea a eșuat')
+    }
   }
 
   const handleSave = async () => {
@@ -240,6 +309,72 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
       data: appointment,
       isNew: false
     })
+  }
+
+  const handleToggleSelectTreatment = (treatment) => {
+    // Nu permitem selectarea tratamentelor realizate
+    const isCompleted = completedTreatments.find(t => t.id === treatment.id)
+    if (isCompleted) return
+    
+    setSelectedTreatments(prev => {
+      const isSelected = prev.find(t => t.id === treatment.id)
+      if (isSelected) {
+        return prev.filter(t => t.id !== treatment.id)
+      }
+      return [...prev, treatment]
+    })
+  }
+
+  const handleToggleCompleteTreatment = (treatment) => {
+    setCompletedTreatments(prev => {
+      const isCompleted = prev.find(t => t.id === treatment.id)
+      if (isCompleted) {
+        return prev.filter(t => t.id !== treatment.id)
+      }
+      // Când marcăm ca realizat, îl eliminăm și din selecție
+      setSelectedTreatments(current => current.filter(t => t.id !== treatment.id))
+      return [...prev, treatment]
+    })
+  }
+
+  const handleCreateAppointmentFromSelected = () => {
+    if (selectedTreatments.length === 0) {
+      setError('Selectează cel puțin un tratament pentru programare')
+      return
+    }
+
+    // Pregătim serviciile din tratamentele selectate
+    const services = selectedTreatments.map(treatment => ({
+      id: treatment.id,
+      name: treatment.title,
+      price: String(treatment.price || 0),
+      duration: treatment.durationMinutes || 0,
+      toothNumber: treatment.toothNumber
+    }))
+
+    // Pentru AppointmentDrawer, trimitem date în formatul așteptat
+    const appointmentData = {
+      // Patient ca obiect simplu pentru transformAppointmentForUI
+      patient: {
+        id: patientData?.resourceId || patientData?.id,
+        name: patientData?.name || patientData?.patientName || ''
+      },
+      services: services,
+      date: new Date().toISOString().split('T')[0],
+      time: '',
+      status: 'scheduled',
+      mention: `Tratamente din plan: ${selectedTreatments.map(t => `Dinte ${t.toothNumber} - ${t.title}`).join(', ')}`
+    }
+
+    // Deschidem AppointmentDrawer cu datele pre-populate
+    openDrawer({
+      type: 'appointment',
+      data: appointmentData,
+      isNew: true
+    })
+
+    // Resetăm selecția
+    setSelectedTreatments([])
   }
 
   const renderPatientDetails = () => (
@@ -468,53 +603,135 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium text-gray-900">Plan de tratament activ</h4>
-                  <span className="text-sm text-blue-600">{planItems.length} tratamente</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">
+                      {planItems.length} total
+                    </span>
+                    {completedTreatments.length > 0 && (
+                      <span className="text-sm text-green-600">
+                        • {completedTreatments.length} realizat(e)
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  {planItems.slice(0, 5).map((item, index) => (
-                    <div key={item.id} className="flex items-start gap-2 text-sm">
-                      <span className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
-                        {index + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">
-                            Dinte {item.toothNumber}
-                          </span>
-                          <span className="text-gray-700 truncate">
-                            {item.title}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
-                          {item.durationMinutes && (
-                            <span>{item.durationMinutes} min</span>
-                          )}
-                          {item.price && (
-                            <span>{item.price} RON</span>
-                          )}
+                  {planItems.map((item, index) => {
+                    const isSelected = selectedTreatments.find(t => t.id === item.id)
+                    const isCompleted = completedTreatments.find(t => t.id === item.id)
+                    
+                    return (
+                      <div 
+                        key={item.id} 
+                        className={`flex items-start gap-3 text-sm p-3 rounded-lg transition-all ${
+                            isCompleted
+                            ? 'bg-green-50 border border-green-200 opacity-70'
+                            : isSelected 
+                            ? 'bg-blue-50 border border-blue-200' 
+                            : 'bg-white border border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {/* Checkbox cu stări multiple */}
+                        <button
+                          onClick={() => {
+                            if (isCompleted) {
+                              // Dacă e realizat, îl demarcăm
+                              handleToggleCompleteTreatment(item)
+                            } else {
+                              // Dacă nu e realizat, toggle selectare pentru programare
+                              handleToggleSelectTreatment(item)
+                            }
+                          }}
+                          onContextMenu={(e) => {
+                            // Click dreapta = marchează ca realizat
+                            e.preventDefault()
+                            if (!isCompleted) {
+                              handleToggleCompleteTreatment(item)
+                            }
+                          }}
+                          className="flex-shrink-0 mt-0.5"
+                          title={
+                            isCompleted 
+                              ? "Realizat (click pentru a anula)" 
+                              : isSelected 
+                              ? "Deselectează" 
+                              : "Click = selectează | Click lung = realizat"
+                          }
+                        >
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                              isCompleted
+                              ? 'bg-green-500 text-white'
+                              : isSelected 
+                              ? 'bg-blue-500 text-white'
+                              : 'border-2 border-gray-300 hover:border-blue-400'
+                          }`}>
+                            {(isCompleted || isSelected) && (
+                              <Check className="h-3 w-3" strokeWidth={3} />
+                            )}
+                          </div>
+                        </button>
+                        
+
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-2">
+                            <span className={`font-semibold text-base ${isCompleted ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                              {item.title}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                            {item.toothNumber && (
+                              <span className="flex items-center gap-1">
+                                <svg viewBox="0 0 12 12" className="h-4 w-4" fill="currentColor">
+                                  <FaTooth className="h-4 w-4" />
+                                </svg>
+                                {item.toothNumber <= 100 ? `${item.toothNumber}` : item.toothNumber}
+                              </span>
+                            )}
+                            {item.durationMinutes && (
+                              <span>{item.durationMinutes} min</span>
+                            )}
+                            {item.price && (
+                              <span>{item.price} RON</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                  {planItems.length > 5 && (
-                    <div className="text-center pt-2">
-                      <button
-                        onClick={() => {
-                          setShowTreatmentPlan(true)
-                          setTreatmentPlanOpen(true)
-                          setTreatmentPlanPatientId(String(patientData?.id || patientData?.resourceId || ''))
-                        }}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        +{planItems.length - 5} tratamente suplimentare
-                      </button>
-                    </div>
-                  )}
+                    )
+                  })}
                 </div>
               </div>
               
-              <div className="text-xs text-muted-foreground">
-                Click pe "Editează planul" pentru a modifica ordinea tratamentelor sau pentru a adăuga/șterge tratamente.
+              {/* Buton pentru crearea programării cu tratamentele selectate */}
+              {selectedTreatments.length > 0 && (
+                <div className="bg-blue-100 border border-blue-300 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-900">
+                      {selectedTreatments.length} tratament(e) selectat(e)
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleCreateAppointmentFromSelected}
+                    className="btn btn-primary w-full"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Creează programare cu tratamente selectate
+                  </button>
+                </div>
+              )}
+              
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                    <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                  </div>
+                  <span>Click pe checkbox = selectează pentru programare</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                  </div>
+                  <span>Click dreapta pe checkbox = marchează ca realizat</span>
+                </div>
               </div>
             </div>
           ) : (
@@ -606,58 +823,87 @@ const PatientDrawer = ({ onClose, isNewPatient = false, patientData = null, posi
     </div>
   )
 
-  const renderGallery = () => (
-    <div className="space-y-4">
-      <div className="text-sm font-medium text-muted-foreground">
-        Galerie foto
-      </div>
-      
-      {/* Upload Area */}
-      <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground mb-2">
-          Trageți și plasați imaginile aici sau
-        </p>
-        <label className="btn btn-outline btn-sm cursor-pointer">
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          Selectează fișiere
-        </label>
-      </div>
-
-      {/* Images Grid */}
-      {formData.images.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Imagini atașate</div>
-          <div className="grid grid-cols-2 gap-2">
-            {formData.images.map((image) => (
-              <div key={image.id} className="relative group">
-                <img
-                  src={image.url}
-                  alt={image.name}
-                  className="w-full h-24 object-cover rounded-lg"
-                />
-                <button
-                  onClick={() => removeImage(image.id)}
-                  className="absolute top-1 right-1 h-6 w-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-                <div className="absolute bottom-1 left-1 right-1 bg-black/50 text-white text-xs p-1 rounded truncate">
-                  {image.name}
-                </div>
-              </div>
-            ))}
+  const renderGallery = () => {
+    const resourceId = patientData?.resourceId || patientData?.id
+    if (!resourceId) {
+      return (
+        <div className="space-y-4">
+          <div className="text-sm font-medium text-muted-foreground">
+            Galerie fișiere pacient
+          </div>
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">
+              Salvează pacientul mai întâi pentru a putea încărca fișiere.
+            </p>
           </div>
         </div>
-      )}
-    </div>
-  )
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="text-sm font-medium text-muted-foreground">
+          Galerie fișiere pacient
+        </div>
+
+        {filesError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+            {filesError}
+          </div>
+        )}
+
+        {/* Upload Area */}
+        <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground mb-2">
+            Trageți și plasați fișierele aici sau
+          </p>
+          <label className="btn btn-outline btn-sm cursor-pointer">
+            <input
+              type="file"
+              multiple
+              accept=".jpg,.jpeg,.png,.obj,.pdf"
+              onChange={handleBackendFileUpload}
+              disabled={uploadingFiles}
+              className="hidden"
+            />
+            {uploadingFiles ? 'Se încarcă...' : 'Selectează fișiere'}
+          </label>
+        </div>
+
+        {/* Files List */}
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Fișiere încărcate</div>
+          {filesLoading ? (
+            <div className="text-center py-6 text-slate-500">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+              Se încarcă lista de fișiere...
+            </div>
+          ) : files.length === 0 ? (
+            <div className="text-slate-500 text-sm">Nu există fișiere încărcate.</div>
+          ) : (
+            <div className="space-y-2">
+              {files.map((f) => (
+                <div key={f.id} className="flex items-center justify-between p-2 border rounded-md">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{f.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">{f.type} · {(f.size / 1024).toFixed(1)} KB</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleFileDownload(f.id)} className="btn btn-outline btn-xs">Descarcă</button>
+                    <button onClick={() => handleFileDelete(f.id)} className="btn btn-destructive btn-xs">Șterge</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const renderMenu = () => {
     switch (currentMenu) {

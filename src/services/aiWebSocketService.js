@@ -170,7 +170,6 @@ export class AIWebSocketService {
       Logger.log('info', '✅ Connected to WebSocket server via SocketFacade', result);
     } catch (error) {
       Logger.log('error', '❌ Failed to connect to WebSocket server', error);
-      this.onError?.(getConfig('ERRORS.CONNECTION_FAILED'), error);
       this.scheduleReconnect();
     }
   }

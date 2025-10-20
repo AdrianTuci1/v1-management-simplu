@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, User, Mail, Phone, AlertCircle, Send } from 'lucide-react'
+import { X, Save, Trash2, User, Mail, Phone, AlertCircle, Send, Loader2, Upload } from 'lucide-react'
 import { useUsers } from '../../hooks/useUsers.js'
 import { useRoles } from '../../hooks/useRoles.js'
 import { useInvitations } from '../../hooks/useInvitations.js'
@@ -10,6 +10,7 @@ import {
   DrawerContent, 
   DrawerFooter 
 } from '../ui/drawer'
+import resourceFilesService from '../../services/resourceFilesService.js'
 
 
 const UserDrawer = ({ onClose, user = null, position = "side" }) => {
@@ -30,6 +31,11 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [invitationStatus, setInvitationStatus] = useState(null)
   const [showInvitationSuccess, setShowInvitationSuccess] = useState(false)
+  const [profileFile, setProfileFile] = useState(null)
+  const [profileUrl, setProfileUrl] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [profileUploading, setProfileUploading] = useState(false)
+  const [profileError, setProfileError] = useState(null)
 
   // Populează formularul când se deschide pentru editare
   useEffect(() => {
@@ -60,6 +66,99 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
     setValidationErrors({})
     setShowInvitationSuccess(false)
   }, [user, roles])
+
+  // Load profile image for existing medic resource
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      const resourceId = user?.resourceId || user?.id
+      if (!resourceId) {
+        setProfileFile(null)
+        setProfileUrl(null)
+        return
+      }
+      setProfileLoading(true)
+      setProfileError(null)
+      try {
+        const result = await resourceFilesService.listFiles('medic', String(resourceId))
+        const files = Array.isArray(result?.files) ? result.files : []
+        const imageFiles = files.filter(f => (f.type || '').startsWith('image/'))
+        if (imageFiles.length === 0) {
+          setProfileFile(null)
+          setProfileUrl(null)
+        } else {
+          const sorted = imageFiles.sort((a, b) => {
+            const ta = Date.parse(a.uploadedAt || '') || 0
+            const tb = Date.parse(b.uploadedAt || '') || 0
+            return tb - ta
+          })
+          const pf = sorted[0]
+          setProfileFile(pf)
+          try {
+            const url = await resourceFilesService.getFileUrl('medic', String(resourceId), String(pf.id))
+            setProfileUrl(url)
+          } catch (_) {
+            setProfileUrl(null)
+          }
+        }
+      } catch (e) {
+        setProfileError(e.message || 'Eroare la încărcarea imaginii de profil')
+        setProfileFile(null)
+        setProfileUrl(null)
+      } finally {
+        setProfileLoading(false)
+      }
+    }
+    loadProfileImage()
+  }, [user?.id, user?.resourceId])
+
+  const handleProfileUpload = async (event) => {
+    const resourceId = user?.resourceId || user?.id
+    if (!resourceId) {
+      setProfileError('Salvează medicul înainte de a încărca o imagine')
+      event.target.value = ''
+      return
+    }
+    const file = event.target.files?.[0]
+    if (!file) return
+    setProfileUploading(true)
+    setProfileError(null)
+    try {
+      await resourceFilesService.uploadFile('medic', String(resourceId), file)
+      const result = await resourceFilesService.listFiles('medic', String(resourceId))
+      const files = Array.isArray(result?.files) ? result.files : []
+      const imageFiles = files.filter(f => (f.type || '').startsWith('image/'))
+      const pf = imageFiles.sort((a, b) => {
+        const ta = Date.parse(a.uploadedAt || '') || 0
+        const tb = Date.parse(b.uploadedAt || '') || 0
+        return tb - ta
+      })[0]
+      setProfileFile(pf || null)
+      if (pf) {
+        const url = await resourceFilesService.getFileUrl('medic', String(resourceId), String(pf.id))
+        setProfileUrl(url)
+      } else {
+        setProfileUrl(null)
+      }
+    } catch (e) {
+      setProfileError(e.message || 'Încărcarea a eșuat')
+    } finally {
+      setProfileUploading(false)
+      event.target.value = ''
+    }
+  }
+
+  const handleProfileDelete = async () => {
+    const resourceId = user?.resourceId || user?.id
+    if (!resourceId || !profileFile?.id) return
+    if (!window.confirm('Ești sigur că vrei să ștergi imaginea de profil?')) return
+    try {
+      await resourceFilesService.deleteFile('medic', String(resourceId), String(profileFile.id))
+      setProfileFile(null)
+      setProfileUrl(null)
+    } catch (e) {
+      setProfileError(e.message || 'Ștergerea a eșuat')
+    }
+  }
 
   // Validare folosind userManager
   const validateField = (name, value) => {
@@ -358,6 +457,50 @@ const UserDrawer = ({ onClose, user = null, position = "side" }) => {
                 )}
               </div>
             </div>
+
+            {/* Imagine profil medic */}
+            {user && (
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Imagine profil
+                </label>
+                {profileError && (
+                  <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{profileError}</div>
+                )}
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full border overflow-hidden bg-gray-100 flex items-center justify-center">
+                    {profileLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                    ) : profileUrl ? (
+                      <img src={profileUrl} alt="Profil" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="h-6 w-6 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm cursor-pointer hover:bg-blue-700 transition-colors">
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png"
+                        onChange={handleProfileUpload}
+                        disabled={profileUploading}
+                        className="hidden"
+                      />
+                      {profileUploading ? 'Se încarcă...' : 'Încarcă/Înlocuiește'}
+                    </label>
+                    {profileFile && (
+                      <button
+                        type="button"
+                        onClick={handleProfileDelete}
+                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm"
+                      >
+                        Șterge
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium mb-2">

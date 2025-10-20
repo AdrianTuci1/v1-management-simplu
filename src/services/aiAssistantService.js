@@ -124,7 +124,7 @@ export class AIAssistantService {
         Logger.log('info', 'No active session exists, continuing...');
         return null;
       }
-      this.onError?.(getConfig('ERRORS.SESSION_LOAD_FAILED'), error);
+      this.onError?.('Failed to load active session', error);
       throw error;
     }
   }
@@ -196,7 +196,7 @@ export class AIAssistantService {
       return null;
     } catch (error) {
       Logger.log('error', '❌ Failed to load today session', error);
-      this.onError?.(getConfig('ERRORS.SESSION_LOAD_FAILED'), error);
+      this.onError?.('Failed to load today session', error);
       throw error;
     }
   }
@@ -257,7 +257,7 @@ export class AIAssistantService {
       }
     } catch (error) {
       Logger.log('error', 'Failed to load message history', error);
-      this.onError?.(getConfig('ERRORS.SESSION_LOAD_FAILED'), error);
+      this.onError?.('Failed to load message history', error);
       throw error;
     }
   }
@@ -343,7 +343,7 @@ export class AIAssistantService {
       return result;
     } catch (error) {
       Logger.log('error', 'Failed to send message via API', error);
-      this.onError?.(getConfig('ERRORS.MESSAGE_SEND_FAILED'), error);
+      this.onError?.('Failed to send message', error);
       throw error;
     }
   }

@@ -84,28 +84,7 @@ export function printTreatmentPlanPDF(treatmentPlanData) {
 
             // <><>><><>><>><><><><><>>><><<><><><><>
             // Logo on each page (supports SVG, PNG, JPG)
-            // Try both .svg and .png/.jpg extensions
-            const tryLoadLogo = async () => {
-                const logoSources = [
-                    'img/logo.svg',
-                    'img/logo.png',
-                    'img/logo.jpg',
-                    '3dark.webp', // Try clinic logo
-                ];
-                
-                for (const logoSrc of logoSources) {
-                    try {
-                        const result = await fetchImage(logoSrc);
-                        if (result.type && result.data) {
-                            return { ...result, src: logoSrc };
-                        }
-                    } catch (e) {
-                        // Try next source
-                        continue;
-                    }
-                }
-                return null;
-            };
+
             
             const logoLoaded = tryLoadLogo().then(async (logoData) => {
                 if (logoData) {

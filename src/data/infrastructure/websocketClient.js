@@ -129,8 +129,7 @@ export function connectWebSocket(url) {
       // Notify listeners about connection error
       listeners.forEach((cb) => cb({ 
         type: 'connection_error', 
-        status: 'error', 
-        message: 'WebSocket indisponibil. Verificați conexiunea la server.' 
+        status: 'error'
       }));
     });
     
@@ -140,8 +139,7 @@ export function connectWebSocket(url) {
     // Notify listeners about initialization error
     listeners.forEach((cb) => cb({ 
       type: 'connection_error', 
-      status: 'error', 
-      message: 'WebSocket indisponibil. Verificați conexiunea la server.' 
+      status: 'error'
     }));
   }
 }
