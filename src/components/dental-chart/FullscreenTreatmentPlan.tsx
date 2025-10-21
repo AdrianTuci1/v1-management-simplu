@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import PlanService from "@/services/planService";
 import DentalHistoryService from "@/services/dentalHistoryService";
 import TreatmentCombobox from "@/components/combobox/TreatmentCombobox.jsx";
@@ -180,6 +180,73 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
     }
   };
 
+  // Function to load chart items from dental history - memoized to avoid recreation
+  const loadChartItems = useCallback(async () => {
+    try {
+      console.log(`🔍 loadChartItems called for patientId: ${patientId}`);
+      const dentalHistory = await dentalHistoryService.getDentalHistory(patientId);
+      console.log(`📋 Loaded dental history for plan (${dentalHistory.length} teeth):`, dentalHistory);
+      
+      const chartItems: PlanItem[] = [];
+      
+      // Add treatments from chart (with specific tooth)
+      dentalHistory.forEach((tooth: any) => {
+        const treatments = tooth.treatments || [];
+        if (Array.isArray(treatments) && treatments.length > 0) {
+          treatments.forEach((treatment: any) => {
+            const duration = treatment.duration || treatment.durationMinutes;
+            const price = treatment.price;
+            
+            chartItems.push({
+              id: `chart-${tooth.toothNumber}-${treatment.id || Math.random()}`,
+              toothNumber: tooth.toothNumber,
+              title: treatment.name || treatment.title || treatment.description || "Tratament",
+              durationMinutes: duration ? (typeof duration === 'string' ? parseInt(duration) : Number(duration)) : null,
+              price: price ? (typeof price === 'string' ? parseFloat(price) : Number(price)) : null,
+              notes: treatment.notes || "",
+              isNew: false,
+              treatmentId: treatment.id,
+              isFromChart: true,
+            });
+          });
+        }
+      });
+      
+      console.log(`✅ Extracted ${chartItems.length} treatments from dental chart for plan`);
+
+      // Add general treatments (tooth 0) with numbers from 100 up
+      const generalTooth = dentalHistory.find((tooth: any) => tooth.toothNumber === 0);
+      if (generalTooth) {
+        const generalTreatments = generalTooth.treatments || [];
+        if (Array.isArray(generalTreatments) && generalTreatments.length > 0) {
+          console.log(`📋 Found ${generalTreatments.length} general treatments (tooth 0)`);
+          generalTreatments.forEach((treatment: any, index: number) => {
+            const duration = treatment.duration || treatment.durationMinutes;
+            const price = treatment.price;
+            
+            chartItems.push({
+              id: `chart-general-${treatment.id || Math.random()}`,
+              toothNumber: 100 + index, // Numbers from 100 up for general treatments
+              title: treatment.name || treatment.title || treatment.description || "Tratament general",
+              durationMinutes: duration ? (typeof duration === 'string' ? parseInt(duration) : Number(duration)) : null,
+              price: price ? (typeof price === 'string' ? parseFloat(price) : Number(price)) : null,
+              notes: treatment.notes || "",
+              isNew: false,
+              treatmentId: treatment.id,
+              isFromChart: true,
+            });
+          });
+        }
+      }
+      
+      console.log(`🎯 Total chart items extracted: ${chartItems.length}`);
+      return chartItems;
+    } catch (e) {
+      console.error("❌ Error loading chart items:", e);
+      return [];
+    }
+  }, [patientId, dentalHistoryService]);
+
   useEffect(() => {
     const load = async () => {
       if (!isOpen || !patientId) return;
@@ -195,61 +262,7 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
         setHasExistingPlan(planItems.length > 0);
         
         // Always load chart treatments for potential import
-        const dentalHistory = await dentalHistoryService.getDentalHistory(patientId);
-        console.log(`📋 Loaded dental history for plan (${dentalHistory.length} teeth):`, dentalHistory);
-        
-        const chartItems: PlanItem[] = [];
-        
-        // Add treatments from chart (with specific tooth)
-        dentalHistory.forEach((tooth: any) => {
-          const treatments = tooth.treatments || [];
-          if (Array.isArray(treatments) && treatments.length > 0) {
-            treatments.forEach((treatment: any) => {
-              const duration = treatment.duration || treatment.durationMinutes;
-              const price = treatment.price;
-              
-              chartItems.push({
-                id: `chart-${tooth.toothNumber}-${treatment.id || Math.random()}`,
-                toothNumber: tooth.toothNumber,
-                title: treatment.name || treatment.title || treatment.description || "Tratament",
-                durationMinutes: duration ? (typeof duration === 'string' ? parseInt(duration) : Number(duration)) : null,
-                price: price ? (typeof price === 'string' ? parseFloat(price) : Number(price)) : null,
-                notes: treatment.notes || "",
-                isNew: false,
-                treatmentId: treatment.id,
-                isFromChart: true,
-              });
-            });
-          }
-        });
-        
-        console.log(`✅ Extracted ${chartItems.length} treatments from dental chart for plan`);
-
-        // Add general treatments (tooth 0) with numbers from 100 up
-        const generalTooth = dentalHistory.find((tooth: any) => tooth.toothNumber === 0);
-        if (generalTooth) {
-          const generalTreatments = generalTooth.treatments || [];
-          if (Array.isArray(generalTreatments) && generalTreatments.length > 0) {
-            console.log(`📋 Found ${generalTreatments.length} general treatments (tooth 0)`);
-            generalTreatments.forEach((treatment: any, index: number) => {
-              const duration = treatment.duration || treatment.durationMinutes;
-              const price = treatment.price;
-              
-              chartItems.push({
-                id: `chart-general-${treatment.id || Math.random()}`,
-                toothNumber: 100 + index, // Numbers from 100 up for general treatments
-                title: treatment.name || treatment.title || treatment.description || "Tratament general",
-                durationMinutes: duration ? (typeof duration === 'string' ? parseInt(duration) : Number(duration)) : null,
-                price: price ? (typeof price === 'string' ? parseFloat(price) : Number(price)) : null,
-                notes: treatment.notes || "",
-                isNew: false,
-                treatmentId: treatment.id,
-                isFromChart: true,
-              });
-            });
-          }
-        }
-        
+        const chartItems = await loadChartItems();
         setChartItems(chartItems);
         
         // If no plan exists, start with empty plan
@@ -268,6 +281,71 @@ const FullscreenTreatmentPlan: React.FC<FullscreenTreatmentPlanProps> = ({ patie
     };
     load();
   }, [isOpen, patientId, planService, dentalHistoryService]);
+
+  // Listen for dental chart updates and reload chart items optimistically
+  useEffect(() => {
+    if (!isOpen || !patientId) return;
+
+    console.log(`👂 Setting up dentalChartUpdated listener for patientId: ${patientId}`);
+
+    const handleDentalChartUpdate = async (event: Event) => {
+      console.log("📢 Received dentalChartUpdated event!", event);
+      const customEvent = event as CustomEvent;
+      const { patientId: updatedPatientId } = customEvent.detail;
+      
+      console.log(`   Event patientId: ${updatedPatientId}, Current patientId: ${patientId}`);
+      
+      // Only reload if the update is for the current patient
+      if (updatedPatientId === patientId) {
+        console.log("🔄 PatientId matches! Reloading chart items optimistically...");
+        
+        try {
+          const newChartItems = await loadChartItems();
+          console.log(`✨ Optimistic update: Loaded ${newChartItems.length} chart items`);
+          console.log(`   New chart items:`, newChartItems.map(i => ({ tooth: i.toothNumber, title: i.title, id: i.treatmentId })));
+          setChartItems(newChartItems);
+          
+          // Update plan items that are from chart with new data
+          setItems((prevItems) => {
+            console.log(`   Updating plan items. Current count: ${prevItems.length}`);
+            const updated = prevItems.map((item) => {
+              if (!item.isFromChart) return item;
+              
+              // Find updated treatment in new chart items
+              const updatedChartItem = newChartItems.find(
+                (chartItem) => chartItem.treatmentId === item.treatmentId
+              );
+              
+              if (updatedChartItem) {
+                console.log(`   ✓ Updated treatment in plan: ${item.title} -> ${updatedChartItem.title}`);
+                return updatedChartItem;
+              }
+              
+              // If treatment no longer exists in chart, keep the item but mark it
+              console.log(`   ⚠ Treatment no longer in chart: ${item.title}`);
+              return item;
+            });
+            console.log(`   Updated plan items count: ${updated.length}`);
+            return updated;
+          });
+          
+          console.log("✅ Optimistic update completed successfully!");
+        } catch (error) {
+          console.error("❌ Failed to reload chart items optimistically:", error);
+        }
+      } else {
+        console.log("⏭️ PatientId doesn't match, skipping update");
+      }
+    };
+
+    window.addEventListener('dentalChartUpdated', handleDentalChartUpdate);
+    console.log("✅ Event listener attached for dentalChartUpdated");
+    
+    return () => {
+      console.log(`🧹 Removing dentalChartUpdated listener for patientId: ${patientId}`);
+      window.removeEventListener('dentalChartUpdated', handleDentalChartUpdate);
+    };
+  }, [isOpen, patientId, loadChartItems]);
 
   const handleAddExtra = () => {
     // Găsește următorul număr disponibil de la 100 în sus

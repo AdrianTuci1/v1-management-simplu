@@ -101,6 +101,13 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
       // Update initial state to match saved data
       initialTeethConditions.current = { ...teethConditions };
       initialToothTreatments.current = { ...toothTreatments };
+
+      // Emit custom event to notify other components about the update
+      const event = new CustomEvent('dentalChartUpdated', { 
+        detail: { patientId, updatedTeeth } 
+      });
+      window.dispatchEvent(event);
+      console.log("📢 Emitted dentalChartUpdated event for patientId:", patientId);
     } catch (error) {
       console.error("❌ Failed to save changes:", error);
     }
@@ -137,7 +144,7 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
     fetchData();
   }, [patientId]);
 
-  // Auto-save with debounce
+  // Auto-save instantly when changes are made
   useEffect(() => {
     console.log("🦷 Auto-save triggered. Current state:");
     console.log("   - teethConditions:", teethConditions);
@@ -146,16 +153,8 @@ const TeethChartTab: React.FC<{ patientId: string }> = ({ patientId }) => {
     
     if (!hasChanges()) return;
 
-    console.log("⏱️ Changes detected, starting 2s countdown for auto-save...");
-    const timeoutId = setTimeout(() => {
-      console.log("⏰ 2 seconds elapsed, calling handleSaveChanges...");
-      handleSaveChanges();
-    }, 2000); // Auto-save after 2 seconds of inactivity
-
-    return () => {
-      console.log("🧹 Clearing auto-save timeout");
-      clearTimeout(timeoutId);
-    };
+    console.log("💾 Changes detected, saving immediately...");
+    handleSaveChanges();
   }, [teethConditions, toothTreatments]);
 
   // Save changes when the component unmounts

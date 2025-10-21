@@ -273,7 +273,17 @@ class ExternalServices {
     }
 
     // Get current app URL for redirect after OAuth
-    const redirectUri = window.location.origin;
+    // IMPORTANT: Meta automatically adds trailing slash, so we add it here too for consistency
+    let redirectUri = window.location.origin;
+    if (!redirectUri.endsWith('/')) {
+      redirectUri += '/';
+    }
+    
+    console.log('🔧 Meta OAuth - Request Details:');
+    console.log('  Business ID:', businessId);
+    console.log('  Location ID:', locationId);
+    console.log('  Redirect URI:', redirectUri);
+    console.log('  ⚠️  Meta automatically adds trailing slash - using it explicitly for consistency');
     
     const url = `${this.baseUrl}/external/meta/auth-url?businessId=${encodeURIComponent(businessId)}&locationId=${encodeURIComponent(locationId)}&redirectUri=${encodeURIComponent(redirectUri)}`;
     
@@ -294,6 +304,9 @@ class ExternalServices {
       throw new Error('No auth URL returned from server');
     }
 
+    console.log('✅ Meta OAuth URL generated successfully');
+    console.log('  Returned redirect URI from backend:', data.redirectUri);
+
     return data.url;
   }
 
@@ -312,26 +325,36 @@ class ExternalServices {
   // Send Meta OAuth code to backend for processing
   async sendMetaAuthCode(code, state) {
     try {
-      const businessId = this.getBusinessId();
-      const locationId = this.getLocationId();
+      console.log('🔧 Sending Meta OAuth callback to backend');
+      console.log('  Code:', code.substring(0, 20) + '...');
       
-      // New format with businessId and locationId in path
-      const url = `${this.baseUrl}/credentials/meta/${encodeURIComponent(businessId)}/${encodeURIComponent(locationId)}`;
+      // Decode state to show what's being sent
+      try {
+        const stateData = JSON.parse(atob(state.replace(/-/g, '+').replace(/_/g, '/')));
+        console.log('  State decoded:', stateData);
+        console.log('  ⚠️  redirectUri in state:', stateData.redirectUri);
+        console.log('  ⚠️  This MUST match the URI used in the initial OAuth request!');
+      } catch (e) {
+        console.log('  State (raw):', state);
+      }
+            // Backend expects GET request with code and state as query parameters
+      const url = `${this.baseUrl}/external/meta/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
       
       const response = await fetch(url, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code, state })
+        }
       });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('❌ Backend returned error:', errorText);
         throw new Error(`Failed to process Meta authorization: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('✅ Meta authorization successful!', data);
       return { success: true, data };
     } catch (error) {
       console.error('Error sending Meta auth code to backend:', error);
